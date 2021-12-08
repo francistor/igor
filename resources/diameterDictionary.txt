@@ -1,0 +1,45 @@
+{
+    version: <value>
+    vendors: 
+    [
+        {vendorId: <value>, vendorName: <value>}
+    ],
+    avps:
+    [
+        {
+            vendorId: <value>,
+            attributes:
+            [
+                code: <>,
+                name: <>,
+                type: <>,
+                group: {<name>: {mandatory: <value>, minOccurs: <value>, maxOccurs: <value>}}
+                enumValues:
+                {
+                    <name>: <value>
+                } 
+            ]
+        }
+    ],
+    applications:
+    [
+        {
+            name: <value>,
+            code: <value>,
+            appType: <value>,
+            commands: 
+            [
+                code: <value>,
+                name: <value>,
+                request: 
+                [
+                    <name>: {mandatory: <value>, minOccurs: <value>, maxOccurs: <value>}
+                ],
+                response:
+                [
+                    <name>: {mandatory: <value>, minOccurs: <value>, maxOccurs: <value>}
+                ]
+            ]
+        }
+    ]
+}
