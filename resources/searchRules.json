@@ -1,0 +1,5 @@
+
+[
+    {"nameRegex": "Gx/(.*)", "base": "http://localhost:8099/diameterDictionary.json"},
+	{"nameRegex": "Gy/(.*)",  "base": "resources/diameterDictionary.json"}
+]

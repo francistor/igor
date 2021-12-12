@@ -1,10 +1,15 @@
 package diamdict
 
+/*
+Package diamdict impements helpers for reading and using the Diameter dictionary
+
+*/
+
 import (
 	"encoding/json"
 )
 
-// One for each Diamter Type
+// One for each Diamter AVP Type
 const (
 	None         = 0
 	OctetString  = 1
@@ -29,7 +34,7 @@ const (
 	IPv6Prefix  = 1003
 )
 
-// Helper class to pass vendorId and code for an avp in a single attribute
+// VendorId and code of AVP in a single attribute
 type AVPCode struct {
 	VendorId uint32
 	Code     uint32
@@ -47,14 +52,122 @@ type AVPDictItem struct {
 	VendorId     uint32 // 3 bytes required according to RFC 6733
 	Code         uint32 // 3 bytes required according to RFC 6733
 	Name         string
-	DiameterType int // One of the constants above
-	EnumValues   map[string]int
-	Group        map[string]GroupedProperties
+	DiameterType int                          // One of the constants above
+	values       map[string]int               // non nil only in enum type
+	codes        map[int]string               // non  nil only in enum type
+	Group        map[string]GroupedProperties // non nil only in grouped type
 }
 
-func AVPDictItemFromJ(v uint32, j jDiameterAVP) AVPDictItem {
+// Represents a Diameter Command
+type DiameterCommand struct {
+	Name     string
+	Code     uint32
+	Request  map[string]GroupedProperties
+	Response map[string]GroupedProperties
+}
+
+// Represents a Diameter Application
+type DiameterApplication struct {
+	Name     string
+	Code     uint32
+	AppType  string
+	Commands []DiameterCommand
+
+	CommandByName map[string]DiameterCommand
+
+	CommandByCode map[uint32]DiameterCommand
+}
+
+// Represents the full Diameter Dictionary
+type DiameterDict struct {
+	// Map of vendor id to vendor name
+	VendorById map[uint32]string
+
+	// Map of vendor name to vendor id
+	VendorByName map[string]uint32
+
+	// Map of avp code to name. Name is <vendorName>-<attributeName>
+	AVPByCode map[AVPCode]AVPDictItem
+
+	// Map of avp name to code
+	AVPByName map[string]AVPDictItem
+
+	// Map of app names
+	AppByName map[string]DiameterApplication
+
+	// Map of app codes
+	AppByCode map[uint32]DiameterApplication
+}
+
+// Returns a Diameter Dictionary object from its serialized representation
+func NewDictionaryFromJSON(data []byte) DiameterDict {
+
+	// Unmarshall from JSON
+	var jDict jDiameterDict
+	json.Unmarshal(data, &jDict)
+
+	// Build the dictionary
+	var dict DiameterDict
+
+	// Build the vendor maps
+	dict.VendorById = make(map[uint32]string)
+	dict.VendorByName = make(map[string]uint32)
+	for _, v := range jDict.Vendors {
+		dict.VendorById[v.VendorId] = v.VendorName
+		dict.VendorByName[v.VendorName] = v.VendorId
+	}
+
+	// Build the AVP maps
+	dict.AVPByCode = make(map[AVPCode]AVPDictItem)
+	dict.AVPByName = make(map[string]AVPDictItem)
+	for _, vendorAVPs := range jDict.Avps {
+		vendorId := vendorAVPs.VendorId
+		vendorName := dict.VendorById[vendorId]
+
+		// For a specific vendor
+		for _, attr := range vendorAVPs.Attributes {
+			avpDictItem := attr.toAVPDictItem(vendorId, vendorName)
+			dict.AVPByCode[AVPCode{vendorId, attr.Code}] = avpDictItem
+			dict.AVPByName[avpDictItem.Name] = avpDictItem
+		}
+	}
+
+	// Build the applications map
+	dict.AppByCode = make(map[uint32]DiameterApplication)
+	dict.AppByName = make(map[string]DiameterApplication)
+	for _, app := range jDict.Applications {
+		app.CommandByName = make(map[string]DiameterCommand)
+		app.CommandByCode = make(map[uint32]DiameterCommand)
+		for _, command := range app.Commands {
+			// Fill the commands map for the application
+			app.CommandByCode[command.Code] = command
+			app.CommandByName[command.Name] = command
+		}
+
+		// Fill the Applications map
+		dict.AppByCode[app.Code] = app
+		dict.AppByName[app.Name] = app
+	}
+
+	return dict
+}
+
+/*
+The following types are helpers for unserializing the JSON Diameter Dictionary
+*/
+
+// To Unmarshall Dictionary from Json
+type jDiameterAVP struct {
+	Code       uint32
+	Name       string
+	Type       string
+	EnumValues map[string]int
+	Group      map[string]GroupedProperties
+}
+
+func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
 	var diameterType int
-	switch j.Type {
+	switch javp.Type {
 	case "None":
 		diameterType = None
 	case "OctetString":
@@ -96,122 +209,31 @@ func AVPDictItemFromJ(v uint32, j jDiameterAVP) AVPDictItem {
 	case "IPv6Prefix":
 		diameterType = IPv6Prefix
 	default:
-		panic(j.Type + " is not a valid DiameterType")
+		panic(javp.Type + " is not a valid DiameterType")
+	}
+
+	var codes map[int]string
+	if javp.EnumValues != nil {
+		codes = make(map[int]string)
+		for enumName, enumValue := range javp.EnumValues {
+			codes[enumValue] = enumName
+		}
+	}
+
+	var namePrefix string
+	if vs != "" {
+		namePrefix = vs + "-"
 	}
 
 	return AVPDictItem{
 		VendorId:     v,
-		Code:         j.Code,
-		Name:         j.Name,
+		Code:         javp.Code,
+		Name:         namePrefix + javp.Name,
 		DiameterType: diameterType,
-		EnumValues:   j.EnumValues,
-		Group:        j.Group,
+		values:       javp.EnumValues,
+		codes:        codes,
+		Group:        javp.Group,
 	}
-}
-
-type DiameterCommand struct {
-	Name     string
-	Code     uint32
-	Request  map[string]GroupedProperties
-	Response map[string]GroupedProperties
-}
-
-type DiameterApplication struct {
-	Name     string
-	Code     uint32
-	AppType  string
-	Commands []DiameterCommand
-
-	CommandByName map[string]DiameterCommand
-
-	CommandByCode map[uint32]DiameterCommand
-}
-
-// Diameter Dictionary
-type DiameterDict struct {
-	// Map of vendor id to vendor name
-	VendorById map[uint32]string
-
-	// Map of vendor name to vendor id
-	VendorByName map[string]uint32
-
-	// Map of avp code to name. Name is <vendorName>-<attributeName>
-	AVPByCode map[AVPCode]AVPDictItem
-
-	// Map of avp name to code
-	AVPByName map[string]AVPDictItem
-
-	// Map of app names
-	AppByName map[string]DiameterApplication
-
-	// Map of app codes
-	AppByCode map[uint32]DiameterApplication
-}
-
-func NewDictionaryFromJSON(data []byte) DiameterDict {
-
-	// Unmarshall from JSON
-	var jDict JDiameterDict
-	json.Unmarshal(data, &jDict)
-
-	// Build the dictionary
-	var dict DiameterDict
-
-	// Build the vendor maps
-	dict.VendorById = make(map[uint32]string)
-	dict.VendorByName = make(map[string]uint32)
-	for _, v := range jDict.Vendors {
-		dict.VendorById[v.VendorId] = v.VendorName
-		dict.VendorByName[v.VendorName] = v.VendorId
-	}
-
-	// Build the AVP maps
-	dict.AVPByCode = make(map[AVPCode]AVPDictItem)
-	dict.AVPByName = make(map[string]AVPDictItem)
-	for _, vendorAVPs := range jDict.Avps {
-		vendorId := vendorAVPs.VendorId
-
-		// AVP names for vendors other than 0 are prepended "vendorName-"
-		var namePrefix string
-		if vendorId != 0 {
-			namePrefix = dict.VendorById[vendorId] + "-"
-		}
-
-		// For a specific vendor
-		for _, attr := range vendorAVPs.Attributes {
-			avpDictItem := AVPDictItemFromJ(vendorId, attr)
-			dict.AVPByCode[AVPCode{vendorId, attr.Code}] = avpDictItem
-			dict.AVPByName[namePrefix+attr.Name] = avpDictItem
-		}
-	}
-
-	// Build the applications map
-	dict.AppByCode = make(map[uint32]DiameterApplication)
-	dict.AppByName = make(map[string]DiameterApplication)
-	for _, app := range jDict.Applications {
-		app.CommandByName = make(map[string]DiameterCommand)
-		app.CommandByCode = make(map[uint32]DiameterCommand)
-		for _, command := range app.Commands {
-			// Fill the commands map for the application
-			app.CommandByCode[command.Code] = command
-			app.CommandByName[command.Name] = command
-		}
-
-		// Fill the Applications map
-		dict.AppByCode[app.Code] = app
-		dict.AppByName[app.Name] = app
-	}
-
-	return dict
-}
-
-// To Unmarshall Dictionary from Json
-type jDiameterAVP struct {
-	Code       uint32
-	Name       string
-	Type       string
-	EnumValues map[string]int
-	Group      map[string]GroupedProperties
 }
 
 type jDiameterVendorAVPs struct {
@@ -219,7 +241,7 @@ type jDiameterVendorAVPs struct {
 	Attributes []jDiameterAVP
 }
 
-type JDiameterDict struct {
+type jDiameterDict struct {
 	Version int
 	Vendors []struct {
 		VendorId   uint32
