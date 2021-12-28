@@ -1,5 +1,6 @@
 
 [
-    {"nameRegex": "Gx/(.*)", "base": "http://localhost:8099/diameterDictionary.json"},
-	{"nameRegex": "Gy/(.*)",  "base": "resources/diameterDictionary.json"}
+    {"nameRegex": "(.*txt)",  "base": "http://localhost:8100/"},
+	{"nameRegex": "Gy/(.*)",  "base": "resources/"},
+    {"nameRegex": "(.*)",     "base": "resources/"}
 ]
