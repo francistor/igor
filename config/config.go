@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 
+	"igor/diamdict"
+
 	"go.uber.org/zap"
 )
 
@@ -34,13 +36,14 @@ type searchRules []searchRule
 // Type for config
 type ConfigManager struct {
 	InstanceName string
-	ObjectCache  sync.Map
+	objectCache  sync.Map
 	sRules       searchRules
-	InFlight     sync.Map
+	inFlight     sync.Map
 }
 
-// The singleton configuration
+// Singletons
 var Config ConfigManager
+var DDict diamdict.DiameterDict
 
 // Logging
 var sl *zap.SugaredLogger
@@ -54,7 +57,7 @@ func init() {
 	sl.Infow("Logger initialized")
 
 	Config = ConfigManager{
-		ObjectCache: sync.Map{},
+		objectCache: sync.Map{},
 	}
 }
 
@@ -85,6 +88,14 @@ func (c *ConfigManager) Init(bootstrapFile string, instanceName string) {
 			panic("Could not compile Search Rule Regex " + sr.NameRegex)
 		}
 	}
+
+	// Load dictionaries
+	diamDictJSON, err := Config.GetConfigObjectAsText("diameterDictionary.json")
+	if err != nil {
+		panic("Could not read diameterDictionary.json")
+	}
+
+	DDict = diamdict.NewDictionaryFromJSON([]byte(diamDictJSON))
 }
 
 // Returns the configuration object as a parsed Json
@@ -160,7 +171,7 @@ func ReadConfigObject(objectName string) (ConfigObject, error) {
 	// Iterate through Search Rules
 	var base string
 	var innerName string
-	for _, rule := range Config.sRules {
+	for _, rule := range Config.SRules {
 		matches := rule.Regex.FindStringSubmatch(objectName)
 		if matches != nil {
 			innerName = matches[1]
