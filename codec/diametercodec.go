@@ -1,44 +1,58 @@
-package codec
+package diamcodec
 
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
 	"igor/config"
 	"igor/diamdict"
+
+	"go.uber.org/zap"
 )
 
-var zeroTime, err = time.Parse("01/01/1900 00:00:00", "01/01/1900 00:00:00")
+// Logging
+var sl *zap.SugaredLogger
+
+func init() {
+	// Logging
+	logger, _ := zap.NewDevelopment()
+	sl = logger.Sugar()
+	sl.Infow("Logger initialized")
+}
+
+// Magical reference date is Mon Jan 2 15:04:05 MST 2006
+var zeroTime, _ = time.Parse("02/01/2006 15:04:05 UTC", "01/01/1900 00:00:00 UTC")
 
 type DiameterAVP struct {
-	Code     uint32
-	Flags    uint8
-	Len      uint32 // Only 24 bytes are relevant. Does not take into account 4 byte padding
-	PadLen   uint32 // Taking into account pad length
+	Code        uint32
+	IsMandatory bool
+	//Flags    uint8
 	VendorId uint32
 
-	Data        []byte
-	StringValue string
-	LongValue   int64
-	FloatValue  float64
-	DateValue   time.Time
-
-	Group []DiameterAVP
-
+	// Got from the dictionary
 	Name string
 
+	// Derived items
+	OctetsValue    []byte
+	StringValue    string
+	LongValue      int64
+	FloatValue     float64
+	DateValue      time.Time
+	IPAddressValue net.IP
+
+	// Embedded AVPs
+	Group []DiameterAVP
+
+	// Dictionary item
+	dictItem diamdict.AVPDictItem
+
 	// val dataOffset = if (isVendorSpecific) 12 else 8
-}
-
-func (avp *DiameterAVP) isVendorSpecific() bool {
-	return avp.Flags&0x80 > 0
-}
-
-func (avp *DiameterAVP) isMandatory() bool {
-	return avp.Flags&0x40 > 0
 }
 
 // Builds the string value for Grouped AVP. Works transparently for other types
@@ -61,11 +75,260 @@ func (avp *DiameterAVP) buildStringValue() string {
 	return avp.StringValue
 }
 
-func NewDiameterAVP(inputBytes []byte) DiameterAVP {
+func (avp *DiameterAVP) SetName(name string) *DiameterAVP {
+	avp.dictItem = config.DDict.GetFromName(name)
+	avp.Name = avp.dictItem.Name
+	avp.Code = avp.dictItem.Code
+	avp.VendorId = avp.dictItem.VendorId
+
+	return avp
+}
+
+func (avp *DiameterAVP) SetLongValue(value int64) *DiameterAVP {
+	avp.LongValue = value
+	avp.FloatValue = float64(value)
+	avp.StringValue = strconv.FormatInt(value, 10)
+
+	return avp
+}
+
+func (avp *DiameterAVP) SetStringValue(value string) *DiameterAVP {
+	avp.StringValue = value
+
+	switch avp.dictItem.DiameterType {
+
+	case diamdict.OctetString:
+		avp.OctetsValue, _ = hex.DecodeString(value)
+
+	case diamdict.Integer32:
+		avp.LongValue, _ = strconv.ParseInt(value, 10, 64)
+		avp.FloatValue, _ = strconv.ParseFloat(value, 64)
+
+	case diamdict.Integer64:
+		avp.LongValue, _ = strconv.ParseInt(value, 10, 64)
+		avp.FloatValue, _ = strconv.ParseFloat(value, 64)
+
+	case diamdict.Unsigned32:
+		avp.LongValue, _ = strconv.ParseInt(value, 10, 64)
+		avp.FloatValue, _ = strconv.ParseFloat(value, 64)
+
+	case diamdict.Unsigned64:
+		avp.LongValue, _ = strconv.ParseInt(value, 10, 64)
+		avp.FloatValue, _ = strconv.ParseFloat(value, 64)
+
+	case diamdict.Float32:
+		avp.FloatValue, _ = strconv.ParseFloat(value, 64)
+
+	case diamdict.Float64:
+		avp.FloatValue, _ = strconv.ParseFloat(value, 64)
+
+	case diamdict.Address:
+		avp.IPAddressValue = net.ParseIP(value)
+
+	case diamdict.Time:
+		var err error
+		avp.DateValue, err = time.Parse("02/01/2006T15:04:05", value)
+		if err != nil {
+			sl.Errorf("Bad AVP Time value: %s", value)
+		} else {
+			var dateDiff = avp.DateValue.Sub(zeroTime)
+			avp.LongValue = int64(dateDiff.Seconds())
+		}
+
+	case diamdict.UTF8String:
+
+	case diamdict.DiamIdent:
+
+	case diamdict.DiameterURI:
+
+	case diamdict.Enumerated:
+		lv, ok := avp.dictItem.EnumValues[value]
+		if ok {
+			avp.LongValue = int64(lv)
+		} else {
+			sl.Errorf("Bad AVP Enumeration value %s for attribute %s", value, avp.dictItem.Name)
+		}
+
+	case diamdict.IPFilterRule:
+
+	case diamdict.IPv4Address:
+		avp.IPAddressValue = net.ParseIP(value)
+		if avp.IPAddressValue == nil {
+			sl.Errorf("Bad AVP IPAddress value %s", value)
+		}
+
+	case diamdict.IPv6Address:
+		avp.IPAddressValue = net.ParseIP(value)
+		if avp.IPAddressValue == nil {
+			sl.Errorf("Bad AVP IPAddress value %s", value)
+		}
+
+	case diamdict.IPv6Prefix:
+
+	}
+
+	return avp
+}
+
+func (avp *DiameterAVP) SetBytesValue(value []byte) *DiameterAVP {
+
+	avp.OctetsValue = append(avp.OctetsValue, value...)
+	avp.StringValue = fmt.Sprintf("%x", value)
+
+	return avp
+}
+
+// AVP Header is
+//    code: 4 byte
+//    flags: 1 byte (vendor, mandatory, proxy)
+//    length: 3 byte
+//    vendorId: 0 / 4 byte
+//    data: rest of bytes
+
+// Includes the padding bytes
+func (avp *DiameterAVP) MarshalBinary() (data []byte, err error) {
+	var buffer = new(bytes.Buffer)
+
+	// Write Code
+	binary.Write(buffer, binary.BigEndian, avp.Code)
+
+	// Write Flags
+	var flags uint8
+	if avp.VendorId > 0 {
+		flags += 0x80
+	}
+	if avp.IsMandatory {
+		flags += 0x40
+	}
+	binary.Write(buffer, binary.BigEndian, flags)
+
+	// Write Len as 0. Will be overriden later
+	binary.Write(buffer, binary.BigEndian, uint8(0))
+	binary.Write(buffer, binary.BigEndian, uint16(0))
+	var avpDataSize = 0
+
+	// Write vendor Id
+	if avp.VendorId > 0 {
+		binary.Write(buffer, binary.BigEndian, avp.VendorId)
+	}
+
+	var initialLen = buffer.Len()
+	switch avp.dictItem.DiameterType {
+
+	case diamdict.OctetString:
+		binary.Write(buffer, binary.BigEndian, avp.OctetsValue)
+
+	case diamdict.Integer32:
+		binary.Write(buffer, binary.BigEndian, int32(avp.LongValue))
+
+	case diamdict.Integer64:
+		binary.Write(buffer, binary.BigEndian, int64(avp.LongValue))
+
+	case diamdict.Unsigned32:
+		binary.Write(buffer, binary.BigEndian, uint32(avp.LongValue))
+
+	case diamdict.Unsigned64:
+		binary.Write(buffer, binary.BigEndian, uint64(avp.LongValue))
+
+	case diamdict.Float32:
+		binary.Write(buffer, binary.BigEndian, float32(avp.FloatValue))
+
+	case diamdict.Float64:
+		binary.Write(buffer, binary.BigEndian, float64(avp.FloatValue))
+
+	case diamdict.Grouped:
+		for _, innerAVP := range avp.Group {
+			data, _ := innerAVP.MarshalBinary()
+			binary.Write(buffer, binary.BigEndian, data)
+		}
+
+	case diamdict.Address:
+		if avp.IPAddressValue.To4() == nil {
+			// Address Type
+			binary.Write(buffer, binary.BigEndian, int16(1))
+			binary.Write(buffer, binary.BigEndian, avp.IPAddressValue)
+		} else {
+			// Address Type
+			binary.Write(buffer, binary.BigEndian, int16(2))
+			binary.Write(buffer, binary.BigEndian, avp.IPAddressValue)
+		}
+
+	case diamdict.Time:
+		binary.Write(buffer, binary.BigEndian, uint32(avp.LongValue))
+
+	case diamdict.UTF8String:
+		binary.Write(buffer, binary.BigEndian, avp.StringValue)
+
+	case diamdict.DiamIdent:
+		binary.Write(buffer, binary.BigEndian, avp.StringValue)
+
+	case diamdict.DiameterURI:
+		binary.Write(buffer, binary.BigEndian, avp.StringValue)
+
+	case diamdict.Enumerated:
+		binary.Write(buffer, binary.BigEndian, int32(avp.LongValue))
+
+	case diamdict.IPFilterRule:
+		binary.Write(buffer, binary.BigEndian, avp.StringValue)
+
+	case diamdict.IPv4Address:
+		binary.Write(buffer, binary.BigEndian, avp.IPAddressValue)
+
+	case diamdict.IPv6Address:
+		binary.Write(buffer, binary.BigEndian, avp.IPAddressValue)
+
+	case diamdict.IPv6Prefix:
+		addrPrefix := strings.Split(avp.StringValue, "/")
+		if len(addrPrefix) == 2 {
+			prefix, err := strconv.ParseUint(addrPrefix[0], 10, 2)
+			ipv6 := net.ParseIP(addrPrefix[1])
+			if err == nil && ipv6 != nil {
+				// Prefix
+				binary.Write(buffer, binary.BigEndian, uint16(prefix))
+				// Address
+				binary.Write(buffer, binary.BigEndian, ipv6)
+			} else {
+				sl.Errorf("Bad IPv6 Prefix %s", avp.StringValue)
+			}
+		} else {
+			sl.Errorf("Bad IPv6 Prefix %s", avp.StringValue)
+		}
+	}
+	avpDataSize = buffer.Len() - initialLen
+
+	// Padding
+	var padSize = 0
+	if avpDataSize%4 != 0 {
+		padSize = 4 - (avpDataSize % 4)
+		padBytes := make([]byte, padSize)
+		binary.Write(buffer, binary.BigEndian, padBytes)
+	}
+
+	// Total length
+	var avpLen = padSize + avpDataSize + 8
+	if avp.VendorId > 0 {
+		avpLen += 4
+	}
+
+	b := buffer.Bytes()
+	b[5] = byte(avpLen / 65535)
+	binary.BigEndian.PutUint16(b, uint16(avpLen%65535))
+
+	return b, nil
+}
+
+// Returns the generated AVP and the bytes read
+func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32) {
 	var avp = DiameterAVP{}
 	var lenHigh uint16
 	var lenLow uint8
+	var len uint32    // Only 24 bytes are relevant. Does not take into account 4 byte padding
+	var padLen uint32 // Taking into account pad length
 	var dataLen uint32
+	var flags uint8
+	var avpBytes []byte
+
+	var isVendorSpecific bool
 
 	reader := bytes.NewReader(inputBytes)
 
@@ -75,9 +338,11 @@ func NewDiameterAVP(inputBytes []byte) DiameterAVP {
 	}
 
 	// Get Flags
-	if err := binary.Read(reader, binary.BigEndian, &avp.Flags); err != nil {
+	if err := binary.Read(reader, binary.BigEndian, &flags); err != nil {
 		panic("Bad AVP Header")
 	}
+	isVendorSpecific = flags&0x80 > 0
+	avp.IsMandatory = flags&0x40 > 0
 
 	// Get Len
 	if err := binary.Read(reader, binary.BigEndian, &lenHigh); err != nil {
@@ -87,40 +352,54 @@ func NewDiameterAVP(inputBytes []byte) DiameterAVP {
 		panic("Bad AVP Header")
 	}
 
-	avp.Len = uint32(lenHigh)*256 + uint32(lenLow)
-	if avp.Len%4 == 0 {
-		avp.PadLen = avp.Len
+	// The Len field contains the full size of the AVP, but not considering the padding
+	len = uint32(lenHigh)*256 + uint32(lenLow)
+	if len%4 == 0 {
+		padLen = len
 	} else {
-		avp.PadLen = avp.Len + 4 - (avp.Len % 4)
+		padLen = len + 4 - (len % 4)
 	}
 
-	// Get VendorId
-	if avp.isVendorSpecific() {
+	// Get VendorId and data length
+	// The size of the data is the size of the AVP minus size of the the headers, which is
+	// different depending on whether the attribute is vendor specific or not.
+
+	if isVendorSpecific {
 		if err := binary.Read(reader, binary.BigEndian, &avp.VendorId); err != nil {
 			panic("Bad AVP Header")
 		}
-		dataLen = avp.Len - 12
+		dataLen = len - 12
 	} else {
-		dataLen = avp.Len - 8
+		dataLen = len - 8
 	}
 
-	avp.Data = make([]byte, dataLen)
 	// Initialize to avoid nasty errors
 	avp.Group = make([]DiameterAVP, 0) // Will Grow as needed
 
+	// Get the relevant info from the dictionary
+	// If not in the dictionary, will get some defaults
+	avp.dictItem = config.DDict.GetFromCode(diamdict.AVPCode{VendorId: avp.VendorId, Code: avp.Code})
+	avp.Name = avp.dictItem.Name
+
+	// Read
+	avpBytes = append(avpBytes, inputBytes[len-dataLen:len]...)
+
 	// Parse according to type
-	avpDict := config.DDict.GetFromCode(diamdict.AVPCode{VendorId: avp.VendorId, Code: avp.Code})
-	avp.Name = avpDict.Name
-	copy(avp.Data, inputBytes[avp.Len-dataLen:avp.Len])
-	switch avpDict.DiameterType {
+	switch avp.dictItem.DiameterType {
 	// None
 	case diamdict.None:
+		avp.OctetsValue = append(avp.OctetsValue, avpBytes...)
+
+		// OctetString
+	case diamdict.OctetString:
+		avp.OctetsValue = append(avp.OctetsValue, avpBytes...)
+		avp.StringValue = fmt.Sprintf("%x", avpBytes)
 
 		// Int32
 	case diamdict.Integer32:
 		var value int32
 		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
-			panic("Bad AVP Header")
+			panic("Bad Integer32 AVP")
 		}
 		avp.LongValue = int64(value)
 		avp.FloatValue = float64(value)
@@ -130,7 +409,7 @@ func NewDiameterAVP(inputBytes []byte) DiameterAVP {
 	case diamdict.Integer64:
 		var value int64
 		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
-			panic("Bad AVP Header")
+			panic("Bad Integer64 AVP")
 		}
 		avp.LongValue = value
 		avp.FloatValue = float64(value)
@@ -140,7 +419,7 @@ func NewDiameterAVP(inputBytes []byte) DiameterAVP {
 	case diamdict.Unsigned32:
 		var value uint32
 		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
-			panic("Bad AVP Header")
+			panic("Bad Unsigned32 AVP")
 		}
 		avp.LongValue = int64(value)
 		avp.FloatValue = float64(value)
@@ -150,7 +429,7 @@ func NewDiameterAVP(inputBytes []byte) DiameterAVP {
 	case diamdict.Unsigned64:
 		var value uint64
 		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
-			panic("Bad AVP Header")
+			panic("Bad Unsigned64 AVP")
 		}
 		avp.LongValue = int64(value)
 		avp.FloatValue = float64(value)
@@ -160,7 +439,7 @@ func NewDiameterAVP(inputBytes []byte) DiameterAVP {
 	case diamdict.Float32:
 		var value float32
 		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
-			panic("Bad AVP Header")
+			panic("Bad Flota32 AVP")
 		}
 		avp.LongValue = int64(value)
 		avp.FloatValue = float64(value)
@@ -170,35 +449,130 @@ func NewDiameterAVP(inputBytes []byte) DiameterAVP {
 	case diamdict.Float64:
 		var value float64
 		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
-			panic("Bad AVP Header")
+			panic("Bad Float64 AVP")
 		}
 		avp.LongValue = int64(value)
 		avp.FloatValue = float64(value)
 		avp.StringValue = fmt.Sprint(avp.Code)
 
+		// Grouped
 	case diamdict.Grouped:
-		currentIndex := avp.Len - dataLen
-		for currentIndex < avp.PadLen {
-			nextAVP := NewDiameterAVP(inputBytes[currentIndex:])
+		currentIndex := len - dataLen
+		for currentIndex < padLen {
+			nextAVP, bytesRead := DiameterAVPFromBytes(inputBytes[currentIndex:])
 			avp.Group = append(avp.Group, nextAVP)
-			currentIndex += nextAVP.PadLen
+			currentIndex += bytesRead
 		}
-		avp.LongValue = -1
-		avp.FloatValue = -1
 		avp.StringValue = avp.buildStringValue()
 
+		// Address
+		// Two bytes for address type, and 4 /16 bytes for address
+	case diamdict.Address:
+		var addrType uint16
+		if err := binary.Read(reader, binary.BigEndian, &addrType); err != nil {
+			panic("Bad Address Type")
+		}
+		if addrType == 1 {
+			var ipv4Addr [4]byte
+			// IPv4
+			if err := binary.Read(reader, binary.BigEndian, &ipv4Addr); err != nil {
+				panic("Bad IPv4 Address AVP")
+			}
+			avp.IPAddressValue = net.IP(ipv4Addr[:])
+		} else {
+			// IPv6
+			var ipv6Addr [16]byte
+			if err := binary.Read(reader, binary.BigEndian, &ipv6Addr); err != nil {
+				panic("Bad IPv6 Address AVP")
+			}
+			avp.IPAddressValue = net.IP(ipv6Addr[:])
+		}
+
+		avp.StringValue = avp.IPAddressValue.String()
+
+		// Time
 	case diamdict.Time:
 		var value uint32
 		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
-			panic("Bad AVP Header")
+			panic("Bad Time AVP")
 		}
 		avp.LongValue = int64(value)
 		avp.FloatValue = float64(value)
 		avp.DateValue = zeroTime.Add(time.Second * time.Duration(value))
 		// Magical reference date is Mon Jan 2 15:04:05 MST 2006
-		avp.StringValue = avp.DateValue.Format("2006-02-01'T'15:04:05")
+		avp.StringValue = avp.DateValue.Format("2006-02-01'T'15:04:05 UTC")
 
+		// UTF8 String
+	case diamdict.UTF8String:
+		value := make([]byte, dataLen)
+		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
+			panic("Bad String AVP")
+		}
+		avp.StringValue = string(value)
+		avp.LongValue, _ = strconv.ParseInt(avp.StringValue, 10, 64)
+
+		// Diameter Identity
+		// Just a string
+	case diamdict.DiamIdent:
+		value := make([]byte, dataLen)
+		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
+			panic("Bad DiamIdent AVP")
+		}
+		avp.StringValue = string(value)
+
+		// Diameter URI
+		// Just a string
+	case diamdict.DiameterURI:
+		value := make([]byte, dataLen)
+		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
+			panic("Bad DiameterURI AVP")
+		}
+		avp.StringValue = string(value)
+
+	case diamdict.Enumerated:
+		var value int32
+		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
+			panic("Bad AVP Header")
+		}
+		avp.LongValue = int64(value)
+		avp.StringValue = avp.dictItem.EnumCodes[int(value)]
+
+		// IPFilterRule
+		// Just a string
+	case diamdict.IPFilterRule:
+		value := make([]byte, dataLen)
+		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
+			panic("Bad IP Filter Rule AVP")
+		}
+		avp.StringValue = string(value)
+
+	case diamdict.IPv4Address:
+		avp.IPAddressValue = net.IP(avpBytes)
+		avp.StringValue = avp.IPAddressValue.String()
+
+	case diamdict.IPv6Address:
+		avp.IPAddressValue = net.IP(avpBytes)
+		avp.StringValue = avp.IPAddressValue.String()
+
+		// First byte is ignored
+		// Second byte is prefix size
+		// Rest is an IPv6 Address
+	case diamdict.IPv6Prefix:
+		var dummy byte
+		var prefixLen byte
+		address := make([]byte, 16)
+		if err := binary.Read(reader, binary.BigEndian, &dummy); err != nil {
+			panic("Bad IPV6Prefix")
+		}
+		if err := binary.Read(reader, binary.BigEndian, &prefixLen); err != nil {
+			panic("Bad IPV6Prefix")
+		}
+		if err := binary.Read(reader, binary.BigEndian, &address); err != nil {
+			panic("Bad IPV6Prefix")
+		}
+		avp.IPAddressValue = net.IP(address)
+		avp.StringValue = avp.IPAddressValue.String() + "/" + string(prefixLen)
 	}
 
-	return avp
+	return avp, padLen
 }

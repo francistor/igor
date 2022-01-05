@@ -7,7 +7,6 @@ Package diamdict impements helpers for reading and using the Diameter dictionary
 
 import (
 	"encoding/json"
-	"errors"
 )
 
 // One for each Diamter AVP Type
@@ -54,8 +53,8 @@ type AVPDictItem struct {
 	Code         uint32 // 3 bytes required according to RFC 6733
 	Name         string
 	DiameterType int                          // One of the constants above
-	values       map[string]int               // non nil only in enum type
-	codes        map[int]string               // non  nil only in enum type
+	EnumValues   map[string]int               // non nil only in enum type
+	EnumCodes    map[int]string               // non  nil only in enum type
 	Group        map[string]GroupedProperties // non nil only in grouped type
 }
 
@@ -108,13 +107,12 @@ func (dd *DiameterDict) GetFromCode(code AVPCode) AVPDictItem {
 	return di
 }
 
-func (dd *DiameterDict) GetFromName(name string) (AVPDictItem, error) {
+func (dd *DiameterDict) GetFromName(name string) AVPDictItem {
 	di, ok := dd.AVPByName[name]
-	if ok {
-		return di, nil
-	} else {
-		return AVPDictItem{}, errors.New("Attribute not found: " + name)
+	if !ok {
+		di.Name = "UNKNOWN"
 	}
+	return di
 }
 
 // Returns a Diameter Dictionary object from its serialized representation
@@ -230,7 +228,11 @@ func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
 		panic(javp.Type + " is not a valid DiameterType")
 	}
 
-	var codes map[int]string
+	// Initialize maps
+	if javp.EnumValues == nil {
+		javp.EnumValues = make(map[string]int, 0)
+	}
+	codes := make(map[int]string, 0)
 	if javp.EnumValues != nil {
 		codes = make(map[int]string)
 		for enumName, enumValue := range javp.EnumValues {
@@ -248,8 +250,8 @@ func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
 		Code:         javp.Code,
 		Name:         namePrefix + javp.Name,
 		DiameterType: diameterType,
-		values:       javp.EnumValues,
-		codes:        codes,
+		EnumValues:   javp.EnumValues,
+		EnumCodes:    codes,
 		Group:        javp.Group,
 	}
 }

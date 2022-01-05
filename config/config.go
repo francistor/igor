@@ -122,7 +122,7 @@ func (c *ConfigManager) GetConfigObjectAsText(objectName string) (string, error)
 // and caches it if not found
 func (c *ConfigManager) GetConfigObject(objectName string) (ConfigObject, error) {
 	// Try cache
-	obj, found := Config.ObjectCache.Load(objectName)
+	obj, found := Config.objectCache.Load(objectName)
 	if found {
 		return obj.(ConfigObject), nil
 	}
@@ -133,7 +133,7 @@ func (c *ConfigManager) GetConfigObject(objectName string) (ConfigObject, error)
 	// once to the map, the others will retrieve the once already pushed. The executing
 	// once will delete the entry from the Inflight map
 	var once sync.Once
-	var flightOncePtr, _ = Config.InFlight.LoadOrStore(objectName, &once)
+	var flightOncePtr, _ = Config.inFlight.LoadOrStore(objectName, &once)
 
 	// Once function
 	var retriever = func() {
@@ -141,16 +141,16 @@ func (c *ConfigManager) GetConfigObject(objectName string) (ConfigObject, error)
 		if err != nil {
 			sl.Errorw("Could not read config object", "name", objectName, "error", err)
 		} else {
-			Config.ObjectCache.Store(objectName, obj)
+			Config.objectCache.Store(objectName, obj)
 		}
-		Config.InFlight.Delete(objectName)
+		Config.inFlight.Delete(objectName)
 	}
 
 	// goroutines will block here until object retreived or failed
 	flightOncePtr.(*sync.Once).Do(retriever)
 
 	// Try again
-	obj, found = Config.ObjectCache.Load(objectName)
+	obj, found = Config.objectCache.Load(objectName)
 	if found {
 		return obj.(ConfigObject), nil
 	} else {
@@ -160,7 +160,7 @@ func (c *ConfigManager) GetConfigObject(objectName string) (ConfigObject, error)
 
 // Removes a ConfigObject from the cache
 func (c *ConfigManager) InvalidateConfigObject(objectName string) {
-	c.ObjectCache.Delete(objectName)
+	c.objectCache.Delete(objectName)
 }
 
 // Finds the remote from the SearchRules and reads the object
@@ -171,7 +171,7 @@ func ReadConfigObject(objectName string) (ConfigObject, error) {
 	// Iterate through Search Rules
 	var base string
 	var innerName string
-	for _, rule := range Config.SRules {
+	for _, rule := range Config.sRules {
 		matches := rule.Regex.FindStringSubmatch(objectName)
 		if matches != nil {
 			innerName = matches[1]
