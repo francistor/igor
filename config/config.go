@@ -1,6 +1,9 @@
 package config
 
-// Set IGOR_CONFIG_BASE to the absolute location of the resource directory (finidhing in slash)
+// Set IGOR_CONFIG_BASE environment variable to the absolute location of the resource directory (finishing in slash)
+// otherwise, file resources will be looked up in the executing directory
+
+// The configuration must be inited once at application startup, invoking Config.Init()
 
 import (
 	"encoding/json"

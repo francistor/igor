@@ -50,7 +50,7 @@ type DiameterAVP struct {
 	Group []DiameterAVP
 
 	// Dictionary item
-	dictItem diamdict.AVPDictItem
+	DictItem diamdict.AVPDictItem
 
 	// val dataOffset = if (isVendorSpecific) 12 else 8
 }
@@ -76,10 +76,10 @@ func (avp *DiameterAVP) buildStringValue() string {
 }
 
 func (avp *DiameterAVP) SetName(name string) *DiameterAVP {
-	avp.dictItem = config.DDict.GetFromName(name)
-	avp.Name = avp.dictItem.Name
-	avp.Code = avp.dictItem.Code
-	avp.VendorId = avp.dictItem.VendorId
+	avp.DictItem = config.DDict.GetFromName(name)
+	avp.Name = avp.DictItem.Name
+	avp.Code = avp.DictItem.Code
+	avp.VendorId = avp.DictItem.VendorId
 
 	return avp
 }
@@ -95,7 +95,7 @@ func (avp *DiameterAVP) SetLongValue(value int64) *DiameterAVP {
 func (avp *DiameterAVP) SetStringValue(value string) *DiameterAVP {
 	avp.StringValue = value
 
-	switch avp.dictItem.DiameterType {
+	switch avp.DictItem.DiameterType {
 
 	case diamdict.OctetString:
 		avp.OctetsValue, _ = hex.DecodeString(value)
@@ -142,11 +142,11 @@ func (avp *DiameterAVP) SetStringValue(value string) *DiameterAVP {
 	case diamdict.DiameterURI:
 
 	case diamdict.Enumerated:
-		lv, ok := avp.dictItem.EnumValues[value]
+		lv, ok := avp.DictItem.EnumValues[value]
 		if ok {
 			avp.LongValue = int64(lv)
 		} else {
-			sl.Errorf("Bad AVP Enumeration value %s for attribute %s", value, avp.dictItem.Name)
+			sl.Errorf("Bad AVP Enumeration value %s for attribute %s", value, avp.DictItem.Name)
 		}
 
 	case diamdict.IPFilterRule:
@@ -170,12 +170,24 @@ func (avp *DiameterAVP) SetStringValue(value string) *DiameterAVP {
 	return avp
 }
 
-func (avp *DiameterAVP) SetBytesValue(value []byte) *DiameterAVP {
+func (avp *DiameterAVP) SetOctetsValue(value []byte) *DiameterAVP {
 
 	avp.OctetsValue = append(avp.OctetsValue, value...)
 	avp.StringValue = fmt.Sprintf("%x", value)
 
 	return avp
+}
+
+func DiameterStringAVP(name string, value string) DiameterAVP {
+	return *new(DiameterAVP).SetName(name).SetStringValue(value)
+}
+
+func DiameterLongAVP(name string, value int64) DiameterAVP {
+	return *new(DiameterAVP).SetName(name).SetLongValue(value)
+}
+
+func DiameterOctetsAVP(name string, value []byte) DiameterAVP {
+	return *new(DiameterAVP).SetName(name).SetOctetsValue(value)
 }
 
 // AVP Header is
@@ -187,6 +199,11 @@ func (avp *DiameterAVP) SetBytesValue(value []byte) *DiameterAVP {
 
 // Includes the padding bytes
 func (avp *DiameterAVP) MarshalBinary() (data []byte, err error) {
+
+	if avp.DictItem.Code == 0 {
+		return nil, fmt.Errorf("%s not found in dictionary", avp.Name)
+	}
+
 	var buffer = new(bytes.Buffer)
 
 	// Write Code
@@ -213,7 +230,8 @@ func (avp *DiameterAVP) MarshalBinary() (data []byte, err error) {
 	}
 
 	var initialLen = buffer.Len()
-	switch avp.dictItem.DiameterType {
+
+	switch avp.DictItem.DiameterType {
 
 	case diamdict.OctetString:
 		binary.Write(buffer, binary.BigEndian, avp.OctetsValue)
@@ -257,19 +275,19 @@ func (avp *DiameterAVP) MarshalBinary() (data []byte, err error) {
 		binary.Write(buffer, binary.BigEndian, uint32(avp.LongValue))
 
 	case diamdict.UTF8String:
-		binary.Write(buffer, binary.BigEndian, avp.StringValue)
+		binary.Write(buffer, binary.BigEndian, []byte(avp.StringValue))
 
 	case diamdict.DiamIdent:
-		binary.Write(buffer, binary.BigEndian, avp.StringValue)
+		binary.Write(buffer, binary.BigEndian, []byte(avp.StringValue))
 
 	case diamdict.DiameterURI:
-		binary.Write(buffer, binary.BigEndian, avp.StringValue)
+		binary.Write(buffer, binary.BigEndian, []byte(avp.StringValue))
 
 	case diamdict.Enumerated:
 		binary.Write(buffer, binary.BigEndian, int32(avp.LongValue))
 
 	case diamdict.IPFilterRule:
-		binary.Write(buffer, binary.BigEndian, avp.StringValue)
+		binary.Write(buffer, binary.BigEndian, []byte(avp.StringValue))
 
 	case diamdict.IPv4Address:
 		binary.Write(buffer, binary.BigEndian, avp.IPAddressValue)
@@ -311,17 +329,19 @@ func (avp *DiameterAVP) MarshalBinary() (data []byte, err error) {
 	}
 
 	b := buffer.Bytes()
-	b[5] = byte(avpLen / 65535)
-	binary.BigEndian.PutUint16(b, uint16(avpLen%65535))
+	b[5] = byte((avpLen - padSize) / 65535)
+	binary.BigEndian.PutUint16(b[6:8], uint16((avpLen-padSize)%65535))
 
 	return b, nil
 }
 
 // Returns the generated AVP and the bytes read
+// TODO: If error, the bytes read will be zero. This is a non-recoverable error
+// and the application should re-start
 func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32) {
 	var avp = DiameterAVP{}
-	var lenHigh uint16
-	var lenLow uint8
+	var lenHigh uint8
+	var lenLow uint16
 	var len uint32    // Only 24 bytes are relevant. Does not take into account 4 byte padding
 	var padLen uint32 // Taking into account pad length
 	var dataLen uint32
@@ -353,7 +373,7 @@ func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32) {
 	}
 
 	// The Len field contains the full size of the AVP, but not considering the padding
-	len = uint32(lenHigh)*256 + uint32(lenLow)
+	len = uint32(lenHigh)*65535 + uint32(lenLow)
 	if len%4 == 0 {
 		padLen = len
 	} else {
@@ -378,14 +398,14 @@ func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32) {
 
 	// Get the relevant info from the dictionary
 	// If not in the dictionary, will get some defaults
-	avp.dictItem = config.DDict.GetFromCode(diamdict.AVPCode{VendorId: avp.VendorId, Code: avp.Code})
-	avp.Name = avp.dictItem.Name
+	avp.DictItem = config.DDict.GetFromCode(diamdict.AVPCode{VendorId: avp.VendorId, Code: avp.Code})
+	avp.Name = avp.DictItem.Name
 
 	// Read
 	avpBytes = append(avpBytes, inputBytes[len-dataLen:len]...)
 
 	// Parse according to type
-	switch avp.dictItem.DiameterType {
+	switch avp.DictItem.DiameterType {
 	// None
 	case diamdict.None:
 		avp.OctetsValue = append(avp.OctetsValue, avpBytes...)
@@ -403,7 +423,7 @@ func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32) {
 		}
 		avp.LongValue = int64(value)
 		avp.FloatValue = float64(value)
-		avp.StringValue = fmt.Sprint(avp.Code)
+		avp.StringValue = fmt.Sprint(value)
 
 		// Int64
 	case diamdict.Integer64:
@@ -413,7 +433,7 @@ func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32) {
 		}
 		avp.LongValue = value
 		avp.FloatValue = float64(value)
-		avp.StringValue = fmt.Sprint(avp.Code)
+		avp.StringValue = fmt.Sprint(value)
 
 		// UInt32
 	case diamdict.Unsigned32:
@@ -423,7 +443,7 @@ func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32) {
 		}
 		avp.LongValue = int64(value)
 		avp.FloatValue = float64(value)
-		avp.StringValue = fmt.Sprint(avp.Code)
+		avp.StringValue = fmt.Sprint(value)
 
 		// UInt64
 	case diamdict.Unsigned64:
@@ -433,7 +453,7 @@ func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32) {
 		}
 		avp.LongValue = int64(value)
 		avp.FloatValue = float64(value)
-		avp.StringValue = fmt.Sprint(avp.Code)
+		avp.StringValue = fmt.Sprint(value)
 
 		// Float32
 	case diamdict.Float32:
@@ -443,7 +463,7 @@ func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32) {
 		}
 		avp.LongValue = int64(value)
 		avp.FloatValue = float64(value)
-		avp.StringValue = fmt.Sprint(avp.Code)
+		avp.StringValue = fmt.Sprint(value)
 
 		// Float64
 	case diamdict.Float64:
@@ -453,7 +473,7 @@ func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32) {
 		}
 		avp.LongValue = int64(value)
 		avp.FloatValue = float64(value)
-		avp.StringValue = fmt.Sprint(avp.Code)
+		avp.StringValue = fmt.Sprint(value)
 
 		// Grouped
 	case diamdict.Grouped:
@@ -535,7 +555,7 @@ func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32) {
 			panic("Bad AVP Header")
 		}
 		avp.LongValue = int64(value)
-		avp.StringValue = avp.dictItem.EnumCodes[int(value)]
+		avp.StringValue = avp.DictItem.EnumCodes[int(value)]
 
 		// IPFilterRule
 		// Just a string
