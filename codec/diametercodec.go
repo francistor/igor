@@ -75,24 +75,57 @@ func (avp *DiameterAVP) buildStringValue() string {
 	return avp.StringValue
 }
 
-func (avp *DiameterAVP) SetName(name string) *DiameterAVP {
+func (avp *DiameterAVP) SetName(name string) (*DiameterAVP, error) {
 	avp.DictItem = config.DDict.GetFromName(name)
+	if avp.DictItem.Name == "" {
+		return nil, fmt.Errorf("%s not found in diameter dictionary", name)
+	}
 	avp.Name = avp.DictItem.Name
 	avp.Code = avp.DictItem.Code
 	avp.VendorId = avp.DictItem.VendorId
 
-	return avp
+	return avp, nil
 }
 
-func (avp *DiameterAVP) SetLongValue(value int64) *DiameterAVP {
-	avp.LongValue = value
-	avp.FloatValue = float64(value)
-	avp.StringValue = strconv.FormatInt(value, 10)
+func (avp *DiameterAVP) SetLongValue(value int64) (*DiameterAVP, error) {
 
-	return avp
+	var t int = avp.DictItem.DiameterType
+	if t == diamdict.Integer32 ||
+		t == diamdict.Integer64 ||
+		t == diamdict.Unsigned32 ||
+		t == diamdict.Unsigned64 ||
+		t == diamdict.Float32 ||
+		t == diamdict.Float64 {
+
+		avp.LongValue = value
+		avp.FloatValue = float64(value)
+		avp.StringValue = strconv.FormatInt(value, 10)
+	} else if t == diamdict.Enumerated {
+		avp.LongValue = value
+		avp.StringValue = avp.DictItem.EnumCodes[int(value)]
+	} else {
+		return nil, fmt.Errorf("%s is not of numeric type", avp.Name)
+	}
+
+	return avp, nil
 }
 
-func (avp *DiameterAVP) SetStringValue(value string) *DiameterAVP {
+func (avp *DiameterAVP) SetFloatValue(value float64) (*DiameterAVP, error) {
+
+	var t int = avp.DictItem.DiameterType
+	if t == diamdict.Float32 ||
+		t == diamdict.Float64 {
+
+		avp.FloatValue = value
+		avp.StringValue = fmt.Sprint(value)
+
+		return avp, nil
+	} else {
+		return nil, fmt.Errorf("%s is not of float type", avp.Name)
+	}
+}
+
+func (avp *DiameterAVP) SetStringValue(value string) (*DiameterAVP, error) {
 	avp.StringValue = value
 
 	switch avp.DictItem.DiameterType {
@@ -121,6 +154,9 @@ func (avp *DiameterAVP) SetStringValue(value string) *DiameterAVP {
 
 	case diamdict.Float64:
 		avp.FloatValue, _ = strconv.ParseFloat(value, 64)
+
+	case diamdict.Grouped:
+		return nil, fmt.Errorf("%s is of grouped type and cannot have a single string value", avp.DictItem.Name)
 
 	case diamdict.Address:
 		avp.IPAddressValue = net.ParseIP(value)
@@ -167,27 +203,59 @@ func (avp *DiameterAVP) SetStringValue(value string) *DiameterAVP {
 
 	}
 
-	return avp
+	return avp, nil
 }
 
-func (avp *DiameterAVP) SetOctetsValue(value []byte) *DiameterAVP {
+func (avp *DiameterAVP) SetOctetsValue(value []byte) (*DiameterAVP, error) {
 
-	avp.OctetsValue = append(avp.OctetsValue, value...)
-	avp.StringValue = fmt.Sprintf("%x", value)
+	if avp.DictItem.DiameterType == diamdict.OctetString {
+		avp.OctetsValue = append(avp.OctetsValue, value...)
+		avp.StringValue = fmt.Sprintf("%x", value)
+		return avp, nil
+	} else {
+		return nil, fmt.Errorf("%s is not of type OctetString", avp.DictItem.Name)
+	}
 
-	return avp
 }
 
-func DiameterStringAVP(name string, value string) DiameterAVP {
-	return *new(DiameterAVP).SetName(name).SetStringValue(value)
+func DiameterStringAVP(name string, value string) (*DiameterAVP, error) {
+	var d = new(DiameterAVP)
+	d, err := d.SetName(name)
+	if err != nil {
+		return d, err
+	} else {
+		return d.SetStringValue(value)
+	}
 }
 
-func DiameterLongAVP(name string, value int64) DiameterAVP {
-	return *new(DiameterAVP).SetName(name).SetLongValue(value)
+func DiameterLongAVP(name string, value int64) (*DiameterAVP, error) {
+	var d = new(DiameterAVP)
+	d, err := d.SetName(name)
+	if err != nil {
+		return d, err
+	} else {
+		return d.SetLongValue(value)
+	}
 }
 
-func DiameterOctetsAVP(name string, value []byte) DiameterAVP {
-	return *new(DiameterAVP).SetName(name).SetOctetsValue(value)
+func DiameterFloatAVP(name string, value float64) (*DiameterAVP, error) {
+	var d = new(DiameterAVP)
+	d, err := d.SetName(name)
+	if err != nil {
+		return d, err
+	} else {
+		return d.SetFloatValue(value)
+	}
+}
+
+func DiameterOctetsAVP(name string, value []byte) (*DiameterAVP, error) {
+	var d = new(DiameterAVP)
+	d, err := d.SetName(name)
+	if err != nil {
+		return d, err
+	} else {
+		return d.SetOctetsValue(value)
+	}
 }
 
 // AVP Header is
@@ -446,6 +514,7 @@ func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32) {
 		avp.StringValue = fmt.Sprint(value)
 
 		// UInt64
+		// Stored internally as an int64. This is a limitation!
 	case diamdict.Unsigned64:
 		var value uint64
 		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
