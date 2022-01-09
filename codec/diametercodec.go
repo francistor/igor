@@ -125,6 +125,37 @@ func (avp *DiameterAVP) SetFloatValue(value float64) (*DiameterAVP, error) {
 	}
 }
 
+func (avp *DiameterAVP) SetAddressValue(value net.IP) (*DiameterAVP, error) {
+
+	switch avp.DictItem.DiameterType {
+	case diamdict.Address:
+		avp.IPAddressValue = value
+		avp.StringValue = value.String()
+		return avp, nil
+
+	case diamdict.IPv4Address:
+		if value.To4() != nil {
+			avp.IPAddressValue = value
+			avp.StringValue = value.String()
+			return avp, nil
+		} else {
+			return nil, fmt.Errorf("%s is not of type IPv4 Address", avp.Name)
+		}
+
+	case diamdict.IPv6Address:
+		if value.To16() != nil {
+			avp.IPAddressValue = value
+			avp.StringValue = value.String()
+			return avp, nil
+		} else {
+			return nil, fmt.Errorf("%s is not of type IPv6 Address", avp.Name)
+		}
+	}
+
+	return nil, fmt.Errorf("%s is not of address type", avp.Name)
+
+}
+
 func (avp *DiameterAVP) SetStringValue(value string) (*DiameterAVP, error) {
 	avp.StringValue = value
 
@@ -163,7 +194,7 @@ func (avp *DiameterAVP) SetStringValue(value string) (*DiameterAVP, error) {
 
 	case diamdict.Time:
 		var err error
-		avp.DateValue, err = time.Parse("02/01/2006T15:04:05", value)
+		avp.DateValue, err = time.Parse("2006-01-02T15:04:05", value)
 		if err != nil {
 			sl.Errorf("Bad AVP Time value: %s", value)
 		} else {
@@ -258,6 +289,16 @@ func DiameterOctetsAVP(name string, value []byte) (*DiameterAVP, error) {
 	}
 }
 
+func DiameterIPAddressAVP(name string, value net.IP) (*DiameterAVP, error) {
+	var d = new(DiameterAVP)
+	d, err := d.SetName(name)
+	if err != nil {
+		return d, err
+	} else {
+		return d.SetAddressValue(value)
+	}
+}
+
 // AVP Header is
 //    code: 4 byte
 //    flags: 1 byte (vendor, mandatory, proxy)
@@ -329,14 +370,14 @@ func (avp *DiameterAVP) MarshalBinary() (data []byte, err error) {
 		}
 
 	case diamdict.Address:
-		if avp.IPAddressValue.To4() == nil {
+		if avp.IPAddressValue.To4() != nil {
 			// Address Type
 			binary.Write(buffer, binary.BigEndian, int16(1))
-			binary.Write(buffer, binary.BigEndian, avp.IPAddressValue)
+			binary.Write(buffer, binary.BigEndian, avp.IPAddressValue.To4())
 		} else {
 			// Address Type
 			binary.Write(buffer, binary.BigEndian, int16(2))
-			binary.Write(buffer, binary.BigEndian, avp.IPAddressValue)
+			binary.Write(buffer, binary.BigEndian, avp.IPAddressValue.To16())
 		}
 
 	case diamdict.Time:

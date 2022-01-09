@@ -3,8 +3,10 @@ package diamcodec
 import (
 	"fmt"
 	"igor/config"
+	"net"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestMain(m *testing.M) {
@@ -47,7 +49,7 @@ func TestOctetsAVP(t *testing.T) {
 
 func TestUTF8StringAVP(t *testing.T) {
 
-	var theString = "'this-is_the string!"
+	var theString = "%Hola España. 'Quiero €"
 
 	// Create avp
 	avp, err := DiameterStringAVP("User-Name", theString)
@@ -231,5 +233,185 @@ func TestFloat64AVP(t *testing.T) {
 	}
 	if newavp.FloatValue != float64(theFloat) {
 		t.Errorf("Float64 AVP not properly encoded after unmarshalling (long value). Got %f", newavp.FloatValue)
+	}
+}
+
+func TestAddressAVP(t *testing.T) {
+
+	var ipv4Address = "1.2.3.4"
+	var ipv6Address = "bebe:cafe::0"
+
+	// Using strings as values
+
+	// IPv4
+	// Create avp
+	avp, err := DiameterStringAVP("francisco.cardosogil@gmail.com-myAddress", ipv4Address)
+	if err != nil {
+		t.Errorf("error creating IPv4 Address AVP %v", err)
+	}
+	if avp.IPAddressValue.String() != net.ParseIP(ipv4Address).String() {
+		t.Errorf("IPv4 AVP does not match value")
+	}
+
+	// Serialize and unserialize
+	data, _ := avp.MarshalBinary()
+	newavp, _ := DiameterAVPFromBytes(data)
+	if newavp.IPAddressValue.String() != net.ParseIP(ipv4Address).String() {
+		t.Errorf("IPv4 AVP not properly encoded after unmarshalling (string value). Got %s %s", newavp.IPAddressValue.String(), net.ParseIP(ipv4Address).String())
+	}
+
+	// IPv6
+	// Create avp
+	avp, err = DiameterStringAVP("francisco.cardosogil@gmail.com-myAddress", ipv6Address)
+	if err != nil {
+		t.Errorf("error creating IPv6 Address AVP %v", err)
+	}
+	if avp.IPAddressValue.String() != net.ParseIP(ipv6Address).String() {
+		t.Errorf("IPv6 AVP does not match value")
+	}
+
+	// Serialize and unserialize
+	data, _ = avp.MarshalBinary()
+	newavp, _ = DiameterAVPFromBytes(data)
+	if newavp.IPAddressValue.String() != net.ParseIP(ipv6Address).String() {
+		t.Errorf("IPv6 AVP not properly encoded after unmarshalling (string value). Got %s %s", newavp.IPAddressValue.String(), net.ParseIP(ipv6Address).String())
+	}
+
+	// Using IP addresses as value
+	avp, _ = DiameterIPAddressAVP("francisco.cardosogil@gmail.com-myAddress", net.ParseIP(ipv4Address))
+	if avp.IPAddressValue.String() != net.ParseIP(ipv4Address).String() {
+		t.Errorf("IPv4 AVP does not match value (created as ipaddr) %s %s", avp.IPAddressValue.String(), net.ParseIP(ipv4Address).String())
+	}
+
+	avp, _ = DiameterIPAddressAVP("francisco.cardosogil@gmail.com-myAddress", net.ParseIP(ipv6Address))
+	if avp.IPAddressValue.String() != net.ParseIP(ipv6Address).String() {
+		t.Errorf("IPv6 AVP does not match value (created as ipaddr) %s %s", avp.IPAddressValue.String(), net.ParseIP(ipv6Address).String())
+	}
+}
+
+func TestIPv4Address(t *testing.T) {
+
+	var ipv4Address = "1.2.3.4"
+
+	// Create avp
+	avp, err := DiameterStringAVP("francisco.cardosogil@gmail.com-myIPv4Address", ipv4Address)
+	if err != nil {
+		t.Errorf("error creating IPv4 Address AVP %v", err)
+	}
+	if avp.IPAddressValue.String() != net.ParseIP(ipv4Address).String() {
+		t.Errorf("IPv4 AVP does not match value")
+	}
+
+	// Serialize and unserialize
+	data, _ := avp.MarshalBinary()
+	newavp, _ := DiameterAVPFromBytes(data)
+	if newavp.IPAddressValue.String() != net.ParseIP(ipv4Address).String() {
+		t.Errorf("IPv4 AVP not properly encoded after unmarshalling (string value). Got %s %s", newavp.IPAddressValue.String(), net.ParseIP(ipv4Address).String())
+	}
+
+	avp, _ = DiameterIPAddressAVP("francisco.cardosogil@gmail.com-myIPv4Address", net.ParseIP(ipv4Address))
+	if avp.IPAddressValue.String() != net.ParseIP(ipv4Address).String() {
+		t.Errorf("IPv4 AVP does not match value (created as ipaddr) %s %s", avp.IPAddressValue.String(), net.ParseIP(ipv4Address).String())
+	}
+}
+
+func TestIPv6Address(t *testing.T) {
+	var ipv6Address = "bebe:cafe::0"
+
+	// Create avp
+	avp, err := DiameterStringAVP("francisco.cardosogil@gmail.com-myIPv6Address", ipv6Address)
+	if err != nil {
+		t.Errorf("error creating IPv6 Address AVP %v", err)
+	}
+	if avp.IPAddressValue.String() != net.ParseIP(ipv6Address).String() {
+		t.Errorf("IPv6 AVP does not match value")
+	}
+
+	// Serialize and unserialize
+	data, _ := avp.MarshalBinary()
+	newavp, _ := DiameterAVPFromBytes(data)
+	if newavp.IPAddressValue.String() != net.ParseIP(ipv6Address).String() {
+		t.Errorf("IPv6 AVP not properly encoded after unmarshalling (string value). Got %s %s", newavp.IPAddressValue.String(), net.ParseIP(ipv6Address).String())
+	}
+
+	avp, _ = DiameterIPAddressAVP("francisco.cardosogil@gmail.com-myIPv6Address", net.ParseIP(ipv6Address))
+	if avp.IPAddressValue.String() != net.ParseIP(ipv6Address).String() {
+		t.Errorf("IPv6 AVP does not match value (created as ipaddr) %s %s", avp.IPAddressValue.String(), net.ParseIP(ipv6Address).String())
+	}
+}
+
+func TestTimeAVP(t *testing.T) {
+	var theTime, _ = time.Parse("02/01/2006 15:04:05 UTC", "26/11/1966 03:21:54 UTC")
+	var theStringTime = "1966-11-26T03:21:54"
+
+	avp, err := DiameterStringAVP("francisco.cardosogil@gmail.com-myTime", theStringTime)
+	if err != nil {
+		t.Errorf("error creating Time Address AVP %v", err)
+	}
+	if avp.DateValue != theTime {
+		t.Errorf("Time AVP does not match value")
+	}
+}
+
+func TestDiamIdentAVP(t *testing.T) {
+
+	var theString = "domain.name"
+
+	// Create avp
+	avp, err := DiameterStringAVP("francisco.cardosogil@gmail.com-myDiameterIdentity", theString)
+	if err != nil {
+		t.Errorf("error creating Diameter Identity AVP %v", err)
+	}
+	if avp.StringValue != theString {
+		t.Errorf("Diamident AVP does not match value")
+	}
+
+	// Serialize and unserialize
+	data, _ := avp.MarshalBinary()
+	newavp, _ := DiameterAVPFromBytes(data)
+	if newavp.StringValue != theString {
+		t.Errorf("Diameter Identity AVP not properly encoded after unmarshalling. Got %s", newavp.StringValue)
+	}
+}
+
+func TestDiamURIAVP(t *testing.T) {
+
+	var theString = "domain.name"
+
+	// Create avp
+	avp, err := DiameterStringAVP("francisco.cardosogil@gmail.com-myDiameterURI", theString)
+	if err != nil {
+		t.Errorf("error creating Diameter URI AVP %v", err)
+	}
+	if avp.StringValue != theString {
+		t.Errorf("Diamident AVP does not match value")
+	}
+
+	// Serialize and unserialize
+	data, _ := avp.MarshalBinary()
+	newavp, _ := DiameterAVPFromBytes(data)
+	if newavp.StringValue != theString {
+		t.Errorf("Diameter URI AVP not properly encoded after unmarshalling. Got %s", newavp.StringValue)
+	}
+}
+
+func TestIPFilterRuleIAVP(t *testing.T) {
+
+	var theString = "deny 1.2.3.4"
+
+	// Create avp
+	avp, err := DiameterStringAVP("francisco.cardosogil@gmail.com-myIPFilterRule", theString)
+	if err != nil {
+		t.Errorf("error creating IP Filter Rule AVP %v", err)
+	}
+	if avp.StringValue != theString {
+		t.Errorf("IP Filter Rule AVP does not match value")
+	}
+
+	// Serialize and unserialize
+	data, _ := avp.MarshalBinary()
+	newavp, _ := DiameterAVPFromBytes(data)
+	if newavp.StringValue != theString {
+		t.Errorf("IP Filter Rule AVP not properly encoded after unmarshalling. Got %s", newavp.StringValue)
 	}
 }
