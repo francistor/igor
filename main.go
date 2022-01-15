@@ -10,9 +10,13 @@ import (
 
 func main() {
 
+	// Initialize logger
+	config.SetupLogger()
+
 	// Get the command line arguments
 	bootPtr := flag.String("boot", "resources/searchRules.json", "File or http URL with Configuration Search Rules")
 	instancePtr := flag.String("instance", "", "Name of instance")
+
 	flag.Parse()
 
 	// Initialize the Config Object

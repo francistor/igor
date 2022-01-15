@@ -7,6 +7,7 @@ Package diamdict impements helpers for reading and using the Diameter dictionary
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 // One for each Diamter AVP Type
@@ -99,20 +100,26 @@ type DiameterDict struct {
 	AppByCode map[uint32]DiameterApplication
 }
 
-func (dd *DiameterDict) GetFromCode(code AVPCode) AVPDictItem {
+// Returns an empty dictionary item if the code is not found
+// The user may decide to go on with an UNKNOWN dictionary item when the error is returned
+func (dd *DiameterDict) GetFromCode(code AVPCode) (AVPDictItem, error) {
 	di := dd.AVPByCode[code]
 	if di.Name == "" {
 		di.Name = "UNKNOWN"
+		return di, fmt.Errorf("%v not found in dictionary", code)
 	}
-	return di
+	return di, nil
 }
 
-func (dd *DiameterDict) GetFromName(name string) AVPDictItem {
+// Returns an empty dictionary item if the code is not found
+// The user may decide to go on with an UNKNOWN dictionary item when the error is returned
+func (dd *DiameterDict) GetFromName(name string) (AVPDictItem, error) {
 	di, ok := dd.AVPByName[name]
 	if !ok {
 		di.Name = "UNKNOWN"
+		return di, fmt.Errorf("%s not found in dictionary", name)
 	}
-	return di
+	return di, nil
 }
 
 // Returns a Diameter Dictionary object from its serialized representation

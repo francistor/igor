@@ -5,19 +5,24 @@ import (
 	"igor/config"
 	"net"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 )
 
+// Initializer of the test suite.
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Object as done in main.go
-	boot := "resources/searchRules.json"
-	instance := "testInstance"
-	config.Config.Init(boot, instance)
+	bootstrapFile := "resources/searchRules.json"
+	instanceName := "testInstance"
+	config.Config.Init(bootstrapFile, instanceName)
 
+	// Execute the tests and exit
 	os.Exit(m.Run())
 }
+
+// One test for each AVP type
 
 func TestAVPNotFound(t *testing.T) {
 	var _, err = DiameterOctetsAVP("Unknown AVP", []byte("hello, world!"))
@@ -41,7 +46,7 @@ func TestOctetsAVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.StringValue != fmt.Sprintf("%x", password) {
 		t.Errorf("Octets AVP not properly encoded after unmarshalling. Got %s", newavp.StringValue)
 	}
@@ -62,7 +67,7 @@ func TestUTF8StringAVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.StringValue != theString {
 		t.Errorf("UTF8String AVP not properly encoded after unmarshalling. Got %s", newavp.StringValue)
 	}
@@ -83,7 +88,7 @@ func TestInt32AVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.StringValue != fmt.Sprint(theInt) {
 		t.Errorf("Integer32 AVP not properly encoded after unmarshalling (string value). Got %s", newavp.StringValue)
 	}
@@ -121,7 +126,7 @@ func TestInt64AVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.StringValue != fmt.Sprint(theInt) {
 		t.Errorf("Integer64 AVP not properly encoded after unmarshalling (string value). Got %s", newavp.StringValue)
 	}
@@ -148,7 +153,7 @@ func TestUnsignedInt32AVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.StringValue != fmt.Sprint(theInt) {
 		t.Errorf("UnsignedInteger32 AVP not properly encoded after unmarshalling (string value). Got %s", newavp.StringValue)
 	}
@@ -176,7 +181,7 @@ func TestUnsignedInt64AVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.StringValue != fmt.Sprint(theInt) {
 		t.Errorf("Unsigned Integer64 AVP not properly encoded after unmarshalling (string value). Got %s", newavp.StringValue)
 	}
@@ -203,7 +208,7 @@ func TestFloat32AVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.StringValue != fmt.Sprint(theFloat) {
 		t.Errorf("Float32 AVP not properly encoded after unmarshalling (string value). Got %s", newavp.StringValue)
 	}
@@ -227,7 +232,7 @@ func TestFloat64AVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.StringValue != fmt.Sprint(theFloat) {
 		t.Errorf("Float64 AVP not properly encoded after unmarshalling (string value). Got %s", newavp.StringValue)
 	}
@@ -255,7 +260,7 @@ func TestAddressAVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.IPAddressValue.String() != net.ParseIP(ipv4Address).String() {
 		t.Errorf("IPv4 AVP not properly encoded after unmarshalling (string value). Got %s %s", newavp.IPAddressValue.String(), net.ParseIP(ipv4Address).String())
 	}
@@ -272,7 +277,7 @@ func TestAddressAVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ = avp.MarshalBinary()
-	newavp, _ = DiameterAVPFromBytes(data)
+	newavp, _, _ = DiameterAVPFromBytes(data)
 	if newavp.IPAddressValue.String() != net.ParseIP(ipv6Address).String() {
 		t.Errorf("IPv6 AVP not properly encoded after unmarshalling (string value). Got %s %s", newavp.IPAddressValue.String(), net.ParseIP(ipv6Address).String())
 	}
@@ -304,7 +309,7 @@ func TestIPv4Address(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.IPAddressValue.String() != net.ParseIP(ipv4Address).String() {
 		t.Errorf("IPv4 AVP not properly encoded after unmarshalling (string value). Got %s %s", newavp.IPAddressValue.String(), net.ParseIP(ipv4Address).String())
 	}
@@ -329,7 +334,7 @@ func TestIPv6Address(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.IPAddressValue.String() != net.ParseIP(ipv6Address).String() {
 		t.Errorf("IPv6 AVP not properly encoded after unmarshalling (string value). Got %s %s", newavp.IPAddressValue.String(), net.ParseIP(ipv6Address).String())
 	}
@@ -368,7 +373,7 @@ func TestDiamIdentAVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.StringValue != theString {
 		t.Errorf("Diameter Identity AVP not properly encoded after unmarshalling. Got %s", newavp.StringValue)
 	}
@@ -389,7 +394,7 @@ func TestDiamURIAVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.StringValue != theString {
 		t.Errorf("Diameter URI AVP not properly encoded after unmarshalling. Got %s", newavp.StringValue)
 	}
@@ -410,8 +415,71 @@ func TestIPFilterRuleIAVP(t *testing.T) {
 
 	// Serialize and unserialize
 	data, _ := avp.MarshalBinary()
-	newavp, _ := DiameterAVPFromBytes(data)
+	newavp, _, _ := DiameterAVPFromBytes(data)
 	if newavp.StringValue != theString {
 		t.Errorf("IP Filter Rule AVP not properly encoded after unmarshalling. Got %s", newavp.StringValue)
+	}
+}
+
+func TestEnumeratedAVP(t *testing.T) {
+
+	var theString = "zero"
+	var theNumber int64 = 0
+
+	avp, err := DiameterStringAVP("francisco.cardosogil@gmail.com-myEnumerated", "zero")
+	if err != nil {
+		t.Errorf("error creating IP Filter Rule AVP %v", err)
+	}
+	if avp.StringValue != theString {
+		t.Errorf("Enumerated AVP does not match string value")
+	}
+	if avp.LongValue != theNumber {
+		t.Errorf("Enumerated AVP does not match number value")
+	}
+
+	avp, err = DiameterLongAVP("francisco.cardosogil@gmail.com-myEnumerated", theNumber)
+	if err != nil {
+		t.Errorf("error creating IP Filter Rule AVP %v", err)
+	}
+	if avp.StringValue != theString {
+		t.Errorf("Enumerated AVP does not match string value")
+	}
+	if avp.LongValue != theNumber {
+		t.Errorf("Enumerated AVP does not match number value")
+	}
+}
+
+func TestSerializationError(t *testing.T) {
+
+	avp, _ := DiameterStringAVP("francisco.cardosogil@gmail.com-myOctetString", "blah blah blah")
+
+	theBytes, _ := avp.MarshalBinary()
+	fmt.Println(cap(theBytes), len(theBytes))
+
+	var theBytesUnknown []byte
+	fmt.Println(cap(theBytesUnknown))
+	theBytesUnknown = append(theBytesUnknown, theBytes...)
+	fmt.Println(cap(theBytesUnknown))
+	// Change the vendorId
+	copy(theBytesUnknown[8:12], []byte{11, 12, 13, 14})
+
+	newavp, _, _ := DiameterAVPFromBytes(theBytesUnknown)
+	if newavp.VendorId != 11*256*256*256+12*256*256+13*256+14 {
+		t.Errorf("Unknown vendor Id was not unmarshalled")
+	}
+
+	otherBytes, err := newavp.MarshalBinary()
+	if err != nil {
+		t.Errorf("Error serializing unknown avp %s", err)
+	}
+	if !reflect.DeepEqual([]byte{11, 12, 13, 14}, otherBytes[8:12]) {
+		t.Error("Error serializing unknown avp. Vendor Id does not match", err)
+	}
+
+	// Force unmarshalling error
+	copy(theBytesUnknown[5:8], []byte{100, 100, 100})
+	_, _, e := DiameterAVPFromBytes(theBytesUnknown)
+	if e == nil {
+		t.Error("Bad bytes should have reported error")
 	}
 }
