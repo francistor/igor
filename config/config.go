@@ -8,16 +8,13 @@ package config
 import (
 	"encoding/json"
 	"errors"
+	"igor/diamdict"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"regexp"
 	"strings"
 	"sync"
-
-	"igor/diamdict"
-
-	"go.uber.org/zap"
 )
 
 // Type ConfigObject holds both the raw text and the
@@ -48,16 +45,9 @@ type ConfigManager struct {
 var Config ConfigManager
 var DDict diamdict.DiameterDict
 
-// Logging
-var sl *zap.SugaredLogger
-
 // Automatically called by go at startup. Makes sure there
 // is a "Config" singleton object
 func init() {
-	// Logging
-	logger, _ := zap.NewDevelopment()
-	sl = logger.Sugar()
-	sl.Infow("Logger initialized")
 
 	Config = ConfigManager{
 		objectCache: sync.Map{},
@@ -68,7 +58,7 @@ func init() {
 // To be called only once, from main function
 func (c *ConfigManager) Init(bootstrapFile string, instanceName string) {
 
-	sl.Debugw("Init with instace name", "instance", instanceName)
+	IgorLogger.Debugw("Init with instace name", "instance", instanceName)
 	c.InstanceName = instanceName
 
 	// Get the search rules object
@@ -77,7 +67,7 @@ func (c *ConfigManager) Init(bootstrapFile string, instanceName string) {
 		panic("Could not retrieve the bootstrap file in " + bootstrapFile)
 	}
 
-	sl.Debugw("Read bootstrap file", "contents", rules)
+	IgorLogger.Debugw("Read bootstrap file", "contents", rules)
 
 	// Decode Search Rules
 	json.Unmarshal([]byte(rules), &Config.sRules)
@@ -142,7 +132,7 @@ func (c *ConfigManager) GetConfigObject(objectName string) (ConfigObject, error)
 	var retriever = func() {
 		obj, err := ReadConfigObject(objectName)
 		if err != nil {
-			sl.Errorw("Could not read config object", "name", objectName, "error", err)
+			IgorLogger.Errorw("Could not read config object", "name", objectName, "error", err)
 		} else {
 			Config.objectCache.Store(objectName, obj)
 		}
@@ -228,13 +218,13 @@ func ReadResource(location string) (string, error) {
 
 	} else {
 
-		sl.Debugw("Reading Configuration file", "fileName", os.Getenv("IGOR_CONFIG_BASE")+location)
+		IgorLogger.Debugw("Reading Configuration file", "fileName", os.Getenv("IGOR_CONFIG_BASE")+location)
 		resp, err := ioutil.ReadFile(os.Getenv("IGOR_CONFIG_BASE") + location)
 		if err != nil {
-			sl.Debugw("Resource not found", "file", location, "error", err)
+			IgorLogger.Debugw("Resource not found", "file", location, "error", err)
 			return "", err
 		}
-		sl.Debugw("Resource found", "file", location, "error", err)
+		IgorLogger.Debugw("Resource found", "file", location, "error", err)
 		return string(resp), err
 	}
 }

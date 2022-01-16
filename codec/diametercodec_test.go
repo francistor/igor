@@ -13,6 +13,9 @@ import (
 // Initializer of the test suite.
 func TestMain(m *testing.M) {
 
+	// Initialize logging
+	config.SetupLogger()
+
 	// Initialize the Config Object as done in main.go
 	bootstrapFile := "resources/searchRules.json"
 	instanceName := "testInstance"
@@ -449,25 +452,72 @@ func TestEnumeratedAVP(t *testing.T) {
 	}
 }
 
+func TestGroupedAVP(t *testing.T) {
+
+	var theInt int64 = 99
+	var theString = "theString"
+
+	// Create grouped AVP
+	avpl0, _ := DiameterGroupedAVP("francisco.cardosogil@gmail.com-myGroupedinGrouped")
+	avpl1, _ := DiameterGroupedAVP("francisco.cardosogil@gmail.com-myGrouped")
+
+	avpInt, _ := DiameterLongAVP("francisco.cardosogil@gmail.com-myInteger32", theInt)
+	avpString, _ := DiameterStringAVP("francisco.cardosogil@gmail.com-myString", theString)
+
+	avpl1.AddAVP(*avpInt).AddAVP(*avpString)
+	avpl0.AddAVP(*avpl1)
+
+	// Serialize and unserialize
+	data, _ := avpl0.MarshalBinary()
+	newavpl0, _, _ := DiameterAVPFromBytes(data)
+
+	// Navigate to the values
+	newavpl1 := newavpl0.GetAllAVP("francisco.cardosogil@gmail.com-myGrouped")[0]
+	newInt, _ := newavpl1.GetOneAVP("francisco.cardosogil@gmail.com-myInteger32")
+	if newInt.LongValue != theInt {
+		t.Error("Integer32 value does not match or not found in Group")
+	}
+	newString, _ := newavpl1.GetOneAVP("francisco.cardosogil@gmail.com-myString")
+	if newString.StringValue != theString {
+		t.Error("String value does not match or not found in Group")
+	}
+	_, err := newavpl1.GetOneAVP("non-existing")
+	if err == nil {
+		t.Error("No error when trying to find a non existing AVP")
+	}
+
+	// Printed avp
+	var targetString = "{francisco.cardosogil@gmail.com-myGrouped={francisco.cardosogil@gmail.com-myInteger32=99,francisco.cardosogil@gmail.com-myString=theString}}"
+	stringRepresentation := newavpl0.GetStringValue()
+	if stringRepresentation != targetString {
+		t.Errorf("Grouped string representation does not match %s", stringRepresentation)
+	}
+
+}
+
 func TestSerializationError(t *testing.T) {
 
+	// Generate an AVP
 	avp, _ := DiameterStringAVP("francisco.cardosogil@gmail.com-myOctetString", "blah blah blah")
-
 	theBytes, _ := avp.MarshalBinary()
-	fmt.Println(cap(theBytes), len(theBytes))
 
+	// Change the vendorId to something not existing in the dict
 	var theBytesUnknown []byte
-	fmt.Println(cap(theBytesUnknown))
 	theBytesUnknown = append(theBytesUnknown, theBytes...)
-	fmt.Println(cap(theBytesUnknown))
-	// Change the vendorId
 	copy(theBytesUnknown[8:12], []byte{11, 12, 13, 14})
 
+	// Simulate we read an AVP not in the dictionary
+	// It should create an AVP with name UNKNOWN
 	newavp, _, _ := DiameterAVPFromBytes(theBytesUnknown)
 	if newavp.VendorId != 11*256*256*256+12*256*256+13*256+14 {
 		t.Errorf("Unknown vendor Id was not unmarshalled")
 	}
+	if newavp.DictItem.Name != "UNKNOWN" {
+		t.Errorf("Unknown AVP not named UNKNOWN")
+	}
 
+	// We should be able to serialize the unknown AVP
+	// The vendorId should be the same
 	otherBytes, err := newavp.MarshalBinary()
 	if err != nil {
 		t.Errorf("Error serializing unknown avp %s", err)
@@ -476,7 +526,7 @@ func TestSerializationError(t *testing.T) {
 		t.Error("Error serializing unknown avp. Vendor Id does not match", err)
 	}
 
-	// Force unmarshalling error
+	// Force unmarshalling error. Size is some big number
 	copy(theBytesUnknown[5:8], []byte{100, 100, 100})
 	_, _, e := DiameterAVPFromBytes(theBytesUnknown)
 	if e == nil {
