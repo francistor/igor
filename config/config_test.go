@@ -1,18 +1,56 @@
 package config
 
 import (
+	"net/http"
 	"os"
+	"sync"
 	"testing"
 )
 
+func httpServer() {
+	// Serve configuration
+	var fileHandler = http.FileServer(http.Dir("resources"))
+	http.Handle("/", fileHandler)
+	err := http.ListenAndServe(":8100", nil)
+	if err != nil {
+		panic("could not start http server")
+	}
+}
+
 func TestMain(m *testing.M) {
 
+	// Initialize logger
+	SetupLogger()
+
 	// Initialize the Config Object as done in main.go
-	boot := "resources/searchRules.json"
-	instance := "testInstance"
-	Config.Init(boot, instance)
+	bootFile := "resources/testInstance/searchRules.json"
+	instanceName := "testInstance"
+	Config.Init(bootFile, instanceName)
+
+	// Start the server for configuration
+	go httpServer()
 
 	os.Exit(m.Run())
+}
+
+// Retrieve a configuration object from multiple threads
+func TestObjectRetrieval(t *testing.T) {
+
+	var wg sync.WaitGroup
+
+	var objectName = "testFile.json"
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := Config.GetConfigObject(objectName)
+			t.Log("Got configuration object")
+			if err != nil {
+				panic(err)
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 // Diameter Configuration
@@ -77,5 +115,4 @@ func TestConfigFile(t *testing.T) {
 	if jsonMap["test"].(string) != "content" {
 		t.Fatal("\"test\" property was not set to \"content\"")
 	}
-
 }

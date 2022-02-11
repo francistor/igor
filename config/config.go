@@ -1,7 +1,9 @@
 package config
 
-// Set IGOR_CONFIG_BASE environment variable to the absolute location of the resource directory (finishing in slash)
-// otherwise, file resources will be looked up in the executing directory
+// Set IGOR_CONFIG_BASE environment variable to the absolute location of the resource directory (*finishing in slash*)
+// otherwise, file resources will be looked up in the executing director
+
+// export IGOR_CONFIG_BASE=/home/francisco/igor/
 
 // The configuration must be inited once at application startup, invoking Config.Init()
 
@@ -123,8 +125,8 @@ func (c *ConfigManager) GetConfigObject(objectName string) (ConfigObject, error)
 	// Not found. Retrieve
 	// InFlight contains a map of object names to Once objects that will retrieve the object
 	// from the remote and store in cache. The first requesting goroutine will push the
-	// once to the map, the others will retrieve the once already pushed. The executing
-	// once will delete the entry from the Inflight map
+	// Once to the map, the others will retrieve the once already pushed. The executing
+	// Once will delete the entry from the Inflight map
 	var once sync.Once
 	var flightOncePtr, _ = Config.inFlight.LoadOrStore(objectName, &once)
 
@@ -224,7 +226,7 @@ func ReadResource(location string) (string, error) {
 			IgorLogger.Debugw("Resource not found", "file", location, "error", err)
 			return "", err
 		}
-		IgorLogger.Debugw("Resource found", "file", location, "error", err)
+		IgorLogger.Debugw("Resource found", "file", location)
 		return string(resp), err
 	}
 }

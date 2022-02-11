@@ -4,7 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"igor/config"
-	"net/http"
+	"igor/diampeer"
+	"net"
 	"time"
 )
 
@@ -22,35 +23,60 @@ func main() {
 	// Initialize the Config Object
 	config.Config.Init(*bootPtr, *instancePtr)
 
-	// Start http server
-	go httpServer()
-
-	time.Sleep(10 * time.Second)
-
-}
-
-func httpServer() {
-	// Serve configuration
-	var fileHandler = http.FileServer(http.Dir("resources"))
-	http.Handle("/", fileHandler)
-	err := http.ListenAndServe(":8100", nil)
-	if err != nil {
-		panic("could not start http server")
+	// Create the PeerSocket objects
+	peerSockets := make([]diampeer.PeerSocket, 0)
+	diameterPeers, _ := config.GetDiameterPeers()
+	for i, _ := range diameterPeers {
+		var peerSocket = diampeer.PeerSocket{PeerConfig: diameterPeers[i]}
+		peerSockets = append(peerSockets, peerSocket)
 	}
-	fmt.Println("Configuration HTTP server started")
-}
+	fmt.Println(diameterPeers)
 
-// Check that if multiple routines ask for the same object,
-// only one fully progresses while the others wait and finally
-// get from cache.
-func testGetMultipleConfigObject(objectName string) {
-	for i := 0; i < 10; i++ {
-		go func() {
-			_, err := config.Config.GetConfigObject(objectName)
+	// Open socket for receiving Peer connections
+	listener, err := net.Listen("tcp", ":3868")
+	if err != nil {
+		panic(err)
+	}
+
+	// Accepter loop
+	go func() {
+		for {
+			fmt.Println("accepting connections ...")
+			connection, err := listener.Accept()
 			if err != nil {
-				fmt.Println("error")
 				panic(err)
 			}
-		}()
+
+			remoteAddr, _, _ := net.SplitHostPort(connection.RemoteAddr().String())
+			fmt.Printf("accepted connection from %s\n", remoteAddr)
+			// Look for peer with this address
+			for i := range peerSockets {
+				if peerSockets[i].PeerConfig.IPAddress == remoteAddr {
+					peerSockets[i].SetConnection(connection)
+					go peerSockets[i].ReceiveLoop()
+					break
+				}
+			}
+		}
+	}()
+
+	// Start Peer active connections
+	time.Sleep(2 * time.Second)
+	for i, _ := range peerSockets {
+		if peerSockets[i].PeerConfig.ConnectionPolicy == "active" {
+			fmt.Println("Connecting peer " + peerSockets[i].PeerConfig.DiameterHost)
+			err := peerSockets[i].Connect()
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				go peerSockets[i].ReceiveLoop()
+				peerSockets[i].SendMessage([]byte{1, 2, 3})
+			}
+		}
 	}
+
+	fmt.Println("waiting ...")
+	time.Sleep(10 * time.Second)
+	fmt.Println("done.")
+
 }
