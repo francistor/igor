@@ -5,7 +5,11 @@ package config
 
 // export IGOR_CONFIG_BASE=/home/francisco/igor/
 
-// The configuration must be inited once at application startup, invoking Config.Init()
+// The configuration must be inited once at application startup, invoking config.Config.Init(boostrapFile, instanceName)
+// Then use as
+// config.Config.GetConfigObjectAs...()
+// config.DDict.GetFromName/GetFromCode
+//
 
 import (
 	"encoding/json"
@@ -91,6 +95,11 @@ func (c *ConfigManager) Init(bootstrapFile string, instanceName string) {
 	}
 
 	DDict = diamdict.NewDictionaryFromJSON([]byte(diamDictJSON))
+
+	// Load diameter configuraton
+	UpdateDiameterServerConfig()
+	UpdateDiameterPeers()
+	UpdateDiameterRoutingRules()
 }
 
 // Returns the configuration object as a parsed Json

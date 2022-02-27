@@ -13,11 +13,6 @@
         "attributes":
             [
                 {
-                    "code": 0,
-                    "name": "AVP",
-                    "type": "OctetString"
-                },
-                {
                     "code": 1,
                     "name": "User-Name",
                     "type": "UTF8String"
@@ -1662,21 +1657,47 @@
                     "type": "Grouped",
                     "group":
                     {
-                        "myInteger32":{"minOccurs": 1, "maxOccurs": 1},
-                        "myString":{"maxOccurs": 1}
+                        "francisco.cardosogil@gmail.com-myInteger32":{"minOccurs": 1, "maxOccurs": 1},
+                        "francisco.cardosogil@gmail.com-myString":{"maxOccurs": 1}
                     }
                 },
                 {
                     "code": 19,
-                    "name": "myGroupedinGrouped",
+                    "name": "myGroupedInGrouped",
                     "type": "Grouped",
                     "group":
                     {
-                        "myInteger32":{"minOccurs": 1, "maxOccurs": 1},
-                        "myString":{"maxOccurs": 1},
-                        "myGrouped":{"maxOccurs": 1}
+                        "francisco.cardosogil@gmail.com-myInteger32":{"minOccurs": 1, "maxOccurs": 1},
+                        "francisco.cardosogil@gmail.com-myString":{"maxOccurs": 1},
+                        "francisco.cardosogil@gmail.com-myGrouped":{"maxOccurs": 1}
+                    }
+                },
+                {
+                    "code": 20,
+                    "name": "myTestAllGrouped",
+                    "type": "Grouped",
+                    "group":
+                    {
+                        "francisco.cardosogil@gmail.com-myOctetString": {},
+                        "francisco.cardosogil@gmail.com-myInteger32": {},
+                        "francisco.cardosogil@gmail.com-myInteger64": {},
+                        "francisco.cardosogil@gmail.com-myUnsigned32": {},
+                        "francisco.cardosogil@gmail.com-myUnsigned64": {},
+                        "francisco.cardosogil@gmail.com-myFloat32": {},
+                        "francisco.cardosogil@gmail.com-myFloat64": {},
+                        "francisco.cardosogil@gmail.com-myAddress": {},
+                        "francisco.cardosogil@gmail.com-myTime": {},
+                        "francisco.cardosogil@gmail.com-myString": {},
+                        "francisco.cardosogil@gmail.com-myDiameterIdentity": {},
+                        "francisco.cardosogil@gmail.com-myDiameterURI": {},
+                        "francisco.cardosogil@gmail.com-myIPFilterRule": {},
+                        "francisco.cardosogil@gmail.com-myIPv4Address": {},
+                        "francisco.cardosogil@gmail.com-myIPv6Address": {},
+                        "francisco.cardosogil@gmail.com-myIPv6Prefix": {},
+                        "francisco.cardosogil@gmail.com-myEnumerated": {}
                     }
                 }
+
             ]
         },
         {

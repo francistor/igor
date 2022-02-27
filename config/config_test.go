@@ -82,7 +82,7 @@ func TestDiamConfig(t *testing.T) {
 	}
 
 	// Routing rules configuration
-	rr, err := GetRoutingRules()
+	rr, err := GetDiameterRoutingRules()
 	if err != nil {
 		t.Fatal("Could not get Routing Rules", err)
 	}
@@ -98,7 +98,7 @@ func TestDiamConfig(t *testing.T) {
 		t.Fatal(`Rule not found for {"realm": "igorsuperserver", "applicationId": "*", "peers": ["superserver.igorsuperserver"], "policy": "fixed"}`)
 	}
 	// Using the helper function
-	rule, _ := rr.FindRoute("igorsuperserver", "Sp", false)
+	rule, _ := rr.FindDiameterRoute("igorsuperserver", "Sp", false)
 	if rule.Realm != "igorsuperserver" || rule.ApplicationId != "*" {
 		t.Fatal(`Rule not found for realm "igorsuperserver" and applicaton "Sp"`)
 	}
