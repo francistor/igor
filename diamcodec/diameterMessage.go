@@ -144,6 +144,28 @@ func DiameterMessageFromBytes(inputBytes []byte) (DiameterMessage, uint32, error
 	return diameterMessage, messageLength, nil
 }
 
+// Makes sure both codes and names are set for ApplicationId and CommandCode
+func (m *DiameterMessage) Tidy() *DiameterMessage {
+
+	if m.ApplicationId == 0 && m.ApplicationName != "" {
+		m.ApplicationId = config.DDict.AppByName[m.ApplicationName].Code
+	}
+
+	if m.ApplicationId != 0 && m.ApplicationName == "" {
+		m.ApplicationName = config.DDict.AppByCode[m.ApplicationId].Name
+	}
+
+	if m.CommandCode == 0 && m.CommandName != "" {
+		m.CommandCode = config.DDict.AppByCode[m.ApplicationId].CommandByName[m.CommandName].Code
+	}
+
+	if m.CommandCode != 0 && m.CommandName == "" {
+		m.CommandName = config.DDict.AppByCode[m.ApplicationId].CommandByCode[m.CommandCode].Name
+	}
+
+	return m
+}
+
 // Serializes the message. TODO: The message needs to have all its fields set => Call Tidy()
 func (m *DiameterMessage) MarshalBinary() (data []byte, err error) {
 	// Will write the output here

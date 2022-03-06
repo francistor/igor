@@ -57,20 +57,14 @@ func TestObjectRetrieval(t *testing.T) {
 func TestDiamConfig(t *testing.T) {
 
 	// Diameter Server Configuration
-	dsc, err := GetDiameterServerConfig()
-	if err != nil {
-		t.Fatal("Could not get Diameter Configuraton", err)
-	}
+	dsc := DiameterServerConf()
 	if dsc.BindAddress != "127.0.0.1" {
 		t.Fatalf("Could not get BindAddress or was not %s", "127.0.0.1")
 	}
 
 	// Diameter Peers configuration
-	dp, err := GetDiameterPeers()
-	if err != nil {
-		t.Fatal("Could not get Diameter Peers", err)
-	}
-	if dp[0].WatchdogIntervalMillis != 300000 {
+	dp := PeersConf()
+	if dp["superserver.igor"].WatchdogIntervalMillis != 300000 {
 		t.Fatal("WatchdogIntervalMillis was not 30000")
 	}
 	peer, err := dp.FindPeer("127.0.0.1", "client.igor")
@@ -82,7 +76,7 @@ func TestDiamConfig(t *testing.T) {
 	}
 
 	// Routing rules configuration
-	rr, err := GetDiameterRoutingRules()
+	rr := RoutingRulesConf()
 	if err != nil {
 		t.Fatal("Could not get Routing Rules", err)
 	}

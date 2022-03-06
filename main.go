@@ -23,60 +23,88 @@ func main() {
 	// Initialize the Config Object
 	config.Config.Init(*bootPtr, *instancePtr)
 
-	// Create the PeerSocket objects
-	peerSockets := make([]diampeer.PeerSocket, 0)
-	diameterPeers, _ := config.GetDiameterPeers()
-	for i, _ := range diameterPeers {
-		var peerSocket = diampeer.PeerSocket{PeerConfig: diameterPeers[i]}
-		peerSockets = append(peerSockets, peerSocket)
-	}
-	fmt.Println(diameterPeers)
-
 	// Open socket for receiving Peer connections
 	listener, err := net.Listen("tcp", ":3868")
 	if err != nil {
 		panic(err)
 	}
 
+	var routerInputChannel = make(chan interface{})
+
+	diameterPeersConf := config.PeersConf()
+
 	// Accepter loop
 	go func() {
 		for {
-			fmt.Println("accepting connections ...")
+			config.IgorLogger.Info("diameter server accepting connections")
 			connection, err := listener.Accept()
 			if err != nil {
 				panic(err)
 			}
 
 			remoteAddr, _, _ := net.SplitHostPort(connection.RemoteAddr().String())
-			fmt.Printf("accepted connection from %s\n", remoteAddr)
-			// Look for peer with this address
-			for i := range peerSockets {
-				if peerSockets[i].PeerConfig.IPAddress == remoteAddr {
-					peerSockets[i].SetConnection(connection)
-					go peerSockets[i].ReceiveLoop()
-					break
-				}
+			config.IgorLogger.Infof("accepted connection from %s", remoteAddr)
+
+			remoteIPAddr, _ := net.ResolveIPAddr("", remoteAddr)
+			if !diameterPeersConf.ValidateIncomingAddress(remoteIPAddr.IP) {
+				fmt.Printf("invalid peer %s\n", remoteIPAddr)
 			}
+
+			// Create peer for the accepted connection and start it
+			diampeer.NewPassivePeerSocket(routerInputChannel, connection)
 		}
 	}()
 
-	// Start Peer active connections
+	// Create the PeerSocket objects after some time for accepter loop to be executed
 	time.Sleep(2 * time.Second)
-	for i, _ := range peerSockets {
-		if peerSockets[i].PeerConfig.ConnectionPolicy == "active" {
-			fmt.Println("Connecting peer " + peerSockets[i].PeerConfig.DiameterHost)
-			err := peerSockets[i].Connect()
-			if err != nil {
-				fmt.Println(err)
-			} else {
-				go peerSockets[i].ReceiveLoop()
-				peerSockets[i].SendMessage([]byte{1, 2, 3})
+	// Initially emtpy
+	peerSockets := make(map[string]diampeer.PeerSocket)
+	// Update
+	peerSockets = updatePeerSockets(routerInputChannel, peerSockets, diameterPeersConf)
+
+	// Use peer for superserver.igor
+	superserverPeer := peerSockets["superserver.igor"]
+
+	// Wait until received connected event and then send message
+	_, ok := (<-routerInputChannel).(diampeer.SocketConnectedEvent)
+	if ok {
+		superserverPeer.InputChannel <- []byte{1, 2, 3}
+	} else {
+		fmt.Println("peersocket error")
+	}
+
+	// Close peer
+	time.Sleep(1 * time.Second)
+	superserverPeer.InputChannel <- diampeer.SocketCloseCommand{}
+
+	// Wait for down event
+	fmt.Println("first message", <-routerInputChannel)
+	fmt.Println("second message", <-routerInputChannel)
+
+	fmt.Println("waiting ...")
+	time.Sleep(5 * time.Second)
+	fmt.Println("done.")
+
+	close(routerInputChannel)
+
+}
+
+// Takes the current map of peerSockets and generates a new one based on the current configuration
+func updatePeerSockets(c chan interface{}, peerSockets map[string]diampeer.PeerSocket, diameterPeers config.DiameterPeers) map[string]diampeer.PeerSocket {
+
+	// TODO: Close the connections for now not configured peers
+
+	// Make sure a peerSocket exists for each active peer
+	for dh := range diameterPeers {
+		peerConfig := diameterPeers[dh]
+		if peerConfig.ConnectionPolicy == "active" {
+			_, found := peerSockets[diameterPeers[dh].DiameterHost]
+			if !found {
+				peerSocket := diampeer.NewActivePeerSocket(c, 3000, peerConfig.IPAddress, peerConfig.Port)
+				peerSockets[peerConfig.DiameterHost] = peerSocket
 			}
 		}
 	}
 
-	fmt.Println("waiting ...")
-	time.Sleep(10 * time.Second)
-	fmt.Println("done.")
-
+	return peerSockets
 }

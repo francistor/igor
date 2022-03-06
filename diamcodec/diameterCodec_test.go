@@ -698,6 +698,12 @@ func TestDiameterMessage(t *testing.T) {
 		t.Errorf("got incorrect value for string avp: %s instead of <hello>", err)
 	}
 
+	// Generate reply message
+	replyMessage := NewDiameterAnswer(recoveredMessage)
+	if replyMessage.IsRequest {
+		t.Errorf("reply message is a request")
+	}
+
 	// TODO:
 	// Cuando se hace return de un item de un slice ¿Es una copia?
 	// Cuando se añade un AVP ¿es una copia o se puede modificar el orgiginal?
@@ -706,6 +712,12 @@ func TestDiameterMessage(t *testing.T) {
 func TestDiameterMessageJSON(t *testing.T) {
 	jDiameterMessage := `
 	{
+		"IsRequest": true,
+		"IsProxyable": false,
+		"IsError": false,
+		"IsRetransmission": false,
+		"CommandCode": 2000,
+		"ApplicationId": 1000,
 		"avps":[
 			{
 			  "francisco.cardosogil@gmail.com-myTestAllGrouped": [
@@ -729,7 +741,7 @@ func TestDiameterMessageJSON(t *testing.T) {
 			  ]
 			}
 		]
-}
+	}
 	`
 
 	// Read JSON to DiameterMessage
@@ -738,9 +750,13 @@ func TestDiameterMessageJSON(t *testing.T) {
 	if err != nil {
 		t.Errorf("unmarshal error for diameter message: %s", err)
 	}
+	diameterMessage.Tidy()
 
 	// Write Diameter message as JSON
 	jNewDiameterMessage, _ := json.Marshal(&diameterMessage)
+	if !strings.Contains(string(jNewDiameterMessage), "TestApplication") || !strings.Contains(string(jNewDiameterMessage), "TestRequest") {
+		t.Errorf("marshalled json does not contain the tidied attributes")
+	}
 
 	var jBytes bytes.Buffer
 	if err := json.Indent(&jBytes, []byte(jNewDiameterMessage), "", "    "); err != nil {

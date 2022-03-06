@@ -5,7 +5,7 @@
         "port": 3867,
 		"connectionPolicy": "passive",
 		"watchdogIntervalMillis": 300000,
-		"originNetwork": "127.0.0.0/8"
+		"originNetwork": "0.0.0.0/0"
 	},
 	{
         "diameterHost": "superserver.igor",

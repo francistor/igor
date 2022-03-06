@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 )
 
 type DiameterServerConfig struct {
@@ -19,7 +20,7 @@ type DiameterServerConfig struct {
 var currentDiameterServerConfig DiameterServerConfig
 
 // Retrieves the diameter server configuration
-func GetDiameterServerConfig() (DiameterServerConfig, error) {
+func getDiameterServerConfig() (DiameterServerConfig, error) {
 	dsc := DiameterServerConfig{}
 	dc, err := Config.GetConfigObject("diameterServer.json")
 	if err != nil {
@@ -30,7 +31,7 @@ func GetDiameterServerConfig() (DiameterServerConfig, error) {
 }
 
 func UpdateDiameterServerConfig() error {
-	dsc, error := GetDiameterServerConfig()
+	dsc, error := getDiameterServerConfig()
 	if error != nil {
 		IgorLogger.Error("could not retrieve the Diameter Server configuration: %v", error)
 		return error
@@ -72,7 +73,7 @@ func (rr DiameterRoutingRules) FindDiameterRoute(realm string, application strin
 }
 
 // Retrieves the Routes configuration
-func GetDiameterRoutingRules() (DiameterRoutingRules, error) {
+func getDiameterRoutingRules() (DiameterRoutingRules, error) {
 	var routingRules []DiameterRoutingRule
 	rr, err := Config.GetConfigObject("diameterRoutes.json")
 	if err != nil {
@@ -83,7 +84,7 @@ func GetDiameterRoutingRules() (DiameterRoutingRules, error) {
 }
 
 func UpdateDiameterRoutingRules() {
-	drr, error := GetDiameterRoutingRules()
+	drr, error := getDiameterRoutingRules()
 	if error != nil {
 		IgorLogger.Error("could not retrieve the Diameter Rules configuration: %v", error)
 		return
@@ -101,17 +102,18 @@ type DiameterPeer struct {
 	Port                   int
 	ConnectionPolicy       string // May be "active" or "passive"
 	OriginNetwork          string // CIDR
+	OriginNetworkCIDR      net.IPNet
 	WatchdogIntervalMillis int
 }
 
-type DiameterPeers []DiameterPeer
+type DiameterPeers map[string]DiameterPeer
 
 var currentDiameterPeers DiameterPeers
 
 // Gets the first Diameter Peer that conforms to the specification: IPAddress and Origin-Host reported
-func (dps DiameterPeers) FindPeer(remoteIPAddress string, diameterHost string) (DiameterPeer, error) {
+func (dps *DiameterPeers) FindPeer(remoteIPAddress string, diameterHost string) (DiameterPeer, error) {
 
-	for _, peer := range dps {
+	for _, peer := range *dps {
 		if peer.IPAddress == remoteIPAddress && peer.DiameterHost == diameterHost {
 			return peer, nil
 		}
@@ -120,19 +122,42 @@ func (dps DiameterPeers) FindPeer(remoteIPAddress string, diameterHost string) (
 	return DiameterPeer{}, fmt.Errorf("no Peer found for IPAddress %s and origin-host %s", remoteIPAddress, diameterHost)
 }
 
+func (dps *DiameterPeers) ValidateIncomingAddress(address net.IP) bool {
+	for _, peer := range *dps {
+		if peer.OriginNetworkCIDR.Contains(address) {
+			// Found one of the peers containging incoming IP address
+			return true
+		}
+	}
+	return false
+}
+
 // Retrieves the Peers configuration
-func GetDiameterPeers() (DiameterPeers, error) {
+func getDiameterPeers() (DiameterPeers, error) {
 	var peers []DiameterPeer
+	peersMap := make(map[string]DiameterPeer)
+
 	dp, err := Config.GetConfigObject("diameterPeers.json")
 	if err != nil {
-		return peers, err
+		return peersMap, err
 	}
 	json.Unmarshal([]byte(dp.RawText), &peers)
-	return peers, nil
+
+	// Cooking
+	for i := range peers {
+		_, ipNet, err := net.ParseCIDR(peers[i].OriginNetwork)
+		if err != nil {
+			return peersMap, err
+		}
+		peers[i].OriginNetworkCIDR = *ipNet
+		peersMap[peers[i].DiameterHost] = peers[i]
+	}
+
+	return peersMap, nil
 }
 
 func UpdateDiameterPeers() {
-	dp, error := GetDiameterPeers()
+	dp, error := getDiameterPeers()
 	if error != nil {
 		IgorLogger.Error("could not retrieve the Peers configuration: %v", error)
 		return
