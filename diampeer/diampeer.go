@@ -1,7 +1,10 @@
 package diampeer
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"igor/config"
 	"io"
@@ -18,11 +21,16 @@ const (
 )
 
 // Ouput Events
-type SocketDownEvent struct{}
-type SocketErrorEvent struct {
-	Error error
+type SocketDownEvent struct {
+	Sender *PeerSocket
 }
-type SocketConnectedEvent struct{}
+type SocketErrorEvent struct {
+	Sender *PeerSocket
+	Error  error
+}
+type SocketConnectedEvent struct {
+	Sender *PeerSocket
+}
 
 // Intput Commands
 type SocketCloseCommand struct{}
@@ -51,6 +59,8 @@ type PeerSocket struct {
 
 	// Internal
 	connection net.Conn
+	connReader *bufio.Reader
+	connWriter *bufio.Writer
 
 	// Canceller of connection
 	cancel context.CancelFunc
@@ -75,7 +85,10 @@ func NewPassivePeerSocket(oc chan interface{}, conn net.Conn) PeerSocket {
 
 	peerSocket.Status = StatusConnected
 
+	peerSocket.connReader = bufio.NewReader(peerSocket.connection)
+	peerSocket.connWriter = bufio.NewWriter(peerSocket.connection)
 	go peerSocket.readLoop()
+
 	go peerSocket.eventLoop()
 
 	return peerSocket
@@ -101,31 +114,33 @@ func (ps *PeerSocket) eventLoop() {
 		// connect goroutine reports connection established
 		case ConnectionEstablishedMsg:
 			ps.connection = v
+			ps.connReader = bufio.NewReader(ps.connection)
+			ps.connWriter = bufio.NewWriter(ps.connection)
 			go ps.readLoop()
-			ps.OutputChannel <- SocketConnectedEvent{}
+			ps.OutputChannel <- SocketConnectedEvent{Sender: ps}
 			ps.Status = StatusConnected
 
 			// connect goroutine reports connection could not be established
 		case ConnectionErrorMsg:
 			if ps.Status <= StatusClosing {
-				ps.OutputChannel <- SocketErrorEvent{v}
+				ps.OutputChannel <- SocketErrorEvent{Sender: ps, Error: v}
 			}
-			ps.OutputChannel <- SocketDownEvent{}
+			ps.OutputChannel <- SocketDownEvent{Sender: ps}
 			ps.Status = StatusClosed
 			return
 
 			// readLoop goroutine reports the connection is closed
 		case ReadEOFMsg:
-			ps.OutputChannel <- SocketDownEvent{}
+			ps.OutputChannel <- SocketDownEvent{Sender: ps}
 			ps.Status = StatusClosed
 			return
 
 			// readLoop goroutine reports a read error
 		case ReadErrorMsg:
 			if ps.Status < StatusClosing {
-				ps.OutputChannel <- SocketErrorEvent(v)
+				ps.OutputChannel <- SocketErrorEvent{Sender: ps}
 			}
-			ps.OutputChannel <- SocketDownEvent{}
+			ps.OutputChannel <- SocketDownEvent{Sender: ps}
 			ps.Status = StatusClosed
 			return
 
@@ -181,7 +196,7 @@ func (ps *PeerSocket) connect(connTimeoutMillis int, ipAddress string, port int)
 // Reader of peer messages
 // To be executed in a goroutine
 // Should not touch inner variables
-func (ps *PeerSocket) readLoop() {
+func (ps *PeerSocket) ReadLoop2() {
 	for {
 		// Each iteration will create a new buffer. Not shared
 		var receivedBytes = make([]byte, 1024)
@@ -194,8 +209,47 @@ func (ps *PeerSocket) readLoop() {
 				ps.InputChannel <- ReadErrorMsg{err}
 			}
 			return
-		} else {
-			ps.OutputChannel <- receivedBytes
 		}
+
+		ps.OutputChannel <- receivedBytes
+	}
+}
+
+// Reader of peer messages
+// To be executed in a goroutine
+// Should not touch inner variables
+func (ps *PeerSocket) readLoop() {
+	for {
+		// Read version and size
+		// First four bytes
+		var initialBuffer = make([]byte, 4)
+		_, err := io.ReadAtLeast(ps.connReader, initialBuffer, 4)
+		initialBuffer[0] = 0 // First byte is the version
+		size := uint32(binary.BigEndian.Uint32(initialBuffer))
+		if err != nil {
+			if err == io.EOF {
+				// The remote peer closed
+				ps.InputChannel <- ReadEOFMsg{}
+			} else {
+				ps.InputChannel <- ReadErrorMsg{err}
+			}
+			return
+		}
+
+		// Read all the message
+		// var size = firstWord & 16777215 // 2^24 - 1
+		var buffer = make([]byte, size)
+		_, err = io.ReadAtLeast(io.MultiReader(bytes.NewReader(initialBuffer), ps.connReader), buffer, int(size))
+		if err != nil {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				// The remote peer closed
+				ps.InputChannel <- ReadEOFMsg{}
+			} else {
+				ps.InputChannel <- ReadErrorMsg{err}
+			}
+			return
+		}
+
+		ps.OutputChannel <- buffer
 	}
 }

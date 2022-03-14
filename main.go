@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"igor/config"
+	"igor/diamcodec"
 	"igor/diampeer"
 	"net"
 	"time"
@@ -68,7 +69,13 @@ func main() {
 	// Wait until received connected event and then send message
 	_, ok := (<-routerInputChannel).(diampeer.SocketConnectedEvent)
 	if ok {
-		superserverPeer.InputChannel <- []byte{1, 2, 3}
+		diameterMessage, error := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
+		if error != nil {
+			panic(error)
+		}
+		diameterMessage.Add("User-Name", "Perico")
+		messageBytes, _ := diameterMessage.MarshalBinary()
+		superserverPeer.InputChannel <- messageBytes
 	} else {
 		fmt.Println("peersocket error")
 	}

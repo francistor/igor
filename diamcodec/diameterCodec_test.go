@@ -435,6 +435,28 @@ func TestIPFilterRuleIAVP(t *testing.T) {
 	}
 }
 
+func TestIPv6PrefixAVP(t *testing.T) {
+
+	var thePrefix = "bebe:cafe::/16"
+
+	// Create avp
+	avp, err := NewAVP("francisco.cardosogil@gmail.com-myIPv6Prefix", thePrefix)
+	if err != nil {
+		t.Errorf("error creating IPv6 prefix AVP %v", err)
+		return
+	}
+	if avp.GetString() != thePrefix {
+		t.Errorf("IPv6 Prefix AVP does not match value")
+	}
+
+	// Serialize and unserialize
+	binaryAVP, _ := avp.MarshalBinary()
+	recoveredAVP, _, _ := DiameterAVPFromBytes(binaryAVP)
+	if recoveredAVP.GetString() != thePrefix {
+		t.Errorf("IPv6 Prefix AVP not properly encoded after unmarshalling. Got %s", recoveredAVP.GetString())
+	}
+}
+
 func TestEnumeratedAVP(t *testing.T) {
 
 	var theString = "zero"
@@ -763,6 +785,56 @@ func TestDiameterMessageJSON(t *testing.T) {
 		t.Errorf("prettyprint error %s", err)
 	}
 
-	fmt.Println(jBytes.String())
+	// fmt.Println(jBytes.String())
+}
 
+func TestMessageSize(t *testing.T) {
+	jDiameterMessage := `
+	{
+		"IsRequest": true,
+		"IsProxyable": false,
+		"IsError": false,
+		"IsRetransmission": false,
+		"CommandCode": 2000,
+		"ApplicationId": 1000,
+		"avps":[
+			{
+			  "francisco.cardosogil@gmail.com-myTestAllGrouped": [
+				{"User-Name" : "this-is-the-user-name"},
+  				{"francisco.cardosogil@gmail.com-myOctetString": "0102030405060708090a0b"},
+  				{"francisco.cardosogil@gmail.com-myInteger32": -99},
+  				{"francisco.cardosogil@gmail.com-myInteger64": -99},
+  				{"francisco.cardosogil@gmail.com-myUnsigned32": 99},
+  				{"francisco.cardosogil@gmail.com-myUnsigned64": 99},
+  				{"francisco.cardosogil@gmail.com-myFloat32": 99.9},
+  				{"francisco.cardosogil@gmail.com-myFloat64": 99.9},
+  				{"francisco.cardosogil@gmail.com-myAddress": "1.2.3.4"},
+  				{"francisco.cardosogil@gmail.com-myTime": "1966-11-26T03:34:08 UTC"},
+  				{"francisco.cardosogil@gmail.com-myString": "Hello, world!"},
+  				{"francisco.cardosogil@gmail.com-myDiameterIdentity": "Diameter@identity"},
+  				{"francisco.cardosogil@gmail.com-myDiameterURI": "Diameter@URI"},
+  				{"francisco.cardosogil@gmail.com-myIPFilterRule": "allow all"},
+  				{"francisco.cardosogil@gmail.com-myIPv4Address": "4.5.6.7"},
+  				{"francisco.cardosogil@gmail.com-myIPv6Address": "bebe:cafe::0"},
+  				{"francisco.cardosogil@gmail.com-myIPv6Prefix": "bebe:cafe::0/128"},
+  				{"francisco.cardosogil@gmail.com-myEnumerated": "two"}
+			  ]
+			}
+		]
+	}
+	`
+
+	// Read JSON to DiameterMessage
+	var diameterMessage DiameterMessage
+	err := json.Unmarshal([]byte(jDiameterMessage), &diameterMessage)
+	if err != nil {
+		t.Errorf("unmarshal error for diameter message: %s", err)
+	}
+	diameterMessage.Tidy()
+
+	// Get size of serialized message
+	buffer, _ := diameterMessage.MarshalBinary()
+	if len(buffer) != diameterMessage.Len() {
+		t.Errorf("error in diameter message len. Actual serialized size %d and reported len is %d", len(buffer), diameterMessage.Len())
+	}
 }

@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 	SetupLogger()
 
 	// Initialize the Config Object as done in main.go
-	bootFile := "resources/testInstance/searchRules.json"
+	bootFile := "resources/searchRules.json"
 	instanceName := "testInstance"
 	Config.Init(bootFile, instanceName)
 
@@ -71,7 +71,7 @@ func TestDiamConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Peer not found for IP address %s and origin-host %s", "127.0.0.1", "client.igor")
 	}
-	if peer.OriginNetwork != "127.0.0.0/8" || peer.ConnectionPolicy != "passive" {
+	if peer.DiameterHost != "client.igor" || peer.ConnectionPolicy != "passive" {
 		t.Fatal("Found peer is not conforming to expected attributes", peer)
 	}
 

@@ -221,6 +221,15 @@ func (m *DiameterMessage) MarshalBinary() (data []byte, err error) {
 	return b, nil
 }
 
+func (dm *DiameterMessage) Len() int {
+	var avpLen = 0
+	for i := range dm.AVPs {
+		avpLen += dm.AVPs[i].Len()
+	}
+
+	return 20 + avpLen
+}
+
 ///////////////////////////////////////////////////////////////
 // AVP manipulation
 ///////////////////////////////////////////////////////////////

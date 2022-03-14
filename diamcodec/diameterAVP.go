@@ -296,18 +296,18 @@ func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32, error) {
 		var prefixLen byte
 		address := make([]byte, 16)
 		if err := binary.Read(reader, binary.BigEndian, &dummy); err != nil {
-			config.IgorLogger.Error("could not write the dummy byte in ipv6 prefix")
+			config.IgorLogger.Error("could not read the dummy byte in ipv6 prefix")
 			return avp, 0, err
 		}
 		if err := binary.Read(reader, binary.BigEndian, &prefixLen); err != nil {
-			config.IgorLogger.Error("could not write the prefix len byte in ipv6 prefix")
+			config.IgorLogger.Error("could not read the prefix len byte in ipv6 prefix")
 			return avp, 0, err
 		}
 		if err := binary.Read(reader, binary.BigEndian, &address); err != nil {
 			config.IgorLogger.Error("could not write the address in ipv6 prefix")
 			return avp, 0, err
 		}
-		avp.Value = net.IP(address).String() + "/" + string(prefixLen)
+		avp.Value = net.IP(address).String() + "/" + fmt.Sprintf("%d", prefixLen)
 	}
 
 	return avp, padLen, nil
@@ -408,8 +408,11 @@ func (avp *DiameterAVP) MarshalBinary() (data []byte, err error) {
 		if !ok {
 			return nil, fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
 		}
-		for _, innerAVP := range groupedValue {
-			data, _ := innerAVP.MarshalBinary()
+		for i, _ := range groupedValue {
+			data, err := groupedValue[i].MarshalBinary()
+			if err != nil {
+				return nil, err
+			}
 			binary.Write(buffer, binary.BigEndian, data)
 		}
 
@@ -475,14 +478,14 @@ func (avp *DiameterAVP) MarshalBinary() (data []byte, err error) {
 		if !ok {
 			return nil, fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
 		}
-		binary.Write(buffer, binary.BigEndian, ipAddress)
+		binary.Write(buffer, binary.BigEndian, ipAddress.To4())
 
 	case diamdict.IPv6Address:
 		var ipAddress, ok = avp.Value.(net.IP)
 		if !ok {
 			return nil, fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
 		}
-		binary.Write(buffer, binary.BigEndian, ipAddress)
+		binary.Write(buffer, binary.BigEndian, ipAddress.To16())
 
 	case diamdict.IPv6Prefix:
 		var ipv6Prefix, ok = avp.Value.(string)
@@ -491,13 +494,15 @@ func (avp *DiameterAVP) MarshalBinary() (data []byte, err error) {
 		}
 		addrPrefix := strings.Split(ipv6Prefix, "/")
 		if len(addrPrefix) == 2 {
-			prefix, err := strconv.ParseUint(addrPrefix[0], 10, 2)
-			ipv6 := net.ParseIP(addrPrefix[1])
+			prefix, err := strconv.ParseUint(addrPrefix[1], 10, 8) // base 10, 8 bits
+			ipv6 := net.ParseIP(addrPrefix[0])
 			if err == nil && ipv6 != nil {
+				// To ignore
+				binary.Write(buffer, binary.BigEndian, byte(0))
 				// Prefix
-				binary.Write(buffer, binary.BigEndian, uint16(prefix))
+				binary.Write(buffer, binary.BigEndian, uint8(prefix))
 				// Address
-				binary.Write(buffer, binary.BigEndian, ipv6)
+				binary.Write(buffer, binary.BigEndian, ipv6.To16())
 			} else {
 				return nil, fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
 			}
@@ -528,6 +533,95 @@ func (avp *DiameterAVP) MarshalBinary() (data []byte, err error) {
 
 	return b, nil
 }
+
+// Returns the size of the AVP
+func (avp *DiameterAVP) Len() int {
+	var dataSize = 0
+
+	switch avp.DictItem.DiameterType {
+
+	case diamdict.None:
+		dataSize = len(avp.Value.([]byte))
+
+	case diamdict.OctetString:
+		dataSize = len(avp.Value.([]byte))
+
+	case diamdict.Integer32:
+		dataSize = 4
+
+	case diamdict.Integer64:
+		dataSize = 8
+
+	case diamdict.Unsigned32:
+		dataSize = 4
+
+	case diamdict.Unsigned64:
+		dataSize = 8
+
+	case diamdict.Float32:
+		dataSize = 4
+
+	case diamdict.Float64:
+		dataSize = 8
+
+	case diamdict.Grouped:
+		values := avp.Value.([]DiameterAVP)
+		for i := range values {
+			dataSize += values[i].Len()
+		}
+
+	case diamdict.Address:
+		if avp.Value.(net.IP).To4() != nil {
+			dataSize = 6
+		} else {
+			dataSize = 18
+		}
+
+	case diamdict.Time:
+		dataSize = 4
+
+	case diamdict.UTF8String:
+		dataSize = len(avp.Value.(string))
+
+	case diamdict.DiamIdent:
+		dataSize = len(avp.Value.(string))
+
+	case diamdict.DiameterURI:
+		dataSize = len(avp.Value.(string))
+
+	case diamdict.Enumerated:
+		dataSize = 4
+
+	case diamdict.IPFilterRule:
+		dataSize = len(avp.Value.(string))
+
+	case diamdict.IPv4Address:
+		dataSize = 4
+
+	case diamdict.IPv6Address:
+		dataSize = 16
+
+	case diamdict.IPv6Prefix:
+		dataSize = 18
+	}
+
+	if avp.DictItem.VendorId == 0 {
+		dataSize += 8
+	} else {
+		dataSize += 12
+	}
+
+	// Fix to 4 byte boundary
+	if dataSize%4 == 0 {
+		return dataSize
+	} else {
+		return dataSize + 4 - (dataSize % 4)
+	}
+}
+
+/////////////////////////////////////////////
+// Value Getters
+/////////////////////////////////////////////
 
 func (avp *DiameterAVP) GetOctets() []byte {
 
