@@ -568,11 +568,13 @@ func TestSerializationError(t *testing.T) {
 	}
 
 	// Force unmarshalling error. Size is some big number
+
 	copy(theBytesUnknown[5:8], []byte{100, 100, 100})
 	_, _, e := DiameterAVPFromBytes(theBytesUnknown)
 	if e == nil {
 		t.Error("bad bytes should have reported error")
 	}
+
 }
 
 func TestJSON(t *testing.T) {

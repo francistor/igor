@@ -12,6 +12,11 @@ import (
 	"time"
 )
 
+/*
+This object follows the Actor model. Interaction with other parts of the application takes part only
+via the input and output channels
+*/
+
 const (
 	StatusCreated    = 0
 	StatusConnecting = 1
@@ -36,6 +41,7 @@ type SocketConnectedEvent struct {
 type SocketCloseCommand struct{}
 
 // Internal messages
+// TODO: use structs
 type ConnectionEstablishedMsg net.Conn
 type ConnectionErrorMsg error
 type ReadEOFMsg struct{}
@@ -66,6 +72,7 @@ type PeerSocket struct {
 	cancel context.CancelFunc
 }
 
+// Creates a new PeerSocket when we are expected to establish the connection with the other side
 func NewActivePeerSocket(oc chan interface{}, connTimeoutMillis int, ipAddress string, port int) PeerSocket {
 
 	// Create the socket
@@ -79,6 +86,7 @@ func NewActivePeerSocket(oc chan interface{}, connTimeoutMillis int, ipAddress s
 	return peerSocket
 }
 
+// Creates a new PeerSocket when the connection has been accepted already
 func NewPassivePeerSocket(oc chan interface{}, conn net.Conn) PeerSocket {
 	// Create the socket
 	peerSocket := PeerSocket{InputChannel: make(chan interface{}), OutputChannel: oc, connection: conn}
@@ -98,7 +106,7 @@ func NewPassivePeerSocket(oc chan interface{}, conn net.Conn) PeerSocket {
 func (ps *PeerSocket) eventLoop() {
 
 	defer func() {
-		// Close the channels
+		// Close the channels that we have created
 		close(ps.InputChannel)
 
 		// Close the connection (another time, should not make harm)
@@ -117,10 +125,13 @@ func (ps *PeerSocket) eventLoop() {
 			ps.connReader = bufio.NewReader(ps.connection)
 			ps.connWriter = bufio.NewWriter(ps.connection)
 			go ps.readLoop()
+
 			ps.OutputChannel <- SocketConnectedEvent{Sender: ps}
 			ps.Status = StatusConnected
 
-			// connect goroutine reports connection could not be established
+		// connect goroutine reports connection could not be established
+		// the Peersocket will terminate the event loop, send the Down event
+		// and the router must recycle it
 		case ConnectionErrorMsg:
 			if ps.Status <= StatusClosing {
 				ps.OutputChannel <- SocketErrorEvent{Sender: ps, Error: v}
@@ -129,13 +140,17 @@ func (ps *PeerSocket) eventLoop() {
 			ps.Status = StatusClosed
 			return
 
-			// readLoop goroutine reports the connection is closed
+		// readLoop goroutine reports the connection is closed
+		// the Peersocket will terminate the event loop, send the Down event
+		// and the router must recycle it
 		case ReadEOFMsg:
 			ps.OutputChannel <- SocketDownEvent{Sender: ps}
 			ps.Status = StatusClosed
 			return
 
-			// readLoop goroutine reports a read error
+		// readLoop goroutine reports a read error
+		// the Peersocket will terminate the event loop, send the Down event
+		// and the router must recycle it
 		case ReadErrorMsg:
 			if ps.Status < StatusClosing {
 				ps.OutputChannel <- SocketErrorEvent{Sender: ps}
@@ -144,7 +159,7 @@ func (ps *PeerSocket) eventLoop() {
 			ps.Status = StatusClosed
 			return
 
-			// command received from outside
+		// command received from outside
 		case SocketCloseCommand:
 
 			// In case it was still connecting
@@ -224,7 +239,7 @@ func (ps *PeerSocket) readLoop() {
 		// First four bytes
 		var initialBuffer = make([]byte, 4)
 		_, err := io.ReadAtLeast(ps.connReader, initialBuffer, 4)
-		initialBuffer[0] = 0 // First byte is the version
+		initialBuffer[0] = 0 // First byte is the version and w are ignoring it
 		size := uint32(binary.BigEndian.Uint32(initialBuffer))
 		if err != nil {
 			if err == io.EOF {

@@ -143,7 +143,7 @@ func (c *ConfigManager) GetConfigObject(objectName string) (ConfigObject, error)
 	var retriever = func() {
 		obj, err := ReadConfigObject(objectName)
 		if err != nil {
-			IgorLogger.Errorw("Could not read config object", "name", objectName, "error", err)
+			IgorLogger.Errorw("could not read config object", "name", objectName, "error", err)
 		} else {
 			Config.objectCache.Store(objectName, obj)
 		}
@@ -232,10 +232,10 @@ func ReadResource(location string) (string, error) {
 		IgorLogger.Debugw("Reading Configuration file", "fileName", os.Getenv("IGOR_CONFIG_BASE")+location)
 		resp, err := ioutil.ReadFile(os.Getenv("IGOR_CONFIG_BASE") + location)
 		if err != nil {
-			IgorLogger.Debugw("Resource not found", "file", location, "error", err)
+			IgorLogger.Debugw("resource not found", "file", location, "error", err)
 			return "", err
 		}
-		IgorLogger.Debugw("Resource found", "file", location)
+		IgorLogger.Debugw("resource found", "file", location)
 		return string(resp), err
 	}
 }
