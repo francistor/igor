@@ -282,61 +282,6 @@ func (dm *DiameterMessage) MarshalBinary() ([]byte, error) {
 	return buffer.Bytes(), err
 }
 
-// Serializes the message. TODO: The message needs to have all its fields set => Call Tidy()
-func (m *DiameterMessage) MarshalBinary2() (data []byte, err error) {
-
-	var buffer = new(bytes.Buffer)
-
-	// Write Version
-	binary.Write(buffer, binary.BigEndian, byte(1))
-
-	// Write Len as 0. Will be overriden later
-	binary.Write(buffer, binary.BigEndian, uint8(0))
-	binary.Write(buffer, binary.BigEndian, uint16(0))
-
-	// Write flags
-	var flags byte
-	if m.IsRequest {
-		flags += 128
-	}
-	if m.IsProxyable {
-		flags += 64
-	}
-	if m.IsError {
-		flags += 32
-	}
-	if m.IsRetransmission {
-		flags += 16
-	}
-	binary.Write(buffer, binary.BigEndian, flags)
-
-	// Write command code
-	binary.Write(buffer, binary.BigEndian, byte(m.CommandCode/65535))
-	binary.Write(buffer, binary.BigEndian, uint16(m.CommandCode%65535))
-
-	// Write the rest of the fields
-	binary.Write(buffer, binary.BigEndian, m.ApplicationId)
-	binary.Write(buffer, binary.BigEndian, m.E2EId)
-	binary.Write(buffer, binary.BigEndian, m.HopByHopId)
-
-	// Write avps
-	for i := range m.AVPs {
-		// TODO: Need to enforce mandatory here
-		avpBytes, err := m.AVPs[i].MarshalBinary()
-		if err != nil {
-			return nil, err
-		}
-		binary.Write(buffer, binary.BigEndian, avpBytes)
-	}
-
-	// Patch the length
-	b := buffer.Bytes()
-	b[1] = byte(len(b) / 65535)
-	binary.BigEndian.PutUint16(b[2:4], uint16(len(b)%65535))
-
-	return b, nil
-}
-
 func (dm *DiameterMessage) Len() int {
 	var avpLen = 0
 	for i := range dm.AVPs {
