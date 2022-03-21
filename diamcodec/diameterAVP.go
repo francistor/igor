@@ -53,29 +53,35 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	var isVendorSpecific bool
 
+	currentIndex := int64(0)
+
 	// Get Header
 	if err := binary.Read(reader, binary.BigEndian, &avp.Code); err != nil {
 		config.IgorLogger.Error("could not decode the AVP code field")
 		return 0, err
 	}
+	currentIndex += 4
 
 	// Get Flags
 	if err := binary.Read(reader, binary.BigEndian, &flags); err != nil {
 		config.IgorLogger.Error("could not decode the AVP flags field")
-		return 0, err
+		return currentIndex, err
 	}
 	isVendorSpecific = flags&0x80 != 0
 	avp.IsMandatory = flags&0x40 != 0
+	currentIndex += 1
 
 	// Get Len
 	if err := binary.Read(reader, binary.BigEndian, &lenHigh); err != nil {
 		config.IgorLogger.Error("could not decode the AVP len (high) field")
-		return 0, err
+		return currentIndex, err
 	}
+	currentIndex += 1
 	if err := binary.Read(reader, binary.BigEndian, &lenLow); err != nil {
 		config.IgorLogger.Error("could not decode the len (low) code field")
-		return 0, err
+		return currentIndex, err
 	}
+	currentIndex += 2
 
 	// The Len field contains the full size of the AVP, but not considering the padding
 	// Pad until the total length is a multiple of 4
@@ -93,14 +99,15 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	if isVendorSpecific {
 		if err := binary.Read(reader, binary.BigEndian, &avp.VendorId); err != nil {
 			config.IgorLogger.Error("could not decode the vendor id code field")
-			return 0, err
+			return currentIndex, err
 		}
+		currentIndex += 4
 		dataLen = avpLen - 12
 	} else {
 		dataLen = avpLen - 8
 	}
 
-	currentIndex := int64(avpLen - dataLen)
+	//currentIndex = int64(avpLen - dataLen)
 
 	// Get the relevant info from the dictionary
 	// If not in the dictionary, will get some defaults

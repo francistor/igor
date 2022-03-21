@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"igor/config"
+	"io"
 )
 
 const (
@@ -52,11 +53,7 @@ type DiameterMessage struct {
 	AVPs []DiameterAVP
 }
 
-// Builds a DiameterMessage from it string representation
-func DiameterMessageFromBytes(inputBytes []byte) (DiameterMessage, uint32, error) {
-
-	diameterMessage := DiameterMessage{}
-
+func (dm *DiameterMessage) ReadFrom(reader io.Reader) (n int64, err error) {
 	var version byte
 	var lenHigh uint8
 	var lenLow uint16
@@ -65,83 +62,109 @@ func DiameterMessageFromBytes(inputBytes []byte) (DiameterMessage, uint32, error
 	var commandCodeHigh uint8
 	var commandCodeLow uint16
 
-	reader := bytes.NewReader(inputBytes)
+	currentIndex := int64(0)
 
 	// Get Version
 	if err := binary.Read(reader, binary.BigEndian, &version); err != nil {
 		config.IgorLogger.Error("could not decode the version")
-		return diameterMessage, 0, err
+		return 0, err
 	}
+	currentIndex += 1
 
 	// Get Length
 	if err := binary.Read(reader, binary.BigEndian, &lenHigh); err != nil {
 		config.IgorLogger.Error("could not decode the Diameter message len (high) field")
-		return diameterMessage, 0, err
+		return currentIndex, err
 	}
+	currentIndex += 1
 	if err := binary.Read(reader, binary.BigEndian, &lenLow); err != nil {
 		config.IgorLogger.Error("could not decode the Diameter message len (high) field")
-		return diameterMessage, 0, err
+		return currentIndex, err
 	}
+	currentIndex += 2
 	messageLength = uint32(lenHigh)*65535 + uint32(lenLow)
 
 	// Get flags
 	if err := binary.Read(reader, binary.BigEndian, &flags); err != nil {
 		config.IgorLogger.Error("could not decode the Diameter message flags")
-		return diameterMessage, 0, err
+		return currentIndex, err
 	}
-	diameterMessage.IsRequest = flags&128 != 0
-	diameterMessage.IsProxyable = flags&64 != 0
-	diameterMessage.IsError = flags&32 != 0
-	diameterMessage.IsRetransmission = flags&16 != 0
+	currentIndex += 1
+	dm.IsRequest = flags&128 != 0
+	dm.IsProxyable = flags&64 != 0
+	dm.IsError = flags&32 != 0
+	dm.IsRetransmission = flags&16 != 0
 
 	// Get CommandCode
 	if err := binary.Read(reader, binary.BigEndian, &commandCodeHigh); err != nil {
 		config.IgorLogger.Error("could not decode the Command code (high) field")
-		return diameterMessage, 0, err
+		return currentIndex, err
 	}
+	currentIndex += 1
 	if err := binary.Read(reader, binary.BigEndian, &commandCodeLow); err != nil {
 		config.IgorLogger.Error("could not decode the Command code (high) field")
-		return diameterMessage, 0, err
+		return currentIndex, err
 	}
-	diameterMessage.CommandCode = uint32(commandCodeHigh)*65535 + uint32(commandCodeLow)
+	currentIndex += 2
+	dm.CommandCode = uint32(commandCodeHigh)*65535 + uint32(commandCodeLow)
 
 	// Get the applicationId
-	if err := binary.Read(reader, binary.BigEndian, &diameterMessage.ApplicationId); err != nil {
+	if err := binary.Read(reader, binary.BigEndian, &dm.ApplicationId); err != nil {
 		config.IgorLogger.Error("could not decode the Applicationid field")
-		return diameterMessage, 0, err
+		return currentIndex, err
 	}
+	currentIndex += 4
 
-	diameterApplication, ok := config.DDict.AppByCode[diameterMessage.ApplicationId]
+	diameterApplication, ok := config.DDict.AppByCode[dm.ApplicationId]
 	if ok {
-		diameterMessage.ApplicationName = diameterApplication.Name
-		diameterMessage.CommandName = diameterApplication.CommandByCode[diameterMessage.CommandCode].Name
+		dm.ApplicationName = diameterApplication.Name
+		dm.CommandName = diameterApplication.CommandByCode[dm.CommandCode].Name
 	}
 
 	// Get the E2EndId
-	if err := binary.Read(reader, binary.BigEndian, &diameterMessage.E2EId); err != nil {
+	if err := binary.Read(reader, binary.BigEndian, &dm.E2EId); err != nil {
 		config.IgorLogger.Error("could not decode the E2EId field")
-		return diameterMessage, 0, err
+		return currentIndex, err
 	}
+	currentIndex += 4
 
 	// Get the HopByHopId
-	if err := binary.Read(reader, binary.BigEndian, &diameterMessage.HopByHopId); err != nil {
+	if err := binary.Read(reader, binary.BigEndian, &dm.HopByHopId); err != nil {
 		config.IgorLogger.Error("could not decode the HopByHopId field")
-		return diameterMessage, 0, err
+		return currentIndex, err
 	}
+	currentIndex += 4
 
 	// Get the AVPs
-	diameterMessage.AVPs = make([]DiameterAVP, 0)
-	var currentIndex uint32 = 20 // The header is always 20 bytes
-	for currentIndex < messageLength {
-		nextAVP, bytesRead, err := DiameterAVPFromBytes(inputBytes[currentIndex:])
+	dm.AVPs = make([]DiameterAVP, 0)
+	if currentIndex != 20 {
+		panic("assert failed. Bad header size in diameter message header")
+	}
+	// var currentIndex uint32 = 20 // The header is always 20 bytes
+	for currentIndex < int64(messageLength) {
+		nextAVP := DiameterAVP{}
+		bytesRead, err := nextAVP.ReadFrom(reader)
 		if err != nil {
-			return diameterMessage, 0, err
+			return currentIndex, err
 		}
-		diameterMessage.AVPs = append(diameterMessage.AVPs, nextAVP)
+		dm.AVPs = append(dm.AVPs, nextAVP)
 		currentIndex += bytesRead
 	}
 
-	return diameterMessage, messageLength, nil
+	if int64(messageLength) != currentIndex {
+		panic("assert failed. Bad header size in diameter message")
+	}
+
+	return int64(messageLength), nil
+}
+
+func DiameterMessageFromBytes(inputBytes []byte) (DiameterMessage, uint32, error) {
+	reader := bytes.NewReader(inputBytes)
+
+	diameterMessage := DiameterMessage{}
+	n, err := diameterMessage.ReadFrom(reader)
+
+	return diameterMessage, uint32(n), err
 }
 
 // Makes sure both codes and names are set for ApplicationId and CommandCode
@@ -166,9 +189,102 @@ func (m *DiameterMessage) Tidy() *DiameterMessage {
 	return m
 }
 
+// Writes the diameter message to the specified writer
+func (m *DiameterMessage) WriteTo(buffer io.Writer) (int64, error) {
+
+	currentIndex := int64(0)
+	var err error
+
+	// Write Version
+	if err = binary.Write(buffer, binary.BigEndian, byte(1)); err != nil {
+		return currentIndex, err
+	}
+	currentIndex += 1
+
+	messageLen := m.Len()
+
+	// Write Len
+	if err = binary.Write(buffer, binary.BigEndian, byte(messageLen/65535)); err != nil {
+		return currentIndex, err
+	}
+	currentIndex += 1
+	if err = binary.Write(buffer, binary.BigEndian, uint16(messageLen%65535)); err != nil {
+		return currentIndex, err
+	}
+	currentIndex += 2
+
+	// Write flags
+	var flags byte
+	if m.IsRequest {
+		flags += 128
+	}
+	if m.IsProxyable {
+		flags += 64
+	}
+	if m.IsError {
+		flags += 32
+	}
+	if m.IsRetransmission {
+		flags += 16
+	}
+	if err = binary.Write(buffer, binary.BigEndian, flags); err != nil {
+		return currentIndex, err
+	}
+	currentIndex += 1
+
+	// Write command code
+	if err = binary.Write(buffer, binary.BigEndian, byte(m.CommandCode/65535)); err != nil {
+		return currentIndex, err
+	}
+	currentIndex += 1
+	if err = binary.Write(buffer, binary.BigEndian, uint16(m.CommandCode%65535)); err != nil {
+		return currentIndex, err
+	}
+	currentIndex += 2
+
+	// Write the rest of the fields
+	if err = binary.Write(buffer, binary.BigEndian, m.ApplicationId); err != nil {
+		return currentIndex, err
+	}
+	currentIndex += 4
+
+	if err = binary.Write(buffer, binary.BigEndian, m.E2EId); err != nil {
+		return currentIndex, err
+	}
+	currentIndex += 4
+
+	if err = binary.Write(buffer, binary.BigEndian, m.HopByHopId); err != nil {
+		return currentIndex, err
+	}
+	currentIndex += 4
+
+	// Write avps
+	for i := range m.AVPs {
+		// TODO: Need to enforce mandatory here
+		n, err := m.AVPs[i].WriteTo(buffer)
+		if err != nil {
+			return currentIndex, err
+		}
+		currentIndex += int64(n)
+	}
+
+	// Saninty check
+	if currentIndex != int64(messageLen) {
+		panic("assert failed. Bad message size")
+	}
+
+	return currentIndex, nil
+}
+
+func (dm *DiameterMessage) MarshalBinary() ([]byte, error) {
+	var buffer = new(bytes.Buffer)
+	_, err := dm.WriteTo(buffer)
+	return buffer.Bytes(), err
+}
+
 // Serializes the message. TODO: The message needs to have all its fields set => Call Tidy()
-func (m *DiameterMessage) MarshalBinary() (data []byte, err error) {
-	// Will write the output here
+func (m *DiameterMessage) MarshalBinary2() (data []byte, err error) {
+
 	var buffer = new(bytes.Buffer)
 
 	// Write Version
