@@ -66,19 +66,16 @@ func (dm *DiameterMessage) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get Version
 	if err := binary.Read(reader, binary.BigEndian, &version); err != nil {
-		config.IgorLogger.Error("could not decode the version")
 		return 0, err
 	}
 	currentIndex += 1
 
 	// Get Length
 	if err := binary.Read(reader, binary.BigEndian, &lenHigh); err != nil {
-		config.IgorLogger.Error("could not decode the Diameter message len (high) field")
 		return currentIndex, err
 	}
 	currentIndex += 1
 	if err := binary.Read(reader, binary.BigEndian, &lenLow); err != nil {
-		config.IgorLogger.Error("could not decode the Diameter message len (high) field")
 		return currentIndex, err
 	}
 	currentIndex += 2
@@ -86,7 +83,6 @@ func (dm *DiameterMessage) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get flags
 	if err := binary.Read(reader, binary.BigEndian, &flags); err != nil {
-		config.IgorLogger.Error("could not decode the Diameter message flags")
 		return currentIndex, err
 	}
 	currentIndex += 1
@@ -97,12 +93,10 @@ func (dm *DiameterMessage) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get CommandCode
 	if err := binary.Read(reader, binary.BigEndian, &commandCodeHigh); err != nil {
-		config.IgorLogger.Error("could not decode the Command code (high) field")
 		return currentIndex, err
 	}
 	currentIndex += 1
 	if err := binary.Read(reader, binary.BigEndian, &commandCodeLow); err != nil {
-		config.IgorLogger.Error("could not decode the Command code (high) field")
 		return currentIndex, err
 	}
 	currentIndex += 2
@@ -110,7 +104,6 @@ func (dm *DiameterMessage) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get the applicationId
 	if err := binary.Read(reader, binary.BigEndian, &dm.ApplicationId); err != nil {
-		config.IgorLogger.Error("could not decode the Applicationid field")
 		return currentIndex, err
 	}
 	currentIndex += 4
@@ -123,14 +116,12 @@ func (dm *DiameterMessage) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get the E2EndId
 	if err := binary.Read(reader, binary.BigEndian, &dm.E2EId); err != nil {
-		config.IgorLogger.Error("could not decode the E2EId field")
 		return currentIndex, err
 	}
 	currentIndex += 4
 
 	// Get the HopByHopId
 	if err := binary.Read(reader, binary.BigEndian, &dm.HopByHopId); err != nil {
-		config.IgorLogger.Error("could not decode the HopByHopId field")
 		return currentIndex, err
 	}
 	currentIndex += 4

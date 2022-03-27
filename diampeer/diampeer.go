@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"igor/config"
+	"igor/diamcodec"
 	"io"
 	"net"
 	"time"
@@ -40,12 +41,30 @@ type SocketConnectedEvent struct {
 // Intput Commands
 type SocketCloseCommand struct{}
 
+// Message sent by handler
+type HandlerDiameterMessage struct {
+	// TODO
+	Message *diamcodec.DiameterMessage
+}
+
+// Message sent by peer
+type PeerDiameterMessage struct {
+	Sender  *PeerSocket
+	Message *diamcodec.DiameterMessage
+}
+
 // Internal messages
-// TODO: use structs
-type ConnectionEstablishedMsg net.Conn
-type ConnectionErrorMsg error
+type ConnectionEstablishedMsg struct {
+	Connection net.Conn
+}
+type ConnectionErrorMsg struct {
+	Error error
+}
 type ReadEOFMsg struct{}
 type ReadErrorMsg struct {
+	Error error
+}
+type WriteErrorMsg struct {
 	Error error
 }
 
@@ -121,7 +140,7 @@ func (ps *PeerSocket) eventLoop() {
 		switch v := in.(type) {
 		// connect goroutine reports connection established
 		case ConnectionEstablishedMsg:
-			ps.connection = v
+			ps.connection = v.Connection
 			ps.connReader = bufio.NewReader(ps.connection)
 			ps.connWriter = bufio.NewWriter(ps.connection)
 			go ps.readLoop()
@@ -134,7 +153,7 @@ func (ps *PeerSocket) eventLoop() {
 		// and the router must recycle it
 		case ConnectionErrorMsg:
 			if ps.Status <= StatusClosing {
-				ps.OutputChannel <- SocketErrorEvent{Sender: ps, Error: v}
+				ps.OutputChannel <- SocketErrorEvent{Sender: ps, Error: v.Error}
 			}
 			ps.OutputChannel <- SocketDownEvent{Sender: ps}
 			ps.Status = StatusClosed
@@ -153,7 +172,16 @@ func (ps *PeerSocket) eventLoop() {
 		// and the router must recycle it
 		case ReadErrorMsg:
 			if ps.Status < StatusClosing {
-				ps.OutputChannel <- SocketErrorEvent{Sender: ps}
+				ps.OutputChannel <- SocketErrorEvent{Sender: ps, Error: v.Error}
+			}
+			ps.OutputChannel <- SocketDownEvent{Sender: ps}
+			ps.Status = StatusClosed
+			return
+
+		// Same for writes
+		case WriteErrorMsg:
+			if ps.Status < StatusClosing {
+				ps.OutputChannel <- SocketErrorEvent{Sender: ps, Error: v.Error}
 			}
 			ps.OutputChannel <- SocketDownEvent{Sender: ps}
 			ps.Status = StatusClosed
@@ -175,9 +203,14 @@ func (ps *PeerSocket) eventLoop() {
 			// The readLoop goroutine will report the connection has been closed
 
 			// Send a message to the peer
-		case []byte:
+		case HandlerDiameterMessage:
 			if ps.Status == StatusConnected {
-				ps.connection.Write(v)
+				// TODO: Keep track of sender for response, if necessary
+				_, err := v.Message.WriteTo(ps.connection)
+				if err != nil {
+					ps.InputChannel <- WriteErrorMsg{err}
+					return
+				}
 			} else {
 				config.IgorLogger.Error("message was not sent because status is %d", ps.Status)
 			}
@@ -201,9 +234,9 @@ func (ps *PeerSocket) connect(connTimeoutMillis int, ipAddress string, port int)
 	conn, err := dialer.DialContext(context, "tcp4", fmt.Sprintf("%s:%d", ipAddress, port))
 
 	if err != nil {
-		ps.InputChannel <- ConnectionErrorMsg(err)
+		ps.InputChannel <- ConnectionErrorMsg{err}
 	} else {
-		ps.InputChannel <- ConnectionEstablishedMsg(conn)
+		ps.InputChannel <- ConnectionEstablishedMsg{conn}
 	}
 
 }
@@ -211,11 +244,11 @@ func (ps *PeerSocket) connect(connTimeoutMillis int, ipAddress string, port int)
 // Reader of peer messages
 // To be executed in a goroutine
 // Should not touch inner variables
-func (ps *PeerSocket) ReadLoop2() {
+func (ps *PeerSocket) readLoop() {
 	for {
-		// Each iteration will create a new buffer. Not shared
-		var receivedBytes = make([]byte, 1024)
-		_, err := ps.connection.Read(receivedBytes)
+		dm := diamcodec.DiameterMessage{}
+		_, err := dm.ReadFrom(ps.connReader)
+
 		if err != nil {
 			if err == io.EOF {
 				// The remote peer closed
@@ -226,14 +259,14 @@ func (ps *PeerSocket) ReadLoop2() {
 			return
 		}
 
-		ps.OutputChannel <- receivedBytes
+		ps.OutputChannel <- PeerDiameterMessage{Sender: ps, Message: &dm}
 	}
 }
 
 // Reader of peer messages
 // To be executed in a goroutine
 // Should not touch inner variables
-func (ps *PeerSocket) readLoop() {
+func (ps *PeerSocket) readLoop2() {
 	for {
 		// Read version and size
 		// First four bytes

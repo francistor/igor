@@ -60,7 +60,7 @@ func main() {
 	time.Sleep(2 * time.Second)
 	// Initially emtpy
 	peerSockets := make(map[string]diampeer.PeerSocket)
-	// Update
+	// Update. Will create a PeerSocket per active peer
 	peerSockets = updatePeerSockets(routerInputChannel, peerSockets, diameterPeersConf)
 
 	// Use peer for superserver.igor
@@ -74,18 +74,18 @@ func main() {
 			panic(error)
 		}
 		diameterMessage.Add("User-Name", "Perico")
-		messageBytes, _ := diameterMessage.MarshalBinary()
-		superserverPeer.InputChannel <- messageBytes
+		superserverPeer.InputChannel <- diampeer.HandlerDiameterMessage{Message: &diameterMessage}
 	} else {
 		fmt.Println("peersocket error")
 	}
 
-	// Close peer
+	// Close active peer that sent the message
 	time.Sleep(1 * time.Second)
 	superserverPeer.InputChannel <- diampeer.SocketCloseCommand{}
 
-	// Wait for down event
-	fmt.Println("first message", <-routerInputChannel)
+	// Get message that was sent
+	fm := <-routerInputChannel
+	fmt.Println("first message", *fm.(diampeer.PeerDiameterMessage).Message)
 	fmt.Println("second message", <-routerInputChannel)
 
 	fmt.Println("waiting ...")
