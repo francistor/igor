@@ -3,6 +3,7 @@ package diamcodec
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"igor/config"
 	"io"
@@ -369,6 +370,9 @@ func NewDiameterRequest(appName string, commandName string) (DiameterMessage, er
 	diameterMessage.CommandName = commandDict.Name
 	diameterMessage.CommandCode = commandDict.Code
 
+	diameterMessage.HopByHopId = getHopByHopId()
+	diameterMessage.E2EId = getE2EId()
+
 	// Add mandatory parameters
 	diameterMessage.Add("Origin-Host", config.DiameterServerConf().DiameterHost)
 	diameterMessage.Add("Origin-Realm", config.DiameterServerConf().DiameterRealm)
@@ -378,7 +382,7 @@ func NewDiameterRequest(appName string, commandName string) (DiameterMessage, er
 
 }
 
-func NewDiameterAnswer(diameterRequest DiameterMessage) DiameterMessage {
+func NewDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage {
 
 	diameterMessage := DiameterMessage{}
 
@@ -388,7 +392,7 @@ func NewDiameterAnswer(diameterRequest DiameterMessage) DiameterMessage {
 	diameterMessage.CommandName = diameterRequest.CommandName
 
 	diameterMessage.E2EId = diameterRequest.E2EId
-	diameterMessage.HopByHopId = diameterRequest.E2EId
+	diameterMessage.HopByHopId = diameterRequest.HopByHopId
 
 	// Add mandatory parameters
 	diameterMessage.Add("Origin-Host", config.DiameterServerConf().DiameterHost)
@@ -398,10 +402,19 @@ func NewDiameterAnswer(diameterRequest DiameterMessage) DiameterMessage {
 }
 
 // TODO:
-func CopyDiameterMessage(diameterMessage DiameterMessage) DiameterMessage {
+func CopyDiameterMessage(diameterMessage *DiameterMessage) DiameterMessage {
 
 	copy := DiameterMessage{}
 	return copy
+}
+
+func (dm DiameterMessage) String() string {
+	b, error := json.Marshal(dm)
+	if error != nil {
+		return "<error>"
+	} else {
+		return string(b)
+	}
 }
 
 ///////////////////////////////////////////////////////////////

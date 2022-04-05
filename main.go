@@ -52,66 +52,71 @@ func main() {
 			}
 
 			// Create peer for the accepted connection and start it
-			diampeer.NewPassivePeerSocket(routerInputChannel, connection)
+			diampeer.NewPassiveDiameterPeer(routerInputChannel, connection, MyMessageHandler)
 		}
 	}()
 
-	// Create the PeerSocket objects after some time for accepter loop to be executed
+	// Create the DiameterPeer objects after some time for accepter loop to be executed
 	time.Sleep(2 * time.Second)
+
 	// Initially emtpy
-	peerSockets := make(map[string]diampeer.PeerSocket)
-	// Update. Will create a PeerSocket per active peer
-	peerSockets = updatePeerSockets(routerInputChannel, peerSockets, diameterPeersConf)
+	diamPeers := make(map[string]diampeer.DiameterPeer)
+	// Will create a DiameterPeer per active Peer
+	diamPeers = updateDiameterPeers(routerInputChannel, diamPeers, diameterPeersConf)
 
 	// Use peer for superserver.igor
-	superserverPeer := peerSockets["superserver.igor"]
+	superserverPeer := diamPeers["superserver.igor"]
 
-	// Wait until received connected event and then send message
-	_, ok := (<-routerInputChannel).(diampeer.SocketConnectedEvent)
+	// Wait until received connected event sent by active peer and then send message
+	_, ok := (<-routerInputChannel).(diampeer.PeerUpEvent)
 	if ok {
 		diameterMessage, error := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
 		if error != nil {
 			panic(error)
 		}
 		diameterMessage.Add("User-Name", "Perico")
-		superserverPeer.InputChannel <- diampeer.HandlerDiameterMessage{Message: &diameterMessage}
+		answer, err := superserverPeer.DiameterRequest(&diameterMessage, 5*time.Second)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			fmt.Println("GOT ANSWER", answer)
+		}
 	} else {
-		fmt.Println("peersocket error")
+		fmt.Println("did not get a peer up event")
 	}
 
 	// Close active peer that sent the message
 	time.Sleep(1 * time.Second)
-	superserverPeer.InputChannel <- diampeer.SocketCloseCommand{}
+	superserverPeer.Close()
 
-	// Get message that was sent
-	fm := <-routerInputChannel
-	fmt.Println("first message", *fm.(diampeer.PeerDiameterMessage).Message)
-	fmt.Println("second message", <-routerInputChannel)
-
-	fmt.Println("waiting ...")
+	fmt.Println("waiting to terminate...")
 	time.Sleep(5 * time.Second)
 	fmt.Println("done.")
 
 	close(routerInputChannel)
-
 }
 
-// Takes the current map of peerSockets and generates a new one based on the current configuration
-func updatePeerSockets(c chan interface{}, peerSockets map[string]diampeer.PeerSocket, diameterPeers config.DiameterPeers) map[string]diampeer.PeerSocket {
+// Takes the current map of DiameterPeers and generates a new one based on the current configuration
+func updateDiameterPeers(c chan interface{}, diamPeers map[string]diampeer.DiameterPeer, diameterPeers config.DiameterPeers) map[string]diampeer.DiameterPeer {
 
 	// TODO: Close the connections for now not configured peers
 
-	// Make sure a peerSocket exists for each active peer
+	// Make sure a DiameterPeer exists for each active peer
 	for dh := range diameterPeers {
 		peerConfig := diameterPeers[dh]
 		if peerConfig.ConnectionPolicy == "active" {
-			_, found := peerSockets[diameterPeers[dh].DiameterHost]
+			_, found := diamPeers[diameterPeers[dh].DiameterHost]
 			if !found {
-				peerSocket := diampeer.NewActivePeerSocket(c, 3000, peerConfig.IPAddress, peerConfig.Port)
-				peerSockets[peerConfig.DiameterHost] = peerSocket
+				diamPeer := diampeer.NewActiveDiameterPeer(c, peerConfig, MyMessageHandler)
+				diamPeers[peerConfig.DiameterHost] = diamPeer
 			}
 		}
 	}
 
-	return peerSockets
+	return diamPeers
+}
+
+func MyMessageHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
+	answer := diamcodec.NewDiameterAnswer(request)
+	return &answer, nil
 }

@@ -14,7 +14,7 @@ func SetupLogger() {
 	rawJSON := []byte(`{
 		"level": "debug",
 		"development": true,
-		"encoding": "json",
+		"encoding": "console",
 		"outputPaths": ["stdout"],
 		"errorOutputPaths": ["stderr"],
 		"disableCaller": false,

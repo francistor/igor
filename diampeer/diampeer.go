@@ -2,9 +2,7 @@ package diampeer
 
 import (
 	"bufio"
-	"bytes"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"igor/config"
 	"igor/diamcodec"
@@ -13,13 +11,7 @@ import (
 	"time"
 )
 
-/*
-This object follows the Actor model. Interaction with other parts of the application takes part only
-via the input and output channels
-*/
-
 const (
-	StatusCreated    = 0
 	StatusConnecting = 1
 	StatusConnected  = 2
 	StatusClosing    = 3
@@ -27,33 +19,40 @@ const (
 )
 
 // Ouput Events
-type SocketDownEvent struct {
-	Sender *PeerSocket
-}
-type SocketErrorEvent struct {
-	Sender *PeerSocket
-	Error  error
-}
-type SocketConnectedEvent struct {
-	Sender *PeerSocket
+type PeerDownEvent struct {
+	// Myself
+	Sender *DiameterPeer
+	// Will be nil if the reason is not an error
+	Error error
 }
 
-// Intput Commands
-type SocketCloseCommand struct{}
+type PeerUpEvent struct {
+	// Myself
+	Sender *DiameterPeer
+	// Reported identity of the remote peer
+	DiameterHost string
+}
 
-// Message sent by handler
-type HandlerDiameterMessage struct {
-	// TODO
+// Message from me to a Diameteer Peer. May be a Request or an Answer
+type EgressDiameterMessage struct {
+	Message *diamcodec.DiameterMessage
+	// Channel to receive the Answer or nil
+	RChann *chan interface{}
+}
+
+// Message received from a Diameter Peer. May be a Request or an Answer
+type IngressDiameterMessage struct {
 	Message *diamcodec.DiameterMessage
 }
 
-// Message sent by peer
-type PeerDiameterMessage struct {
-	Sender  *PeerSocket
-	Message *diamcodec.DiameterMessage
+// Timeout expired
+type CancelDiameterRequest struct {
+	HopByHopId uint32
 }
 
 // Internal messages
+type PeerCloseCommand struct{}
+
 type ConnectionEstablishedMsg struct {
 	Connection net.Conn
 }
@@ -68,18 +67,27 @@ type WriteErrorMsg struct {
 	Error error
 }
 
-// A PeerSocket is a helper for doing the low level job of sending messages and
-// receiving messages
-type PeerSocket struct {
+type MessageHandler func(request *diamcodec.DiameterMessage) (answer *diamcodec.DiameterMessage, err error)
+
+// This object abstracts the operations against a Diameter Peer
+// It implements the Actor model: all internal variables are modified
+// from an internal single threaded EventLoop and message passing
+type DiameterPeer struct {
+
+	// Holds the Peer configuration
+	// Passed during instantiation if Peer is Active
+	// TODO: Filled after CER/CEA exchange and settlement of duplicates
+	peerConfig config.DiameterPeer
 
 	// Input and output channels
-	// Created iternally
-	InputChannel chan interface{}
 
-	// Passed as parameter
+	// Created iternally
+	eventLoopChannel chan interface{}
+
+	// Passed as parameter. To report events to the Router
 	OutputChannel chan interface{}
 
-	// To signal graceful closing
+	// The Status of the object (one of the const defined)
 	Status int
 
 	// Internal
@@ -89,130 +97,184 @@ type PeerSocket struct {
 
 	// Canceller of connection
 	cancel context.CancelFunc
+
+	// Outstanding requests map
+	// Maps HopByHopIds to a channel where the response or a timeout will be sent
+	requestsMap map[uint32]*chan interface{}
+
+	// Handler
+	handler MessageHandler
 }
 
-// Creates a new PeerSocket when we are expected to establish the connection with the other side
-func NewActivePeerSocket(oc chan interface{}, connTimeoutMillis int, ipAddress string, port int) PeerSocket {
+// Creates a new DiameterPeer when we are expected to establish the connection with the other side
+func NewActiveDiameterPeer(oc chan interface{}, peer config.DiameterPeer, handler MessageHandler) DiameterPeer {
 
-	// Create the socket
-	peerSocket := PeerSocket{InputChannel: make(chan interface{}), OutputChannel: oc}
+	// Create the Peer struct
+	diamPeer := DiameterPeer{eventLoopChannel: make(chan interface{}), OutputChannel: oc, requestsMap: make(map[uint32]*chan interface{}), handler: handler}
 
-	peerSocket.Status = StatusConnecting
+	diamPeer.Status = StatusConnecting
 
-	go peerSocket.connect(connTimeoutMillis, ipAddress, port)
-	go peerSocket.eventLoop()
+	// Default value for timeout
+	timeout := peer.ConnectionTimeoutMillis
+	if timeout == 0 {
+		timeout = 5000
+	}
+	go diamPeer.connect(timeout, peer.IPAddress, peer.Port)
 
-	return peerSocket
+	go diamPeer.eventLoop()
+
+	return diamPeer
 }
 
-// Creates a new PeerSocket when the connection has been accepted already
-func NewPassivePeerSocket(oc chan interface{}, conn net.Conn) PeerSocket {
+// Creates a new DiameterPeer when the connection has been accepted already
+func NewPassiveDiameterPeer(oc chan interface{}, conn net.Conn, handler MessageHandler) DiameterPeer {
 	// Create the socket
-	peerSocket := PeerSocket{InputChannel: make(chan interface{}), OutputChannel: oc, connection: conn}
+	diamPeer := DiameterPeer{eventLoopChannel: make(chan interface{}), OutputChannel: oc, connection: conn, requestsMap: make(map[uint32]*chan interface{}), handler: handler}
 
-	peerSocket.Status = StatusConnected
+	diamPeer.Status = StatusConnected
 
-	peerSocket.connReader = bufio.NewReader(peerSocket.connection)
-	peerSocket.connWriter = bufio.NewWriter(peerSocket.connection)
-	go peerSocket.readLoop()
+	diamPeer.connReader = bufio.NewReader(diamPeer.connection)
+	diamPeer.connWriter = bufio.NewWriter(diamPeer.connection)
+	go diamPeer.readLoop()
 
-	go peerSocket.eventLoop()
+	go diamPeer.eventLoop()
 
-	return peerSocket
+	return diamPeer
+}
+
+// Terminates the Peer connection and the event loop
+// The object may be recycled
+func (ps *DiameterPeer) Close() {
+	ps.eventLoopChannel <- PeerCloseCommand{}
 }
 
 // Event loop
-func (ps *PeerSocket) eventLoop() {
+func (dp *DiameterPeer) eventLoop() {
 
 	defer func() {
 		// Close the channels that we have created
-		close(ps.InputChannel)
+		close(dp.eventLoopChannel)
 
 		// Close the connection (another time, should not make harm)
-		if ps.connection != nil {
-			ps.connection.Close()
+		if dp.connection != nil {
+			dp.connection.Close()
 		}
 	}()
 
 	for {
-		in := <-ps.InputChannel
+		in := <-dp.eventLoopChannel
 
 		switch v := in.(type) {
-		// connect goroutine reports connection established
+		// Connect goroutine reports connection established
+		// Start the event loop
 		case ConnectionEstablishedMsg:
-			ps.connection = v.Connection
-			ps.connReader = bufio.NewReader(ps.connection)
-			ps.connWriter = bufio.NewWriter(ps.connection)
-			go ps.readLoop()
+			dp.connection = v.Connection
+			dp.connReader = bufio.NewReader(dp.connection)
+			dp.connWriter = bufio.NewWriter(dp.connection)
+			go dp.readLoop()
 
-			ps.OutputChannel <- SocketConnectedEvent{Sender: ps}
-			ps.Status = StatusConnected
+			// TODO: Send this after CER/CEA handshake
+			dp.OutputChannel <- PeerUpEvent{Sender: dp}
+			dp.Status = StatusConnected
 
-		// connect goroutine reports connection could not be established
-		// the Peersocket will terminate the event loop, send the Down event
+		// Connect goroutine reports connection could not be established
+		// the DiameterPeer will terminate the event loop, send the Down event
 		// and the router must recycle it
 		case ConnectionErrorMsg:
-			if ps.Status <= StatusClosing {
-				ps.OutputChannel <- SocketErrorEvent{Sender: ps, Error: v.Error}
-			}
-			ps.OutputChannel <- SocketDownEvent{Sender: ps}
-			ps.Status = StatusClosed
+			dp.OutputChannel <- PeerDownEvent{Sender: dp, Error: v.Error}
+			dp.Status = StatusClosed
 			return
 
 		// readLoop goroutine reports the connection is closed
-		// the Peersocket will terminate the event loop, send the Down event
+		// the DiameterPeer will terminate the event loop, send the Down event
 		// and the router must recycle it
 		case ReadEOFMsg:
-			ps.OutputChannel <- SocketDownEvent{Sender: ps}
-			ps.Status = StatusClosed
+			dp.OutputChannel <- PeerDownEvent{Sender: dp, Error: nil}
+			dp.Status = StatusClosed
 			return
 
 		// readLoop goroutine reports a read error
-		// the Peersocket will terminate the event loop, send the Down event
+		// the DiameterPeer will terminate the event loop, send the Down event
 		// and the router must recycle it
 		case ReadErrorMsg:
-			if ps.Status < StatusClosing {
-				ps.OutputChannel <- SocketErrorEvent{Sender: ps, Error: v.Error}
-			}
-			ps.OutputChannel <- SocketDownEvent{Sender: ps}
-			ps.Status = StatusClosed
+			dp.OutputChannel <- PeerDownEvent{Sender: dp, Error: v.Error}
+			dp.Status = StatusClosed
 			return
 
 		// Same for writes
 		case WriteErrorMsg:
-			if ps.Status < StatusClosing {
-				ps.OutputChannel <- SocketErrorEvent{Sender: ps, Error: v.Error}
-			}
-			ps.OutputChannel <- SocketDownEvent{Sender: ps}
-			ps.Status = StatusClosed
+			dp.OutputChannel <- PeerDownEvent{Sender: dp, Error: v.Error}
+			dp.Status = StatusClosed
 			return
 
 		// command received from outside
-		case SocketCloseCommand:
+		case PeerCloseCommand:
 
 			// In case it was still connecting
-			ps.cancel()
+			dp.cancel()
 
 			// Close the connection. Any reads will return
-			if ps.connection != nil {
-				ps.connection.Close()
+			if dp.connection != nil {
+				dp.connection.Close()
 			}
 
-			ps.Status = StatusClosing
+			dp.Status = StatusClosing
 
 			// The readLoop goroutine will report the connection has been closed
 
-			// Send a message to the peer
-		case HandlerDiameterMessage:
-			if ps.Status == StatusConnected {
-				// TODO: Keep track of sender for response, if necessary
-				_, err := v.Message.WriteTo(ps.connection)
+			// Send a message to the peer. May be a request or an answer
+		case EgressDiameterMessage:
+			if dp.Status == StatusConnected {
+				config.IgorLogger.Debugf("-> Sending Message %s\n", v.Message)
+				_, err := v.Message.WriteTo(dp.connection)
 				if err != nil {
-					ps.InputChannel <- WriteErrorMsg{err}
-					return
+					dp.eventLoopChannel <- WriteErrorMsg{err}
+					if v.Message.IsRequest {
+						*v.RChann <- err
+					}
 				}
+
+				// If it was a Request, store in the outstanding request map
+				if v.Message.IsRequest {
+					dp.requestsMap[v.Message.HopByHopId] = v.RChann
+				}
+
 			} else {
-				config.IgorLogger.Error("message was not sent because status is %d", ps.Status)
+				config.IgorLogger.Error("message was not sent because status is %d", dp.Status)
+			}
+
+			// Received message from peer
+		case IngressDiameterMessage:
+			config.IgorLogger.Debugf("<- Receiving Message %s\n", v.Message)
+			if v.Message.IsRequest {
+				// Reveived a request. Invoke handler
+				go func() {
+					resp, err := dp.handler(v.Message)
+					if err != nil {
+						config.IgorLogger.Error(err)
+					} else {
+						dp.eventLoopChannel <- EgressDiameterMessage{Message: resp}
+					}
+				}()
+			} else {
+				// Received an answer
+				respChann, ok := dp.requestsMap[v.Message.HopByHopId]
+				if !ok {
+					config.IgorLogger.Errorf("stalled diameter answer: '%v'", *v.Message)
+				} else {
+					*respChann <- v.Message
+					close(*respChann)
+					delete(dp.requestsMap, v.Message.HopByHopId)
+				}
+			}
+
+		case CancelDiameterRequest:
+			respChann, ok := dp.requestsMap[v.HopByHopId]
+			if !ok {
+				config.IgorLogger.Errorf("attemtp to cancel an non existing request")
+			} else {
+				close(*respChann)
+				delete(dp.requestsMap, v.HopByHopId)
 			}
 		}
 	}
@@ -222,21 +284,21 @@ func (ps *PeerSocket) eventLoop() {
 // Establishes the connection with the peer
 // To be executed in a goroutine
 // Should not touch inner variables
-func (ps *PeerSocket) connect(connTimeoutMillis int, ipAddress string, port int) {
+func (dp *DiameterPeer) connect(connTimeoutMillis int, ipAddress string, port int) {
 
 	// Create a cancellable deadline
 	context, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Duration(connTimeoutMillis)*time.Millisecond))
-	ps.cancel = cancel
-	defer ps.cancel()
+	dp.cancel = cancel
+	defer dp.cancel()
 
 	// Connect
 	var dialer net.Dialer
 	conn, err := dialer.DialContext(context, "tcp4", fmt.Sprintf("%s:%d", ipAddress, port))
 
 	if err != nil {
-		ps.InputChannel <- ConnectionErrorMsg{err}
+		dp.eventLoopChannel <- ConnectionErrorMsg{err}
 	} else {
-		ps.InputChannel <- ConnectionEstablishedMsg{conn}
+		dp.eventLoopChannel <- ConnectionEstablishedMsg{conn}
 	}
 
 }
@@ -244,60 +306,64 @@ func (ps *PeerSocket) connect(connTimeoutMillis int, ipAddress string, port int)
 // Reader of peer messages
 // To be executed in a goroutine
 // Should not touch inner variables
-func (ps *PeerSocket) readLoop() {
+func (dp *DiameterPeer) readLoop() {
 	for {
+		// Read a Diameter message from the connection
 		dm := diamcodec.DiameterMessage{}
-		_, err := dm.ReadFrom(ps.connReader)
+		_, err := dm.ReadFrom(dp.connReader)
 
 		if err != nil {
 			if err == io.EOF {
 				// The remote peer closed
-				ps.InputChannel <- ReadEOFMsg{}
+				dp.eventLoopChannel <- ReadEOFMsg{}
 			} else {
-				ps.InputChannel <- ReadErrorMsg{err}
+				dp.eventLoopChannel <- ReadErrorMsg{err}
 			}
 			return
 		}
 
-		ps.OutputChannel <- PeerDiameterMessage{Sender: ps, Message: &dm}
+		// Send myself the received message
+		dp.eventLoopChannel <- IngressDiameterMessage{Message: &dm}
 	}
 }
 
-// Reader of peer messages
-// To be executed in a goroutine
-// Should not touch inner variables
-func (ps *PeerSocket) readLoop2() {
-	for {
-		// Read version and size
-		// First four bytes
-		var initialBuffer = make([]byte, 4)
-		_, err := io.ReadAtLeast(ps.connReader, initialBuffer, 4)
-		initialBuffer[0] = 0 // First byte is the version and w are ignoring it
-		size := uint32(binary.BigEndian.Uint32(initialBuffer))
-		if err != nil {
-			if err == io.EOF {
-				// The remote peer closed
-				ps.InputChannel <- ReadEOFMsg{}
-			} else {
-				ps.InputChannel <- ReadErrorMsg{err}
-			}
-			return
-		}
+// Sends a Diameter request and gets the answer or an error (timeout or network error)
+func (dp *DiameterPeer) DiameterRequest(dm *diamcodec.DiameterMessage, timeout time.Duration) (resp *diamcodec.DiameterMessage, e error) {
 
-		// Read all the message
-		// var size = firstWord & 16777215 // 2^24 - 1
-		var buffer = make([]byte, size)
-		_, err = io.ReadAtLeast(io.MultiReader(bytes.NewReader(initialBuffer), ps.connReader), buffer, int(size))
-		if err != nil {
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
-				// The remote peer closed
-				ps.InputChannel <- ReadEOFMsg{}
-			} else {
-				ps.InputChannel <- ReadErrorMsg{err}
-			}
-			return
-		}
-
-		ps.OutputChannel <- buffer
+	// Validations
+	if !(*dm).IsRequest {
+		return nil, fmt.Errorf("Diameter message is not a request")
 	}
+	hbhId := (*dm).HopByHopId
+	if _, ok := dp.requestsMap[hbhId]; ok {
+		return nil, fmt.Errorf("Duplicated HopByHopId")
+	}
+
+	// This channel will receive the response
+	// It will be closed in the event loop, at the same time as deleting the requestMap entry
+	var responseChannel = make(chan interface{})
+
+	// Send myself the message
+	dp.eventLoopChannel <- EgressDiameterMessage{Message: dm, RChann: &responseChannel}
+
+	// Create the timer
+	timer := time.NewTimer(timeout)
+
+	// Wait for the timer or the response, which can be a DiameterAnswer or an error
+	select {
+	case <-timer.C:
+		dp.eventLoopChannel <- CancelDiameterRequest{HopByHopId: hbhId}
+		return nil, fmt.Errorf("Timeout")
+
+	case r := <-responseChannel:
+		switch v := r.(type) {
+		case error:
+			return nil, v
+		case *diamcodec.DiameterMessage:
+			return v, nil
+		}
+	}
+
+	// TODO: Write code in event loop to support this, and finish building this function
+	panic("unreachable code in diampeer.DiameterRequest")
 }

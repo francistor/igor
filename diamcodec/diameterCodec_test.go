@@ -723,7 +723,7 @@ func TestDiameterMessage(t *testing.T) {
 	}
 
 	// Generate reply message
-	replyMessage := NewDiameterAnswer(recoveredMessage)
+	replyMessage := NewDiameterAnswer(&recoveredMessage)
 	if replyMessage.IsRequest {
 		t.Errorf("reply message is a request")
 	}

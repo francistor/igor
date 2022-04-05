@@ -97,13 +97,14 @@ func RoutingRulesConf() DiameterRoutingRules {
 }
 
 type DiameterPeer struct {
-	DiameterHost           string
-	IPAddress              string
-	Port                   int
-	ConnectionPolicy       string // May be "active" or "passive"
-	OriginNetwork          string // CIDR
-	OriginNetworkCIDR      net.IPNet
-	WatchdogIntervalMillis int
+	DiameterHost            string
+	IPAddress               string
+	Port                    int
+	ConnectionPolicy        string // May be "active" or "passive"
+	OriginNetwork           string // CIDR
+	OriginNetworkCIDR       net.IPNet
+	WatchdogIntervalMillis  int
+	ConnectionTimeoutMillis int
 }
 
 type DiameterPeers map[string]DiameterPeer
