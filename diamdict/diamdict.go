@@ -235,11 +235,7 @@ func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
 		panic(javp.Type + " is not a valid DiameterType")
 	}
 
-	// Initialize maps
-	if javp.EnumValues == nil {
-		javp.EnumValues = make(map[string]int, 0)
-	}
-	codes := make(map[int]string, 0)
+	var codes map[int]string
 	if javp.EnumValues != nil {
 		codes = make(map[int]string)
 		for enumName, enumValue := range javp.EnumValues {

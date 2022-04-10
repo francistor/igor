@@ -349,7 +349,6 @@ func (m *DiameterMessage) DeleteAllAVP(avpName string) *DiameterMessage {
 ///////////////////////////////////////////////////////////////
 // Message constructors
 ///////////////////////////////////////////////////////////////
-
 func NewDiameterRequest(appName string, commandName string) (DiameterMessage, error) {
 
 	diameterMessage := DiameterMessage{IsRequest: true}

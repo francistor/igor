@@ -7,7 +7,11 @@ import (
 	"igor/diamcodec"
 	"igor/diampeer"
 	"net"
-	"time"
+)
+
+const (
+	statusRunning = 0
+	statusClosing = 1
 )
 
 func main() {
@@ -24,15 +28,21 @@ func main() {
 	// Initialize the Config Object
 	config.Config.Init(*bootPtr, *instancePtr)
 
+	var routerStatus = statusRunning
+
 	// Open socket for receiving Peer connections
-	listener, err := net.Listen("tcp", ":3868")
+	listener, err := net.Listen("tcp4", fmt.Sprintf(":%d", config.DiameterServerConf().BindPort))
 	if err != nil {
 		panic(err)
 	}
 
-	var routerInputChannel = make(chan interface{})
+	var routerControlChannel = make(chan interface{})
 
 	diameterPeersConf := config.PeersConf()
+
+	// Holds the current Peers Table. Initially emtpy
+	// Passive peers with the other party not yet identified will not be here
+	diamPeersTable := make(map[string]*diampeer.DiameterPeer)
 
 	// Accepter loop
 	go func() {
@@ -48,72 +58,88 @@ func main() {
 
 			remoteIPAddr, _ := net.ResolveIPAddr("", remoteAddr)
 			if !diameterPeersConf.ValidateIncomingAddress(remoteIPAddr.IP) {
-				fmt.Printf("invalid peer %s\n", remoteIPAddr)
+				config.IgorLogger.Infof("invalid peer %s\n", remoteIPAddr)
+				connection.Close()
+				continue
 			}
 
 			// Create peer for the accepted connection and start it
-			diampeer.NewPassiveDiameterPeer(routerInputChannel, connection, MyMessageHandler)
+			// The addition to the peers table will be done later
+			diampeer.NewPassiveDiameterPeer(routerControlChannel, connection, MyMessageHandler)
 		}
 	}()
 
-	// Create the DiameterPeer objects after some time for accepter loop to be executed
-	time.Sleep(2 * time.Second)
+	// Initialize
+	diamPeersTable = updatePeersTable(routerControlChannel, diamPeersTable, diameterPeersConf)
 
-	// Initially emtpy
-	diamPeers := make(map[string]diampeer.DiameterPeer)
-	// Will create a DiameterPeer per active Peer
-	diamPeers = updateDiameterPeers(routerInputChannel, diamPeers, diameterPeersConf)
+	// Peers Lifecycle
+	for {
+		msg := <-routerControlChannel
+		switch v := msg.(type) {
 
-	// Use peer for superserver.igor
-	superserverPeer := diamPeers["superserver.igor"]
+		// New Peer is engaged
+		case diampeer.PeerUpEvent:
 
-	// Wait until received connected event sent by active peer and then send message
-	_, ok := (<-routerInputChannel).(diampeer.PeerUpEvent)
-	if ok {
-		diameterMessage, error := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
-		if error != nil {
-			panic(error)
-		}
-		diameterMessage.Add("User-Name", "Perico")
-		answer, err := superserverPeer.DiameterRequest(&diameterMessage, 5*time.Second)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			fmt.Println("GOT ANSWER", answer)
-		}
-	} else {
-		fmt.Println("did not get a peer up event")
-	}
+			config.IgorLogger.Debugf("peerup event from %s", v.Sender.PeerConfig.DiameterHost)
 
-	// Close active peer that sent the message
-	time.Sleep(1 * time.Second)
-	superserverPeer.Close()
+			if existingPeer, found := diamPeersTable[v.Sender.PeerConfig.DiameterHost]; found {
+				if existingPeer != v.Sender {
+					// Peer already exists. Close the new peer
+					existingPeer.Close()
+				} // Else do nothing. This is an active peer reporting that it is Engaged
+			} else {
+				// Register the new peer
+				diamPeersTable[v.Sender.PeerConfig.DiameterHost] = v.Sender
+			}
 
-	fmt.Println("waiting to terminate...")
-	time.Sleep(5 * time.Second)
-	fmt.Println("done.")
+		// Peer is down
+		case diampeer.PeerDownEvent:
 
-	close(routerInputChannel)
-}
+			config.IgorLogger.Debugf("peerup event from %s", v.Sender.PeerConfig.DiameterHost)
 
-// Takes the current map of DiameterPeers and generates a new one based on the current configuration
-func updateDiameterPeers(c chan interface{}, diamPeers map[string]diampeer.DiameterPeer, diameterPeers config.DiameterPeers) map[string]diampeer.DiameterPeer {
+			// Remove from peers table
+			delete(diamPeersTable, v.Sender.PeerConfig.DiameterHost)
 
-	// TODO: Close the connections for now not configured peers
-
-	// Make sure a DiameterPeer exists for each active peer
-	for dh := range diameterPeers {
-		peerConfig := diameterPeers[dh]
-		if peerConfig.ConnectionPolicy == "active" {
-			_, found := diamPeers[diameterPeers[dh].DiameterHost]
-			if !found {
-				diamPeer := diampeer.NewActiveDiameterPeer(c, peerConfig, MyMessageHandler)
-				diamPeers[peerConfig.DiameterHost] = diamPeer
+			// If in normal operation, update the peers
+			if routerStatus == statusRunning {
+				diamPeersTable = updatePeersTable(routerControlChannel, diamPeersTable, diameterPeersConf)
+			} else {
+				// We are closing the shop
+				if len(diamPeersTable) == 0 {
+					break
+				}
 			}
 		}
 	}
 
-	return diamPeers
+	// close(routerControlChannel)
+}
+
+// Takes the current map of DiameterPeers and generates a new one based on the current configuration
+func updatePeersTable(controlCh chan interface{}, peersTable map[string]*diampeer.DiameterPeer, diameterPeersConf config.DiameterPeers) map[string]*diampeer.DiameterPeer {
+
+	// Close the connections for now not configured peers
+	for existingDH := range peersTable {
+		if _, found := diameterPeersConf[existingDH]; !found {
+			peer := peersTable[existingDH]
+			// The table will be updated and this peer removed wheh the PeerDown event is received
+			peer.Close()
+		}
+	}
+
+	// Make sure a DiameterPeer exists for each active peer
+	for dh := range diameterPeersConf {
+		peerConfig := diameterPeersConf[dh]
+		if peerConfig.ConnectionPolicy == "active" {
+			_, found := peersTable[diameterPeersConf[dh].DiameterHost]
+			if !found {
+				diamPeer := diampeer.NewActiveDiameterPeer(controlCh, peerConfig, MyMessageHandler)
+				peersTable[peerConfig.DiameterHost] = diamPeer
+			}
+		}
+	}
+
+	return peersTable
 }
 
 func MyMessageHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {

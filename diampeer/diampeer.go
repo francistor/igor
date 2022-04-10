@@ -14,8 +14,9 @@ import (
 const (
 	StatusConnecting = 1
 	StatusConnected  = 2
-	StatusClosing    = 3
-	StatusClosed     = 4
+	StatusEngaged    = 3
+	StatusClosing    = 4
+	StatusClosed     = 5
 )
 
 // Ouput Events
@@ -77,7 +78,7 @@ type DiameterPeer struct {
 	// Holds the Peer configuration
 	// Passed during instantiation if Peer is Active
 	// TODO: Filled after CER/CEA exchange and settlement of duplicates
-	peerConfig config.DiameterPeer
+	PeerConfig config.DiameterPeer
 
 	// Input and output channels
 
@@ -107,10 +108,12 @@ type DiameterPeer struct {
 }
 
 // Creates a new DiameterPeer when we are expected to establish the connection with the other side
-func NewActiveDiameterPeer(oc chan interface{}, peer config.DiameterPeer, handler MessageHandler) DiameterPeer {
+func NewActiveDiameterPeer(oc chan interface{}, peer config.DiameterPeer, handler MessageHandler) *DiameterPeer {
+
+	config.IgorLogger.Debugf("creating active diameter peer for %s", peer.DiameterHost)
 
 	// Create the Peer struct
-	diamPeer := DiameterPeer{eventLoopChannel: make(chan interface{}), OutputChannel: oc, requestsMap: make(map[uint32]*chan interface{}), handler: handler}
+	diamPeer := DiameterPeer{eventLoopChannel: make(chan interface{}), OutputChannel: oc, PeerConfig: peer, requestsMap: make(map[uint32]*chan interface{}), handler: handler}
 
 	diamPeer.Status = StatusConnecting
 
@@ -123,11 +126,14 @@ func NewActiveDiameterPeer(oc chan interface{}, peer config.DiameterPeer, handle
 
 	go diamPeer.eventLoop()
 
-	return diamPeer
+	return &diamPeer
 }
 
 // Creates a new DiameterPeer when the connection has been accepted already
-func NewPassiveDiameterPeer(oc chan interface{}, conn net.Conn, handler MessageHandler) DiameterPeer {
+func NewPassiveDiameterPeer(oc chan interface{}, conn net.Conn, handler MessageHandler) *DiameterPeer {
+
+	config.IgorLogger.Debugf("creating passive diameter peer for %s", conn.RemoteAddr().String())
+
 	// Create the socket
 	diamPeer := DiameterPeer{eventLoopChannel: make(chan interface{}), OutputChannel: oc, connection: conn, requestsMap: make(map[uint32]*chan interface{}), handler: handler}
 
@@ -139,13 +145,13 @@ func NewPassiveDiameterPeer(oc chan interface{}, conn net.Conn, handler MessageH
 
 	go diamPeer.eventLoop()
 
-	return diamPeer
+	return &diamPeer
 }
 
 // Terminates the Peer connection and the event loop
 // The object may be recycled
-func (ps *DiameterPeer) Close() {
-	ps.eventLoopChannel <- PeerCloseCommand{}
+func (dp *DiameterPeer) Close() {
+	dp.eventLoopChannel <- PeerCloseCommand{}
 }
 
 // Event loop
@@ -168,6 +174,7 @@ func (dp *DiameterPeer) eventLoop() {
 		// Connect goroutine reports connection established
 		// Start the event loop
 		case ConnectionEstablishedMsg:
+			config.IgorLogger.Debug("connection established")
 			dp.connection = v.Connection
 			dp.connReader = bufio.NewReader(dp.connection)
 			dp.connWriter = bufio.NewWriter(dp.connection)
@@ -181,6 +188,7 @@ func (dp *DiameterPeer) eventLoop() {
 		// the DiameterPeer will terminate the event loop, send the Down event
 		// and the router must recycle it
 		case ConnectionErrorMsg:
+			config.IgorLogger.Debugf("connection error %s", v.Error)
 			dp.OutputChannel <- PeerDownEvent{Sender: dp, Error: v.Error}
 			dp.Status = StatusClosed
 			return
@@ -189,6 +197,7 @@ func (dp *DiameterPeer) eventLoop() {
 		// the DiameterPeer will terminate the event loop, send the Down event
 		// and the router must recycle it
 		case ReadEOFMsg:
+			config.IgorLogger.Debug("Read EOF")
 			dp.OutputChannel <- PeerDownEvent{Sender: dp, Error: nil}
 			dp.Status = StatusClosed
 			return
@@ -197,21 +206,25 @@ func (dp *DiameterPeer) eventLoop() {
 		// the DiameterPeer will terminate the event loop, send the Down event
 		// and the router must recycle it
 		case ReadErrorMsg:
+			config.IgorLogger.Debugf("read error %s", v.Error)
 			dp.OutputChannel <- PeerDownEvent{Sender: dp, Error: v.Error}
 			dp.Status = StatusClosed
 			return
 
 		// Same for writes
 		case WriteErrorMsg:
+			config.IgorLogger.Debugf("write error %s", v.Error)
 			dp.OutputChannel <- PeerDownEvent{Sender: dp, Error: v.Error}
 			dp.Status = StatusClosed
 			return
 
 		// command received from outside
 		case PeerCloseCommand:
-
+			config.IgorLogger.Debugf("closing")
 			// In case it was still connecting
-			dp.cancel()
+			if dp.cancel != nil {
+				dp.cancel()
+			}
 
 			// Close the connection. Any reads will return
 			if dp.connection != nil {
@@ -269,6 +282,7 @@ func (dp *DiameterPeer) eventLoop() {
 			}
 
 		case CancelDiameterRequest:
+			config.IgorLogger.Debugf("Timeout to %d\n", v.HopByHopId)
 			respChann, ok := dp.requestsMap[v.HopByHopId]
 			if !ok {
 				config.IgorLogger.Errorf("attemtp to cancel an non existing request")
@@ -367,3 +381,13 @@ func (dp *DiameterPeer) DiameterRequest(dm *diamcodec.DiameterMessage, timeout t
 	// TODO: Write code in event loop to support this, and finish building this function
 	panic("unreachable code in diampeer.DiameterRequest")
 }
+
+// Sends the message and executes the handler function when the answer is received
+// In case of error, the response will be nill and e will be non nil
+func (dp *DiameterPeer) DiameterRequestAsync(dm *diamcodec.DiameterMessage, timeout time.Duration, handler func(resp *diamcodec.DiameterMessage, e error)) {
+	go func() {
+		handler(dp.DiameterRequest(dm, timeout))
+	}()
+}
+
+//Code for Sending CER and, in general, Base messages
