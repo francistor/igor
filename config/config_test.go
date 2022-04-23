@@ -67,9 +67,9 @@ func TestDiamConfig(t *testing.T) {
 	if dp["superserver.igor"].WatchdogIntervalMillis != 300000 {
 		t.Fatal("WatchdogIntervalMillis was not 30000")
 	}
-	peer, err := dp.FindPeer("127.0.0.1", "client.igor")
+	peer, err := dp.FindPeer("client.igor")
 	if err != nil {
-		t.Fatalf("Peer not found for IP address %s and origin-host %s", "127.0.0.1", "client.igor")
+		t.Fatalf("Peer not found for and origin-host %s", "client.igor")
 	}
 	if peer.DiameterHost != "client.igor" || peer.ConnectionPolicy != "passive" {
 		t.Fatal("Found peer is not conforming to expected attributes", peer)

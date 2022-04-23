@@ -2,7 +2,7 @@
 	"version": 1001,
 	"vendors":
     [
-        {"vendorId": 1001, "vendorName": "francisco.cardosogil@gmail.com"},
+        {"vendorId": 1001, "vendorName": "franciscocardosogil"},
         {"vendorId": 9, "vendorName": "Cisco"},
         {"vendorId": 10415, "vendorName": "3GPP"}
     ],
@@ -274,7 +274,8 @@
                         "Mobile-IPv4": 2,
                         "Accounting": 3,
                         "Credit-Control": 4,
-                        "Gx": 16777238
+                        "Gx": 16777238,
+                        "Relay": -1
                     }
                 },
                 {
@@ -288,7 +289,8 @@
                         "Mobile-IPv4": 2,
                         "Accounting": 3,
                         "Credit-Control": 4,
-                        "Gx": 16777238
+                        "Gx": 16777238,
+                        "Relay": -1
                     }
                 },
                 {
@@ -1657,8 +1659,8 @@
                     "type": "Grouped",
                     "group":
                     {
-                        "francisco.cardosogil@gmail.com-myInteger32":{"minOccurs": 1, "maxOccurs": 1},
-                        "francisco.cardosogil@gmail.com-myString":{"maxOccurs": 1}
+                        "franciscocardosogil-myInteger32":{"minOccurs": 1, "maxOccurs": 1},
+                        "franciscocardosogil-myString":{"maxOccurs": 1}
                     }
                 },
                 {
@@ -1667,9 +1669,9 @@
                     "type": "Grouped",
                     "group":
                     {
-                        "francisco.cardosogil@gmail.com-myInteger32":{"minOccurs": 1, "maxOccurs": 1},
-                        "francisco.cardosogil@gmail.com-myString":{"maxOccurs": 1},
-                        "francisco.cardosogil@gmail.com-myGrouped":{"maxOccurs": 1}
+                        "franciscocardosogil-myInteger32":{"minOccurs": 1, "maxOccurs": 1},
+                        "franciscocardosogil-myString":{"maxOccurs": 1},
+                        "franciscocardosogil-myGrouped":{"maxOccurs": 1}
                     }
                 },
                 {
@@ -1678,23 +1680,23 @@
                     "type": "Grouped",
                     "group":
                     {
-                        "francisco.cardosogil@gmail.com-myOctetString": {},
-                        "francisco.cardosogil@gmail.com-myInteger32": {},
-                        "francisco.cardosogil@gmail.com-myInteger64": {},
-                        "francisco.cardosogil@gmail.com-myUnsigned32": {},
-                        "francisco.cardosogil@gmail.com-myUnsigned64": {},
-                        "francisco.cardosogil@gmail.com-myFloat32": {},
-                        "francisco.cardosogil@gmail.com-myFloat64": {},
-                        "francisco.cardosogil@gmail.com-myAddress": {},
-                        "francisco.cardosogil@gmail.com-myTime": {},
-                        "francisco.cardosogil@gmail.com-myString": {},
-                        "francisco.cardosogil@gmail.com-myDiameterIdentity": {},
-                        "francisco.cardosogil@gmail.com-myDiameterURI": {},
-                        "francisco.cardosogil@gmail.com-myIPFilterRule": {},
-                        "francisco.cardosogil@gmail.com-myIPv4Address": {},
-                        "francisco.cardosogil@gmail.com-myIPv6Address": {},
-                        "francisco.cardosogil@gmail.com-myIPv6Prefix": {},
-                        "francisco.cardosogil@gmail.com-myEnumerated": {}
+                        "franciscocardosogil-myOctetString": {},
+                        "franciscocardosogil-myInteger32": {},
+                        "franciscocardosogil-myInteger64": {},
+                        "franciscocardosogil-myUnsigned32": {},
+                        "franciscocardosogil-myUnsigned64": {},
+                        "franciscocardosogil-myFloat32": {},
+                        "franciscocardosogil-myFloat64": {},
+                        "franciscocardosogil-myAddress": {},
+                        "franciscocardosogil-myTime": {},
+                        "franciscocardosogil-myString": {},
+                        "franciscocardosogil-myDiameterIdentity": {},
+                        "franciscocardosogil-myDiameterURI": {},
+                        "franciscocardosogil-myIPFilterRule": {},
+                        "franciscocardosogil-myIPv4Address": {},
+                        "franciscocardosogil-myIPv6Address": {},
+                        "franciscocardosogil-myIPv6Prefix": {},
+                        "franciscocardosogil-myEnumerated": {}
                     }
                 }
 
@@ -2152,7 +2154,7 @@
                         "Subscription-Id":{},
                         "User-Name":{},
                         "Framed-IP-Address":{},
-                        "francisco.cardosogil@gmail.com-myGroupedInGrouped": {}
+                        "franciscocardosogil-myGroupedInGrouped": {}
                     },
                     "response":
                     {

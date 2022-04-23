@@ -57,7 +57,7 @@ func main() {
 			config.IgorLogger.Infof("accepted connection from %s", remoteAddr)
 
 			remoteIPAddr, _ := net.ResolveIPAddr("", remoteAddr)
-			if !diameterPeersConf.ValidateIncomingAddress(remoteIPAddr.IP) {
+			if !diameterPeersConf.ValidateIncomingAddress("", remoteIPAddr.IP) {
 				config.IgorLogger.Infof("invalid peer %s\n", remoteIPAddr)
 				connection.Close()
 				continue

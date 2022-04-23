@@ -4,7 +4,7 @@
 	"diameterHost": "server.igor",
 	"diameterRealm": "igor",
 	"vendorId": 1101,
-	"productName": "Lever",
+	"productName": "Igor",
 	"firmwareRevision": 1,
 	"peerCheckTimeSeconds": 120
 }

@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"igor/config"
 	"io"
+	"net"
+	"strings"
+	"time"
 )
 
 const (
@@ -296,10 +299,16 @@ func (m *DiameterMessage) AddAVP(avp *DiameterAVP) *DiameterMessage {
 
 // Adds a new AVP specified by name to the diameter message
 func (m *DiameterMessage) Add(name string, value interface{}) *DiameterMessage {
+
+	// If avp to add is nil, do nothing
+	if value == nil {
+		return m
+	}
+
 	avp, error := NewAVP(name, value)
 
 	if error != nil {
-		config.IgorLogger.Errorf("avp could not be added %s: %v", name, value)
+		config.IgorLogger.Errorf("avp could not be added %s: %v, %s", name, value, error)
 		return m
 	}
 
@@ -318,6 +327,32 @@ func (m *DiameterMessage) GetAVP(avpName string) (DiameterAVP, error) {
 	return DiameterAVP{}, fmt.Errorf("avp named %s not found", avpName)
 }
 
+// Retrieves the first AVP with the specified path (dot separated) from the message
+func (m *DiameterMessage) GetAVPFromPath(avpName string) (DiameterAVP, error) {
+	pathComponents := strings.Split(avpName, ".")
+
+	// The first iteration gets the AVP from the message, using the name until the
+	// first dot, then the navigation is done on the successive AVP got from the
+	// Group
+	var avp DiameterAVP
+	var err error
+	for i, pathComponent := range pathComponents {
+		if i == 0 {
+			avp, err = m.GetAVP(pathComponent)
+			if err != nil {
+				return DiameterAVP{}, err
+			}
+		} else {
+			avp, err = avp.GetAVP(pathComponent)
+			if err != nil {
+				return DiameterAVP{}, err
+			}
+		}
+	}
+
+	return avp, nil
+}
+
 // Retrieves all AVP with the specified name from the message
 func (m *DiameterMessage) GetAllAVP(avpName string) []DiameterAVP {
 
@@ -333,6 +368,7 @@ func (m *DiameterMessage) GetAllAVP(avpName string) []DiameterAVP {
 	return avpList
 }
 
+// Deletes all AVP with the specified name
 func (m *DiameterMessage) DeleteAllAVP(avpName string) *DiameterMessage {
 
 	// To be rewritten to the message
@@ -344,6 +380,65 @@ func (m *DiameterMessage) DeleteAllAVP(avpName string) *DiameterMessage {
 	}
 	m.AVPs = avpList
 	return m
+}
+
+// Gets the Result-Code, or 0 if not found
+func (m *DiameterMessage) GetResultCode() int64 {
+	rc, err := m.GetAVP("Result-Code")
+	if err != nil {
+		return 0
+	}
+
+	return rc.GetInt()
+}
+
+// Retrieves the specified AVP name as a string, or the string default value
+// if not found (instead of returning an error. Use with care)
+// The AVP name may be a path including grouped attributes, that is
+// avpname1.avpname2, etc.
+func (m *DiameterMessage) GetStringAVP(avpName string) string {
+	avp, err := m.GetAVPFromPath(avpName)
+	if err != nil {
+		return ""
+	}
+
+	return avp.GetString()
+}
+
+// Same, for int
+func (m *DiameterMessage) GetIntAVP(avpName string) int64 {
+	avp, err := m.GetAVPFromPath(avpName)
+	if err != nil {
+		return 0
+	}
+	return avp.GetInt()
+}
+
+// Same, for float
+func (m *DiameterMessage) GetFloatAVP(avpName string) float64 {
+	avp, err := m.GetAVPFromPath(avpName)
+	if err != nil {
+		return 0
+	}
+	return avp.GetFloat()
+}
+
+// Same for IPAddress
+func (m *DiameterMessage) GetIPAddressAVP(avpName string) net.IP {
+	avp, err := m.GetAVPFromPath(avpName)
+	if err != nil {
+		return net.IP{}
+	}
+	return avp.GetIPAddress()
+}
+
+// Same for Time
+func (m *DiameterMessage) GetDateAVP(avpName string) time.Time {
+	avp, err := m.GetAVPFromPath(avpName)
+	if err != nil {
+		return time.Time{}
+	}
+	return avp.GetDate()
 }
 
 ///////////////////////////////////////////////////////////////

@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 
 	// Initialize the Config Object as done in main.go
 	bootstrapFile := "resources/searchRules.json"
-	instanceName := "testInstance"
+	instanceName := "unitTestInstance"
 	config.Config.Init(bootstrapFile, instanceName)
 
 	// Execute the tests and exit
@@ -87,7 +87,7 @@ func TestInt32AVP(t *testing.T) {
 	var theInt int32 = -65535*16384 - 1000 // 2^31 - 1000
 
 	// Create avp
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myInteger32", theInt)
+	avp, err := NewAVP("franciscocardosogil-myInteger32", theInt)
 	if err != nil {
 		t.Errorf("error creating Int32 AVP %v", err)
 		return
@@ -114,7 +114,7 @@ func TestInt64AVP(t *testing.T) {
 
 	var theInt int64 = -65535*65535*65534*16384 - 999 // - 2 ^ 62 - 999
 	// Create avp
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myInteger64", theInt)
+	avp, err := NewAVP("franciscocardosogil-myInteger64", theInt)
 	if err != nil {
 		t.Errorf("error creating Int64 AVP %v", err)
 		return
@@ -143,7 +143,7 @@ func TestUnsignedInt32AVP(t *testing.T) {
 	var theInt uint32 = 65535 * 40001
 
 	// Create avp
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myUnsigned32", int64(theInt))
+	avp, err := NewAVP("franciscocardosogil-myUnsigned32", int64(theInt))
 	if err != nil {
 		t.Errorf("error creating UInt32 AVP %v", err)
 		return
@@ -172,7 +172,7 @@ func TestUnsignedInt64AVP(t *testing.T) {
 	var theInt int64 = 65535 * 65535 * 65535 * 16001
 
 	// Create avp
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myUnsigned64", theInt)
+	avp, err := NewAVP("franciscocardosogil-myUnsigned64", theInt)
 	if err != nil {
 		t.Errorf("error creating UInt64 AVP %v", err)
 		return
@@ -200,7 +200,7 @@ func TestFloat32AVP(t *testing.T) {
 	var theFloat float32 = 6.03e23
 
 	// Create avp
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myFloat32", theFloat)
+	avp, err := NewAVP("franciscocardosogil-myFloat32", theFloat)
 	if err != nil {
 		t.Errorf("error creating Float32 AVP %v", err)
 		return
@@ -225,7 +225,7 @@ func TestFloat64AVP(t *testing.T) {
 	var theFloat float64 = 6.03e23
 
 	// Create avp
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myFloat64", float64(theFloat))
+	avp, err := NewAVP("franciscocardosogil-myFloat64", float64(theFloat))
 	if err != nil {
 		t.Errorf("error creating Float64 AVP %v", err)
 		return
@@ -254,7 +254,7 @@ func TestAddressAVP(t *testing.T) {
 
 	// IPv4
 	// Create avp
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myAddress", ipv4Address)
+	avp, err := NewAVP("franciscocardosogil-myAddress", ipv4Address)
 	if err != nil {
 		t.Errorf("error creating IPv4 Address AVP: %v", err)
 		return
@@ -272,7 +272,7 @@ func TestAddressAVP(t *testing.T) {
 
 	// IPv6
 	// Create avp
-	avp, err = NewAVP("francisco.cardosogil@gmail.com-myAddress", ipv6Address)
+	avp, err = NewAVP("franciscocardosogil-myAddress", ipv6Address)
 	if err != nil {
 		t.Errorf("error creating IPv6 Address AVP: %v", err)
 	}
@@ -288,12 +288,12 @@ func TestAddressAVP(t *testing.T) {
 	}
 
 	// Using IP addresses as value
-	avp, _ = NewAVP("francisco.cardosogil@gmail.com-myAddress", net.ParseIP(ipv4Address))
+	avp, _ = NewAVP("franciscocardosogil-myAddress", net.ParseIP(ipv4Address))
 	if avp.GetString() != net.ParseIP(ipv4Address).String() {
 		t.Errorf("IPv4 AVP does not match value (created as ipaddr) %s %s", avp.GetString(), net.ParseIP(ipv4Address).String())
 	}
 
-	avp, _ = NewAVP("francisco.cardosogil@gmail.com-myAddress", net.ParseIP(ipv6Address))
+	avp, _ = NewAVP("franciscocardosogil-myAddress", net.ParseIP(ipv6Address))
 	if avp.GetString() != net.ParseIP(ipv6Address).String() {
 		t.Errorf("IPv6 AVP does not match value (created as ipaddr) %s %s", avp.GetString(), net.ParseIP(ipv6Address).String())
 	}
@@ -304,7 +304,7 @@ func TestIPv4Address(t *testing.T) {
 	var ipv4Address = "1.2.3.4"
 
 	// Create avp from string
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myIPv4Address", ipv4Address)
+	avp, err := NewAVP("franciscocardosogil-myIPv4Address", ipv4Address)
 	if err != nil {
 		t.Errorf("error creating IPv4 Address AVP %v", err)
 		return
@@ -321,7 +321,7 @@ func TestIPv4Address(t *testing.T) {
 	}
 
 	// Create avp from address
-	avp, _ = NewAVP("francisco.cardosogil@gmail.com-myIPv4Address", net.ParseIP(ipv4Address))
+	avp, _ = NewAVP("franciscocardosogil-myIPv4Address", net.ParseIP(ipv4Address))
 	if avp.GetIPAddress().String() != net.ParseIP(ipv4Address).String() {
 		t.Errorf("IPv4 AVP does not match value (created as ipaddr) %s", avp.GetIPAddress())
 	}
@@ -331,7 +331,7 @@ func TestIPv6Address(t *testing.T) {
 	var ipv6Address = "bebe:cafe::0"
 
 	// Create avp from string
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myIPv6Address", ipv6Address)
+	avp, err := NewAVP("franciscocardosogil-myIPv6Address", ipv6Address)
 	if err != nil {
 		t.Errorf("error creating IPv6 Address AVP %v", err)
 		return
@@ -348,7 +348,7 @@ func TestIPv6Address(t *testing.T) {
 	}
 
 	// Create avp from IP address
-	avp, _ = NewAVP("francisco.cardosogil@gmail.com-myIPv6Address", net.ParseIP(ipv6Address))
+	avp, _ = NewAVP("franciscocardosogil-myIPv6Address", net.ParseIP(ipv6Address))
 	if avp.GetString() != net.ParseIP(ipv6Address).String() {
 		t.Errorf("IPv6 AVP does not match value (created as ipaddr) %s", avp.GetString())
 	}
@@ -359,7 +359,7 @@ func TestTimeAVP(t *testing.T) {
 	var theStringTime = "1966-11-26T03:21:54 UTC"
 
 	// Create avp from string
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myTime", theStringTime)
+	avp, err := NewAVP("franciscocardosogil-myTime", theStringTime)
 	if err != nil {
 		t.Errorf("error creating Time Address AVP %v", err)
 		return
@@ -374,7 +374,7 @@ func TestDiamIdentAVP(t *testing.T) {
 	var theString = "domain.name"
 
 	// Create avp
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myDiameterIdentity", theString)
+	avp, err := NewAVP("franciscocardosogil-myDiameterIdentity", theString)
 	if err != nil {
 		t.Errorf("error creating Diameter Identity AVP %v", err)
 		return
@@ -396,7 +396,7 @@ func TestDiamURIAVP(t *testing.T) {
 	var theString = "domain.name"
 
 	// Create avp
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myDiameterURI", theString)
+	avp, err := NewAVP("franciscocardosogil-myDiameterURI", theString)
 	if err != nil {
 		t.Errorf("error creating Diameter URI AVP %v", err)
 		return
@@ -418,7 +418,7 @@ func TestIPFilterRuleIAVP(t *testing.T) {
 	var theString = "deny 1.2.3.4"
 
 	// Create avp
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myIPFilterRule", theString)
+	avp, err := NewAVP("franciscocardosogil-myIPFilterRule", theString)
 	if err != nil {
 		t.Errorf("error creating IP Filter Rule AVP %v", err)
 		return
@@ -440,7 +440,7 @@ func TestIPv6PrefixAVP(t *testing.T) {
 	var thePrefix = "bebe:cafe::/16"
 
 	// Create avp
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myIPv6Prefix", thePrefix)
+	avp, err := NewAVP("franciscocardosogil-myIPv6Prefix", thePrefix)
 	if err != nil {
 		t.Errorf("error creating IPv6 prefix AVP %v", err)
 		return
@@ -462,7 +462,7 @@ func TestEnumeratedAVP(t *testing.T) {
 	var theString = "zero"
 	var theNumber int64 = 0
 
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myEnumerated", "zero")
+	avp, err := NewAVP("franciscocardosogil-myEnumerated", "zero")
 	if err != nil {
 		t.Errorf("error creating Enumerated AVP: %v", err)
 		return
@@ -474,7 +474,7 @@ func TestEnumeratedAVP(t *testing.T) {
 		t.Errorf("Enumerated AVP does not match number value")
 	}
 
-	avp, err = NewAVP("francisco.cardosogil@gmail.com-myEnumerated", theNumber)
+	avp, err = NewAVP("franciscocardosogil-myEnumerated", theNumber)
 	if err != nil {
 		t.Errorf("error creating Enumerated AVP: %v", err)
 		return
@@ -493,11 +493,11 @@ func TestGroupedAVP(t *testing.T) {
 	var theString = "theString"
 
 	// Create grouped AVP
-	avpl0, _ := NewAVP("francisco.cardosogil@gmail.com-myGroupedInGrouped", nil)
-	avpl1, _ := NewAVP("francisco.cardosogil@gmail.com-myGrouped", nil)
+	avpl0, _ := NewAVP("franciscocardosogil-myGroupedInGrouped", nil)
+	avpl1, _ := NewAVP("franciscocardosogil-myGrouped", nil)
 
-	avpInt, _ := NewAVP("francisco.cardosogil@gmail.com-myInteger32", theInt)
-	avpString, _ := NewAVP("francisco.cardosogil@gmail.com-myString", theString)
+	avpInt, _ := NewAVP("franciscocardosogil-myInteger32", theInt)
+	avpString, _ := NewAVP("franciscocardosogil-myString", theString)
 
 	avpl1.AddAVP(*avpInt).AddAVP(*avpString)
 	avpl0.AddAVP(*avpl1)
@@ -507,12 +507,12 @@ func TestGroupedAVP(t *testing.T) {
 	recoveredAVPl0, _, _ := DiameterAVPFromBytes(binaryAVP)
 
 	// Navigate to the values
-	recoveredAVPl1 := recoveredAVPl0.GetAllAVP("francisco.cardosogil@gmail.com-myGrouped")[0]
-	newInt, _ := recoveredAVPl1.GetAVP("francisco.cardosogil@gmail.com-myInteger32")
+	recoveredAVPl1 := recoveredAVPl0.GetAllAVP("franciscocardosogil-myGrouped")[0]
+	newInt, _ := recoveredAVPl1.GetAVP("franciscocardosogil-myInteger32")
 	if newInt.GetInt() != theInt {
 		t.Error("Integer value does not match or not found in Group")
 	}
-	newString, _ := recoveredAVPl1.GetAVP("francisco.cardosogil@gmail.com-myString")
+	newString, _ := recoveredAVPl1.GetAVP("franciscocardosogil-myString")
 	if newString.GetString() != theString {
 		t.Error("String value does not match or not found in Group")
 	}
@@ -524,7 +524,7 @@ func TestGroupedAVP(t *testing.T) {
 	}
 
 	// Printed avp
-	var targetString = "{francisco.cardosogil@gmail.com-myGrouped={francisco.cardosogil@gmail.com-myInteger32=99,francisco.cardosogil@gmail.com-myString=theString}}"
+	var targetString = "{franciscocardosogil-myGrouped={franciscocardosogil-myInteger32=99,franciscocardosogil-myString=theString}}"
 	stringRepresentation := recoveredAVPl0.GetString()
 	if stringRepresentation != targetString {
 		t.Errorf("Grouped string representation does not match %s", stringRepresentation)
@@ -534,7 +534,7 @@ func TestGroupedAVP(t *testing.T) {
 func TestSerializationError(t *testing.T) {
 
 	// Generate an AVP
-	avp, err := NewAVP("francisco.cardosogil@gmail.com-myOctetString", "0A0B0C0c765654")
+	avp, err := NewAVP("franciscocardosogil-myOctetString", "0A0B0C0c765654")
 	theBytes, _ := avp.MarshalBinary()
 
 	if err != nil {
@@ -580,24 +580,24 @@ func TestSerializationError(t *testing.T) {
 func TestJSON(t *testing.T) {
 
 	var javp = `{
-		"francisco.cardosogil@gmail.com-myTestAllGrouped": [
-			{"francisco.cardosogil@gmail.com-myOctetString": "0102030405060708090a0b"},
-			{"francisco.cardosogil@gmail.com-myInteger32": -99},
-			{"francisco.cardosogil@gmail.com-myInteger64": -99},
-			{"francisco.cardosogil@gmail.com-myUnsigned32": 99},
-			{"francisco.cardosogil@gmail.com-myUnsigned64": 99},
-			{"francisco.cardosogil@gmail.com-myFloat32": 99.9},
-			{"francisco.cardosogil@gmail.com-myFloat64": 99.9},
-			{"francisco.cardosogil@gmail.com-myAddress": "1.2.3.4"},
-			{"francisco.cardosogil@gmail.com-myTime": "1966-11-26T03:34:08 UTC"},
-			{"francisco.cardosogil@gmail.com-myString": "Hello, world!"},
-			{"francisco.cardosogil@gmail.com-myDiameterIdentity": "Diameter@identity"},
-			{"francisco.cardosogil@gmail.com-myDiameterURI": "Diameter@URI"},
-			{"francisco.cardosogil@gmail.com-myIPFilterRule": "allow all"},
-			{"francisco.cardosogil@gmail.com-myIPv4Address": "4.5.6.7"},
-			{"francisco.cardosogil@gmail.com-myIPv6Address": "bebe:cafe::0"},
-			{"francisco.cardosogil@gmail.com-myIPv6Prefix": "bebe:cafe::0/128"},
-			{"francisco.cardosogil@gmail.com-myEnumerated": "two"}
+		"franciscocardosogil-myTestAllGrouped": [
+			{"franciscocardosogil-myOctetString": "0102030405060708090a0b"},
+			{"franciscocardosogil-myInteger32": -99},
+			{"franciscocardosogil-myInteger64": -99},
+			{"franciscocardosogil-myUnsigned32": 99},
+			{"franciscocardosogil-myUnsigned64": 99},
+			{"franciscocardosogil-myFloat32": 99.9},
+			{"franciscocardosogil-myFloat64": 99.9},
+			{"franciscocardosogil-myAddress": "1.2.3.4"},
+			{"franciscocardosogil-myTime": "1966-11-26T03:34:08 UTC"},
+			{"franciscocardosogil-myString": "Hello, world!"},
+			{"franciscocardosogil-myDiameterIdentity": "Diameter@identity"},
+			{"franciscocardosogil-myDiameterURI": "Diameter@URI"},
+			{"franciscocardosogil-myIPFilterRule": "allow all"},
+			{"franciscocardosogil-myIPv4Address": "4.5.6.7"},
+			{"franciscocardosogil-myIPv6Address": "bebe:cafe::0"},
+			{"franciscocardosogil-myIPv6Prefix": "bebe:cafe::0/128"},
+			{"franciscocardosogil-myEnumerated": "two"}
 		]
 	}`
 
@@ -608,13 +608,13 @@ func TestJSON(t *testing.T) {
 		t.Errorf("unmarshal error for avp: %s", err)
 	}
 	// Check the contents of the unmarshalled avp
-	if avp.Name != "francisco.cardosogil@gmail.com-myTestAllGrouped" {
+	if avp.Name != "franciscocardosogil-myTestAllGrouped" {
 		t.Errorf("unmarshalled avp has the wrong name: %s", avp.Name)
 	}
-	if v, _ := avp.GetAVP("francisco.cardosogil@gmail.com-myEnumerated"); v.GetInt() != 2 {
+	if v, _ := avp.GetAVP("franciscocardosogil-myEnumerated"); v.GetInt() != 2 {
 		t.Errorf("unmarshalled avp has the wrong name: %s", avp.Name)
 	}
-	v, _ := avp.GetAVP("francisco.cardosogil@gmail.com-myTime")
+	v, _ := avp.GetAVP("franciscocardosogil-myTime")
 	vv, _ := time.Parse(timeFormatString, "1966-11-26T03:34:08 UTC")
 	if v.GetDate() != vv {
 		t.Errorf("unmarshalled avp has the wrong date value: %s", v.String())
@@ -649,10 +649,10 @@ func TestDiameterMessage(t *testing.T) {
 	originRealmAVP, _ := NewAVP("Origin-Realm", "igor")
 	destinationHostAVP, _ := NewAVP("Destination-Host", "server.igor")
 	destinationRealmAVP, _ := NewAVP("Destination-Realm", "igor")
-	groupedInGroupedAVP, _ := NewAVP("francisco.cardosogil@gmail.com-myGroupedInGrouped", nil)
-	groupedAVP, _ := NewAVP("francisco.cardosogil@gmail.com-myGrouped", nil)
-	intAVP, _ := NewAVP("francisco.cardosogil@gmail.com-myInteger32", 1)
-	stringAVP, _ := NewAVP("francisco.cardosogil@gmail.com-myString", "hello")
+	groupedInGroupedAVP, _ := NewAVP("franciscocardosogil-myGroupedInGrouped", nil)
+	groupedAVP, _ := NewAVP("franciscocardosogil-myGrouped", nil)
+	intAVP, _ := NewAVP("franciscocardosogil-myInteger32", 1)
+	stringAVP, _ := NewAVP("franciscocardosogil-myString", "hello")
 	groupedAVP.AddAVP(*intAVP)
 	groupedAVP.AddAVP(*stringAVP)
 	groupedInGroupedAVP.AddAVP(*groupedAVP)
@@ -666,8 +666,8 @@ func TestDiameterMessage(t *testing.T) {
 	diameterMessage.AddAVP(destinationRealmAVP)
 	diameterMessage.AddAVP(groupedInGroupedAVP)
 
-	diameterMessage.Add("francisco.cardosogil@gmail.com-myUnsigned32", 8)
-	diameterMessage.Add("francisco.cardosogil@gmail.com-myUnsigned32", 9)
+	diameterMessage.Add("franciscocardosogil-myUnsigned32", 8)
+	diameterMessage.Add("franciscocardosogil-myUnsigned32", 9)
 
 	// Serialize
 	theBytes, err := diameterMessage.MarshalBinary()
@@ -684,7 +684,7 @@ func TestDiameterMessage(t *testing.T) {
 	}
 
 	// Get and check the values of simple AVP
-	unsignedAVPs := recoveredMessage.GetAllAVP("francisco.cardosogil@gmail.com-myUnsigned32")
+	unsignedAVPs := recoveredMessage.GetAllAVP("franciscocardosogil-myUnsigned32")
 	if len(unsignedAVPs) != 2 {
 		t.Errorf("did not get two unsigned32 avps in Diameter message")
 	}
@@ -696,24 +696,24 @@ func TestDiameterMessage(t *testing.T) {
 	}
 
 	// Delete the avp
-	recoveredMessage.DeleteAllAVP("francisco.cardosogil@gmail.com-myUnsigned32")
-	unsignedAVPs = recoveredMessage.GetAllAVP("francisco.cardosogil@gmail.com-myUnsigned32")
+	recoveredMessage.DeleteAllAVP("franciscocardosogil-myUnsigned32")
+	unsignedAVPs = recoveredMessage.GetAllAVP("franciscocardosogil-myUnsigned32")
 	if len(unsignedAVPs) != 0 {
 		t.Errorf("avp still there after being deleted")
 	}
 
 	// Get and check the value of a grouped AVP
-	gig, err := recoveredMessage.GetAVP("francisco.cardosogil@gmail.com-myGroupedInGrouped")
+	gig, err := recoveredMessage.GetAVP("franciscocardosogil-myGroupedInGrouped")
 	if err != nil {
 		t.Errorf("could not retrieve groupedingrouped avp: %s", err)
 		return
 	}
-	g, err := gig.GetAVP("francisco.cardosogil@gmail.com-myGrouped")
+	g, err := gig.GetAVP("franciscocardosogil-myGrouped")
 	if err != nil {
 		t.Errorf("could not retrieve grouped avp: %s", err)
 		return
 	}
-	s, err := g.GetAVP("francisco.cardosogil@gmail.com-myString")
+	s, err := g.GetAVP("franciscocardosogil-myString")
 	if err != nil {
 		t.Errorf("could not retrieve string avp: %s", err)
 		return
@@ -733,6 +733,82 @@ func TestDiameterMessage(t *testing.T) {
 	// Cuando se añade un AVP ¿es una copia o se puede modificar el orgiginal?
 }
 
+func TestDiameterMessageAllAttributeTypes(t *testing.T) {
+
+	jDiameterMessage := `
+	{
+		"IsRequest": true,
+		"IsProxyable": false,
+		"IsError": false,
+		"IsRetransmission": false,
+		"CommandCode": 2000,
+		"ApplicationId": 1000,
+		"avps":[
+			{
+			  "franciscocardosogil-myTestAllGrouped": [
+  				{"franciscocardosogil-myOctetString": "0102030405060708090a0b"},
+  				{"franciscocardosogil-myInteger32": -99},
+  				{"franciscocardosogil-myInteger64": -99},
+  				{"franciscocardosogil-myUnsigned32": 99},
+  				{"franciscocardosogil-myUnsigned64": 99},
+  				{"franciscocardosogil-myFloat32": 99.9},
+  				{"franciscocardosogil-myFloat64": 99.9},
+  				{"franciscocardosogil-myAddress": "1.2.3.4"},
+  				{"franciscocardosogil-myTime": "1966-11-26T03:34:08 UTC"},
+  				{"franciscocardosogil-myString": "Hello, world!"},
+  				{"franciscocardosogil-myDiameterIdentity": "Diameter@identity"},
+  				{"franciscocardosogil-myDiameterURI": "Diameter@URI"},
+  				{"franciscocardosogil-myIPFilterRule": "allow all"},
+  				{"franciscocardosogil-myIPv4Address": "4.5.6.7"},
+  				{"franciscocardosogil-myIPv6Address": "bebe:cafe::0"},
+  				{"franciscocardosogil-myIPv6Prefix": "bebe:cafe::0/128"},
+  				{"franciscocardosogil-myEnumerated": "two"}
+			  ]
+			}
+		]
+	}
+	`
+
+	// Read JSON to DiameterMessage
+	var diameterMessage DiameterMessage
+	err := json.Unmarshal([]byte(jDiameterMessage), &diameterMessage)
+	if err != nil {
+		t.Errorf("unmarshal error for diameter message: %s", err)
+	}
+	diameterMessage.Tidy()
+
+	// Write message to buffer
+	messageBytes, error := diameterMessage.MarshalBinary()
+	if error != nil {
+		t.Fatal("Marshal error")
+	}
+
+	// Recover message from buffer
+	recoveredMessage := DiameterMessage{}
+	_, err = recoveredMessage.ReadFrom(bytes.NewReader(messageBytes))
+	if err != nil {
+		t.Fatalf("Error recovering DiameterMessage from bytes: %s", err)
+	}
+
+	if recoveredMessage.GetStringAVP("franciscocardosogil-myTestAllGrouped.franciscocardosogil-myAddress") != "1.2.3.4" {
+		t.Errorf("Error recovering IP address. Got <%s> instead of 1.2.3.4", recoveredMessage.GetStringAVP("franciscocardosogil-myTestAllGrouped.franciscocardosogil-myAddress"))
+	}
+	if recoveredMessage.GetStringAVP("franciscocardosogil-myTestAllGrouped.franciscocardosogil-myEnumerated") != "two" {
+		t.Errorf("Error recovering Enumerated. Got <%s> instead of <two>", recoveredMessage.GetStringAVP("franciscocardosogil-myTestAllGrouped.franciscocardosogil-myEnumerated"))
+	}
+	targetTime, _ := time.Parse("2006-01-02T15:04:05 UTC", "1966-11-26T03:34:08 UTC")
+	if recoveredMessage.GetDateAVP("franciscocardosogil-myTestAllGrouped.franciscocardosogil-myTime") != targetTime {
+		t.Errorf("Error recovering date. Got <%v> instead of <1966-11-26T03:34:08 UTC>", recoveredMessage.GetDateAVP("franciscocardosogil-myTestAllGrouped.franciscocardosogil-myTime"))
+	}
+	if recoveredMessage.GetIntAVP("franciscocardosogil-myTestAllGrouped.franciscocardosogil-myInteger32") != -99 {
+		t.Errorf("Error recovering int. Got <%d> instead of -99", recoveredMessage.GetIntAVP("franciscocardosogil-myTestAllGrouped.franciscocardosogil-myInteger32"))
+	}
+	targetIPAddress := net.ParseIP("4.5.6.7")
+	if !recoveredMessage.GetIPAddressAVP("franciscocardosogil-myTestAllGrouped.franciscocardosogil-myIPv4Address").Equal(targetIPAddress) {
+		t.Errorf("Error recovering IPv4Address. Got <%v> instead of <4.5.6.7>", recoveredMessage.GetIPAddressAVP("franciscocardosogil-myTestAllGrouped.franciscocardosogil-myIPv4Address"))
+	}
+}
+
 func TestDiameterMessageJSON(t *testing.T) {
 	jDiameterMessage := `
 	{
@@ -744,24 +820,24 @@ func TestDiameterMessageJSON(t *testing.T) {
 		"ApplicationId": 1000,
 		"avps":[
 			{
-			  "francisco.cardosogil@gmail.com-myTestAllGrouped": [
-  				{"francisco.cardosogil@gmail.com-myOctetString": "0102030405060708090a0b"},
-  				{"francisco.cardosogil@gmail.com-myInteger32": -99},
-  				{"francisco.cardosogil@gmail.com-myInteger64": -99},
-  				{"francisco.cardosogil@gmail.com-myUnsigned32": 99},
-  				{"francisco.cardosogil@gmail.com-myUnsigned64": 99},
-  				{"francisco.cardosogil@gmail.com-myFloat32": 99.9},
-  				{"francisco.cardosogil@gmail.com-myFloat64": 99.9},
-  				{"francisco.cardosogil@gmail.com-myAddress": "1.2.3.4"},
-  				{"francisco.cardosogil@gmail.com-myTime": "1966-11-26T03:34:08 UTC"},
-  				{"francisco.cardosogil@gmail.com-myString": "Hello, world!"},
-  				{"francisco.cardosogil@gmail.com-myDiameterIdentity": "Diameter@identity"},
-  				{"francisco.cardosogil@gmail.com-myDiameterURI": "Diameter@URI"},
-  				{"francisco.cardosogil@gmail.com-myIPFilterRule": "allow all"},
-  				{"francisco.cardosogil@gmail.com-myIPv4Address": "4.5.6.7"},
-  				{"francisco.cardosogil@gmail.com-myIPv6Address": "bebe:cafe::0"},
-  				{"francisco.cardosogil@gmail.com-myIPv6Prefix": "bebe:cafe::0/128"},
-  				{"francisco.cardosogil@gmail.com-myEnumerated": "two"}
+			  "franciscocardosogil-myTestAllGrouped": [
+  				{"franciscocardosogil-myOctetString": "0102030405060708090a0b"},
+  				{"franciscocardosogil-myInteger32": -99},
+  				{"franciscocardosogil-myInteger64": -99},
+  				{"franciscocardosogil-myUnsigned32": 99},
+  				{"franciscocardosogil-myUnsigned64": 99},
+  				{"franciscocardosogil-myFloat32": 99.9},
+  				{"franciscocardosogil-myFloat64": 99.9},
+  				{"franciscocardosogil-myAddress": "1.2.3.4"},
+  				{"franciscocardosogil-myTime": "1966-11-26T03:34:08 UTC"},
+  				{"franciscocardosogil-myString": "Hello, world!"},
+  				{"franciscocardosogil-myDiameterIdentity": "Diameter@identity"},
+  				{"franciscocardosogil-myDiameterURI": "Diameter@URI"},
+  				{"franciscocardosogil-myIPFilterRule": "allow all"},
+  				{"franciscocardosogil-myIPv4Address": "4.5.6.7"},
+  				{"franciscocardosogil-myIPv6Address": "bebe:cafe::0"},
+  				{"franciscocardosogil-myIPv6Prefix": "bebe:cafe::0/128"},
+  				{"franciscocardosogil-myEnumerated": "two"}
 			  ]
 			}
 		]
@@ -787,56 +863,6 @@ func TestDiameterMessageJSON(t *testing.T) {
 		t.Errorf("prettyprint error %s", err)
 	}
 
+	// Uncoment this to see the result
 	// fmt.Println(jBytes.String())
-}
-
-func TestMessageSize(t *testing.T) {
-	jDiameterMessage := `
-	{
-		"IsRequest": true,
-		"IsProxyable": false,
-		"IsError": false,
-		"IsRetransmission": false,
-		"CommandCode": 2000,
-		"ApplicationId": 1000,
-		"avps":[
-			{
-			  "francisco.cardosogil@gmail.com-myTestAllGrouped": [
-				{"User-Name" : "this-is-the-user-name"},
-  				{"francisco.cardosogil@gmail.com-myOctetString": "0102030405060708090a0b"},
-  				{"francisco.cardosogil@gmail.com-myInteger32": -99},
-  				{"francisco.cardosogil@gmail.com-myInteger64": -99},
-  				{"francisco.cardosogil@gmail.com-myUnsigned32": 99},
-  				{"francisco.cardosogil@gmail.com-myUnsigned64": 99},
-  				{"francisco.cardosogil@gmail.com-myFloat32": 99.9},
-  				{"francisco.cardosogil@gmail.com-myFloat64": 99.9},
-  				{"francisco.cardosogil@gmail.com-myAddress": "1.2.3.4"},
-  				{"francisco.cardosogil@gmail.com-myTime": "1966-11-26T03:34:08 UTC"},
-  				{"francisco.cardosogil@gmail.com-myString": "Hello, world!"},
-  				{"francisco.cardosogil@gmail.com-myDiameterIdentity": "Diameter@identity"},
-  				{"francisco.cardosogil@gmail.com-myDiameterURI": "Diameter@URI"},
-  				{"francisco.cardosogil@gmail.com-myIPFilterRule": "allow all"},
-  				{"francisco.cardosogil@gmail.com-myIPv4Address": "4.5.6.7"},
-  				{"francisco.cardosogil@gmail.com-myIPv6Address": "bebe:cafe::0"},
-  				{"francisco.cardosogil@gmail.com-myIPv6Prefix": "bebe:cafe::0/128"},
-  				{"francisco.cardosogil@gmail.com-myEnumerated": "two"}
-			  ]
-			}
-		]
-	}
-	`
-
-	// Read JSON to DiameterMessage
-	var diameterMessage DiameterMessage
-	err := json.Unmarshal([]byte(jDiameterMessage), &diameterMessage)
-	if err != nil {
-		t.Errorf("unmarshal error for diameter message: %s", err)
-	}
-	diameterMessage.Tidy()
-
-	// Get size of serialized message
-	buffer, _ := diameterMessage.MarshalBinary()
-	if len(buffer) != diameterMessage.Len() {
-		t.Errorf("error in diameter message len. Actual serialized size %d and reported len is %d", len(buffer), diameterMessage.Len())
-	}
 }

@@ -42,6 +42,7 @@ type DiameterAVP struct {
 //    vendorId: 0 / 4 byte
 //    data: rest of bytes
 
+// Returns the number of bytes read, including padding
 func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	var lenHigh uint8
 	var lenLow uint16
@@ -106,8 +107,6 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	} else {
 		dataLen = avpLen - 8
 	}
-
-	//currentIndex = int64(avpLen - dataLen)
 
 	// Get the relevant info from the dictionary
 	// If not in the dictionary, will get some defaults
@@ -187,12 +186,13 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 			currentIndex += bytesRead
 		}
 
-		return int64(currentIndex), err
+		return currentIndex, err
 
 	// Address
 	// Two bytes for address type, and 4 /16 bytes for address
 	case diamdict.Address:
 		var addrType uint16
+		var padding uint16
 		if err := binary.Read(reader, binary.BigEndian, &addrType); err != nil {
 			config.IgorLogger.Error("bad address value (decoding type)")
 			return currentIndex, err
@@ -205,7 +205,10 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 				return currentIndex + 2, err
 			}
 			avp.Value = net.IP(ipv4Addr[:])
-			return currentIndex + 6, nil
+			// Drain 2 bytes
+			binary.Read(reader, binary.BigEndian, &padding)
+
+			return currentIndex + 8, nil
 		} else {
 			// IPv6
 			var ipv6Addr [16]byte
@@ -214,7 +217,10 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 				return currentIndex + 2, err
 			}
 			avp.Value = net.IP(ipv6Addr[:])
-			return currentIndex + 18, nil
+			// Drain 2 bytes
+			binary.Read(reader, binary.BigEndian, &padding)
+
+			return currentIndex + 20, nil
 		}
 
 	// Time
@@ -238,7 +244,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	case diamdict.Enumerated:
 		var value int32
 		err := binary.Read(reader, binary.BigEndian, &value)
-		avp.Value = value
+		avp.Value = int64(value)
 		return currentIndex + 4, err
 
 	case diamdict.IPv4Address, diamdict.IPv6Address:
@@ -253,6 +259,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	case diamdict.IPv6Prefix:
 		var dummy byte
 		var prefixLen byte
+		var padding uint16
 		address := make([]byte, 16)
 		if err := binary.Read(reader, binary.BigEndian, &dummy); err != nil {
 			config.IgorLogger.Error("could not read the dummy byte in ipv6 prefix")
@@ -266,9 +273,13 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 			config.IgorLogger.Error("could not write the address in ipv6 prefix")
 			return currentIndex + 2, err
 		}
+
+		// Drain 2 bytes
+		binary.Read(reader, binary.BigEndian, &padding)
+
 		avp.Value = net.IP(address).String() + "/" + fmt.Sprintf("%d", prefixLen)
 
-		return currentIndex + 18, err
+		return currentIndex + 20, err
 	}
 
 	return currentIndex, fmt.Errorf("Unknown type: %d", avp.DictItem.DiameterType)
@@ -284,6 +295,7 @@ func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32, error) {
 }
 
 // Writes the AVP to the specified writer
+// Returns the number of bytes written including padding
 func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 
 	var bytesWritten = 0
@@ -308,7 +320,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 	}
 	bytesWritten += 1
 
-	// Write Len
+	// Write Len (this is without padding)
 	avpLen := avp.DataLen()
 	if err = binary.Write(buffer, binary.BigEndian, uint8(avpLen/65535)); err != nil {
 		return int64(bytesWritten), err
@@ -519,7 +531,6 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 
 	// Saninty check
 	if bytesWritten != avpLen {
-		fmt.Printf("%v", avp)
 		panic(fmt.Sprintf("Bad AVP size. Bytes Written: %d, reported size: %d", bytesWritten, avpLen))
 	}
 
@@ -712,8 +723,8 @@ func (avp *DiameterAVP) GetString() string {
 		return stringValue
 
 	case diamdict.Enumerated:
-		var intValue, _ = avp.Value.(int)
-		return avp.DictItem.EnumCodes[intValue]
+		var intValue, _ = avp.Value.(int64)
+		return avp.DictItem.EnumCodes[int(intValue)]
 
 	case diamdict.IPFilterRule:
 		var stringValue, _ = avp.Value.(string)
@@ -766,7 +777,7 @@ func (avp *DiameterAVP) GetDate() time.Time {
 	var value, ok = avp.Value.(time.Time)
 	if !ok {
 		config.IgorLogger.Errorf("cannot convert %v to time", avp.Value)
-		return zeroTime
+		return time.Time{}
 	}
 
 	return value

@@ -1,4 +1,4 @@
-package config
+package config2
 
 import (
 	"encoding/json"
@@ -17,12 +17,10 @@ type DiameterServerConfig struct {
 	PeerCheckTimeSeconds string
 }
 
-var currentDiameterServerConfig DiameterServerConfig
-
 // Retrieves the diameter server configuration
-func getDiameterServerConfig() (DiameterServerConfig, error) {
+func (c *ConfigurationManager) getDiameterServerConfig() (DiameterServerConfig, error) {
 	dsc := DiameterServerConfig{}
-	dc, err := Config.GetConfigObject("diameterServer.json")
+	dc, err := c.GetConfigObject("diameterServer.json")
 	if err != nil {
 		return dsc, err
 	}
@@ -30,18 +28,18 @@ func getDiameterServerConfig() (DiameterServerConfig, error) {
 	return dsc, nil
 }
 
-func UpdateDiameterServerConfig() error {
-	dsc, error := getDiameterServerConfig()
+func (c *ConfigurationManager) UpdateDiameterServerConfig() error {
+	dsc, error := c.getDiameterServerConfig()
 	if error != nil {
-		IgorLogger.Errorf("could not retrieve the Diameter Server configuration: %v", error)
+		c.IgorLogger.Errorf("could not retrieve the Diameter Server configuration: %v", error)
 		return error
 	}
-	currentDiameterServerConfig = dsc
+	c.currentDiameterServerConfig = dsc
 	return nil
 }
 
-func DiameterServerConf() DiameterServerConfig {
-	return currentDiameterServerConfig
+func (c *ConfigurationManager) DiameterServerConf() DiameterServerConfig {
+	return c.currentDiameterServerConfig
 }
 
 type DiameterRoutingRule struct {
@@ -53,8 +51,6 @@ type DiameterRoutingRule struct {
 }
 
 type DiameterRoutingRules []DiameterRoutingRule
-
-var currentRoutingRules DiameterRoutingRules
 
 // Finds the appropriate route, taking into account wildcards.
 // If nonLocal is true, force that the router is not local (has no nandler)
@@ -73,9 +69,9 @@ func (rr DiameterRoutingRules) FindDiameterRoute(realm string, application strin
 }
 
 // Retrieves the Routes configuration
-func getDiameterRoutingRules() (DiameterRoutingRules, error) {
+func (c *ConfigurationManager) getDiameterRoutingRules() (DiameterRoutingRules, error) {
 	var routingRules []DiameterRoutingRule
-	rr, err := Config.GetConfigObject("diameterRoutes.json")
+	rr, err := c.GetConfigObject("diameterRoutes.json")
 	if err != nil {
 		return routingRules, err
 	}
@@ -83,17 +79,17 @@ func getDiameterRoutingRules() (DiameterRoutingRules, error) {
 	return routingRules, nil
 }
 
-func UpdateDiameterRoutingRules() {
-	drr, error := getDiameterRoutingRules()
+func (c *ConfigurationManager) UpdateDiameterRoutingRules() {
+	drr, error := c.getDiameterRoutingRules()
 	if error != nil {
-		IgorLogger.Errorf("could not retrieve the Diameter Rules configuration: %v", error)
+		c.IgorLogger.Errorf("could not retrieve the Diameter Rules configuration: %v", error)
 		return
 	}
-	currentRoutingRules = drr
+	c.currentRoutingRules = drr
 }
 
-func RoutingRulesConf() DiameterRoutingRules {
-	return currentRoutingRules
+func (c *ConfigurationManager) RoutingRulesConf() DiameterRoutingRules {
+	return c.currentRoutingRules
 }
 
 type DiameterPeer struct {
@@ -108,8 +104,6 @@ type DiameterPeer struct {
 }
 
 type DiameterPeers map[string]DiameterPeer
-
-var currentDiameterPeers DiameterPeers
 
 // Gets the first Diameter Peer with the specified Diameter-Host
 func (dps *DiameterPeers) FindPeer(diameterHost string) (DiameterPeer, error) {
@@ -135,11 +129,11 @@ func (dps *DiameterPeers) ValidateIncomingAddress(host string, address net.IP) b
 }
 
 // Retrieves the Peers configuration
-func getDiameterPeers() (DiameterPeers, error) {
+func (c *ConfigurationManager) getDiameterPeers() (DiameterPeers, error) {
 	var peers []DiameterPeer
 	peersMap := make(map[string]DiameterPeer)
 
-	dp, err := Config.GetConfigObject("diameterPeers.json")
+	dp, err := c.GetConfigObject("diameterPeers.json")
 	if err != nil {
 		return peersMap, err
 	}
@@ -158,17 +152,17 @@ func getDiameterPeers() (DiameterPeers, error) {
 	return peersMap, nil
 }
 
-func UpdateDiameterPeers() {
-	dp, error := getDiameterPeers()
+func (c *ConfigurationManager) UpdateDiameterPeers() {
+	dp, error := c.getDiameterPeers()
 	if error != nil {
-		IgorLogger.Error("could not retrieve the Peers configuration: %v", error)
+		c.IgorLogger.Error("could not retrieve the Peers configuration: %v", error)
 		return
 	}
-	currentDiameterPeers = dp
+	c.currentDiameterPeers = dp
 }
 
-func PeersConf() DiameterPeers {
-	return currentDiameterPeers
+func (c *ConfigurationManager) PeersConf() DiameterPeers {
+	return c.currentDiameterPeers
 }
 
 type Handler struct {
