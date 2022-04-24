@@ -16,13 +16,10 @@ import (
 // Initializer of the test suite.
 func TestMain(m *testing.M) {
 
-	// Initialize logging
-	config.SetupLogger()
-
 	// Initialize the Config Object as done in main.go
 	bootstrapFile := "resources/searchRules.json"
 	instanceName := "unitTestInstance"
-	config.Config.Init(bootstrapFile, instanceName)
+	config.InitConfigurationInstance(bootstrapFile, instanceName)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())

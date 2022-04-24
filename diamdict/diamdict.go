@@ -123,7 +123,7 @@ func (dd *DiameterDict) GetFromName(name string) (AVPDictItem, error) {
 }
 
 // Returns a Diameter Dictionary object from its serialized representation
-func NewDictionaryFromJSON(data []byte) DiameterDict {
+func NewDictionaryFromJSON(data []byte) *DiameterDict {
 
 	// Unmarshall from JSON
 	var jDict jDiameterDict
@@ -172,7 +172,7 @@ func NewDictionaryFromJSON(data []byte) DiameterDict {
 		dict.AppByName[app.Name] = app
 	}
 
-	return dict
+	return &dict
 }
 
 /*

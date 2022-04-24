@@ -6,10 +6,9 @@ import (
 	"go.uber.org/zap"
 )
 
-var IgorLogger *zap.SugaredLogger
-
 // https://pkg.go.dev/go.uber.org/zap
-func SetupLogger() {
+// Returns a configure instance of zap logger
+func setupLogger() *zap.SugaredLogger {
 	// Setup logger
 	rawJSON := []byte(`{
 		"level": "debug",
@@ -42,5 +41,5 @@ func SetupLogger() {
 		panic(logError)
 	}
 
-	IgorLogger = logger.Sugar()
+	return logger.Sugar()
 }

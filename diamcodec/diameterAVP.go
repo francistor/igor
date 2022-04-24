@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+// Uses the default configuration instance
+
 // Magical reference date is Mon Jan 2 15:04:05 MST 2006
 // Time AVP is the number of seconds since 1/1/1900
 var zeroTime, _ = time.Parse("2006-01-02T15:04:05 UTC", "1900-01-01T00:00:00 UTC")
@@ -58,14 +60,14 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get Header
 	if err := binary.Read(reader, binary.BigEndian, &avp.Code); err != nil {
-		config.IgorLogger.Error("could not decode the AVP code field")
+		config.GetLogger().Error("could not decode the AVP code field")
 		return 0, err
 	}
 	currentIndex += 4
 
 	// Get Flags
 	if err := binary.Read(reader, binary.BigEndian, &flags); err != nil {
-		config.IgorLogger.Error("could not decode the AVP flags field")
+		config.GetLogger().Error("could not decode the AVP flags field")
 		return currentIndex, err
 	}
 	isVendorSpecific = flags&0x80 != 0
@@ -74,12 +76,12 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get Len
 	if err := binary.Read(reader, binary.BigEndian, &lenHigh); err != nil {
-		config.IgorLogger.Error("could not decode the AVP len (high) field")
+		config.GetLogger().Error("could not decode the AVP len (high) field")
 		return currentIndex, err
 	}
 	currentIndex += 1
 	if err := binary.Read(reader, binary.BigEndian, &lenLow); err != nil {
-		config.IgorLogger.Error("could not decode the len (low) code field")
+		config.GetLogger().Error("could not decode the len (low) code field")
 		return currentIndex, err
 	}
 	currentIndex += 2
@@ -99,7 +101,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	if isVendorSpecific {
 		if err := binary.Read(reader, binary.BigEndian, &avp.VendorId); err != nil {
-			config.IgorLogger.Error("could not decode the vendor id code field")
+			config.GetLogger().Error("could not decode the vendor id code field")
 			return currentIndex, err
 		}
 		currentIndex += 4
@@ -110,7 +112,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get the relevant info from the dictionary
 	// If not in the dictionary, will get some defaults
-	avp.DictItem, _ = config.DDict.GetFromCode(diamdict.AVPCode{VendorId: avp.VendorId, Code: avp.Code})
+	avp.DictItem, _ = config.GetDDict().GetFromCode(diamdict.AVPCode{VendorId: avp.VendorId, Code: avp.Code})
 	avp.Name = avp.DictItem.Name
 
 	// Parse according to type
@@ -194,14 +196,14 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		var addrType uint16
 		var padding uint16
 		if err := binary.Read(reader, binary.BigEndian, &addrType); err != nil {
-			config.IgorLogger.Error("bad address value (decoding type)")
+			config.GetLogger().Error("bad address value (decoding type)")
 			return currentIndex, err
 		}
 		if addrType == 1 {
 			var ipv4Addr [4]byte
 			// IPv4
 			if err := binary.Read(reader, binary.BigEndian, &ipv4Addr); err != nil {
-				config.IgorLogger.Error("bad address value (decoding ipv4 value)")
+				config.GetLogger().Error("bad address value (decoding ipv4 value)")
 				return currentIndex + 2, err
 			}
 			avp.Value = net.IP(ipv4Addr[:])
@@ -213,7 +215,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 			// IPv6
 			var ipv6Addr [16]byte
 			if err := binary.Read(reader, binary.BigEndian, &ipv6Addr); err != nil {
-				config.IgorLogger.Error("bad address value (decoding ipv6 value)")
+				config.GetLogger().Error("bad address value (decoding ipv6 value)")
 				return currentIndex + 2, err
 			}
 			avp.Value = net.IP(ipv6Addr[:])
@@ -262,15 +264,15 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		var padding uint16
 		address := make([]byte, 16)
 		if err := binary.Read(reader, binary.BigEndian, &dummy); err != nil {
-			config.IgorLogger.Error("could not read the dummy byte in ipv6 prefix")
+			config.GetLogger().Error("could not read the dummy byte in ipv6 prefix")
 			return currentIndex, err
 		}
 		if err := binary.Read(reader, binary.BigEndian, &prefixLen); err != nil {
-			config.IgorLogger.Error("could not read the prefix len byte in ipv6 prefix")
+			config.GetLogger().Error("could not read the prefix len byte in ipv6 prefix")
 			return currentIndex + 1, err
 		}
 		if err := binary.Read(reader, binary.BigEndian, &address); err != nil {
-			config.IgorLogger.Error("could not write the address in ipv6 prefix")
+			config.GetLogger().Error("could not write the address in ipv6 prefix")
 			return currentIndex + 2, err
 		}
 
@@ -659,7 +661,7 @@ func (avp *DiameterAVP) GetOctets() []byte {
 
 	var value, ok = avp.Value.([]byte)
 	if !ok {
-		config.IgorLogger.Errorf("cannot convert %v to []byte")
+		config.GetLogger().Errorf("cannot convert %v to []byte")
 		return nil
 	}
 
@@ -754,7 +756,7 @@ func (avp *DiameterAVP) GetInt() int64 {
 
 		return avp.Value.(int64)
 	default:
-		config.IgorLogger.Errorf("cannot convert value to int64 %T", avp.Value)
+		config.GetLogger().Errorf("cannot convert value to int64 %T", avp.Value)
 		return 0
 	}
 }
@@ -766,7 +768,7 @@ func (avp *DiameterAVP) GetFloat() float64 {
 	case diamdict.Float32, diamdict.Float64:
 		return avp.Value.(float64)
 	default:
-		config.IgorLogger.Errorf("cannot convert value to float64 %T", avp.Value)
+		config.GetLogger().Errorf("cannot convert value to float64 %T", avp.Value)
 		return 0
 	}
 }
@@ -776,7 +778,7 @@ func (avp *DiameterAVP) GetDate() time.Time {
 
 	var value, ok = avp.Value.(time.Time)
 	if !ok {
-		config.IgorLogger.Errorf("cannot convert %v to time", avp.Value)
+		config.GetLogger().Errorf("cannot convert %v to time", avp.Value)
 		return time.Time{}
 	}
 
@@ -788,7 +790,7 @@ func (avp *DiameterAVP) GetIPAddress() net.IP {
 
 	var value, ok = avp.Value.(net.IP)
 	if !ok {
-		config.IgorLogger.Errorf("cannot convert %v to ip address", avp.Value)
+		config.GetLogger().Errorf("cannot convert %v to ip address", avp.Value)
 		return net.IP{}
 	}
 
@@ -800,7 +802,7 @@ func (avp *DiameterAVP) GetIPAddress() net.IP {
 func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 	var avp = DiameterAVP{}
 
-	avp.DictItem = config.DDict.AVPByName[name]
+	avp.DictItem = config.GetDDict().AVPByName[name]
 	if avp.DictItem.DiameterType == diamdict.None {
 		return &avp, fmt.Errorf("%s not found in dictionary", name)
 	}
@@ -1004,7 +1006,7 @@ func toFloat64(value interface{}) (float64, error) {
 func (avp *DiameterAVP) AddAVP(gavp DiameterAVP) *DiameterAVP {
 	var groupedValue, ok = avp.Value.([]DiameterAVP)
 	if !ok {
-		config.IgorLogger.Error("value is not of type grouped")
+		config.GetLogger().Error("value is not of type grouped")
 		return avp
 	}
 	// TODO: verify allowed in dictionary
@@ -1025,7 +1027,7 @@ func (avp *DiameterAVP) Add(name string, value interface{}) *DiameterAVP {
 func (avp *DiameterAVP) DeleteAll(name string) *DiameterAVP {
 	var groupedValue, ok = avp.Value.([]DiameterAVP)
 	if !ok {
-		config.IgorLogger.Error("value is not of type grouped")
+		config.GetLogger().Error("value is not of type grouped")
 		return avp
 	}
 
@@ -1060,7 +1062,7 @@ func (avp *DiameterAVP) GetAVP(name string) (DiameterAVP, error) {
 func (avp *DiameterAVP) GetAllAVP(name string) []DiameterAVP {
 	var groupedValue, ok = avp.Value.([]DiameterAVP)
 	if !ok {
-		config.IgorLogger.Error("value is not of type grouped")
+		config.GetLogger().Error("value is not of type grouped")
 		return nil
 	}
 	avpList := make([]DiameterAVP, 0)

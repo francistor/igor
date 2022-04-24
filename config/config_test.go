@@ -19,13 +19,10 @@ func httpServer() {
 
 func TestMain(m *testing.M) {
 
-	// Initialize logger
-	SetupLogger()
-
 	// Initialize the Config Object as done in main.go
 	bootFile := "resources/searchRules.json"
-	instanceName := "testInstance"
-	Config.Init(bootFile, instanceName)
+	instanceName := "unitTestInstance"
+	InitConfigurationInstance(bootFile, instanceName)
 
 	// Start the server for configuration
 	go httpServer()
@@ -43,7 +40,7 @@ func TestObjectRetrieval(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := Config.GetConfigObject(objectName)
+			_, err := GetConfig().GetConfigObject(objectName)
 			t.Log("Got configuration object")
 			if err != nil {
 				panic(err)
@@ -57,13 +54,13 @@ func TestObjectRetrieval(t *testing.T) {
 func TestDiamConfig(t *testing.T) {
 
 	// Diameter Server Configuration
-	dsc := DiameterServerConf()
+	dsc := GetConfig().DiameterServerConf()
 	if dsc.BindAddress != "127.0.0.1" {
 		t.Fatalf("Could not get BindAddress or was not %s", "127.0.0.1")
 	}
 
 	// Diameter Peers configuration
-	dp := PeersConf()
+	dp := GetConfig().PeersConf()
 	if dp["superserver.igor"].WatchdogIntervalMillis != 300000 {
 		t.Fatal("WatchdogIntervalMillis was not 30000")
 	}
@@ -76,7 +73,7 @@ func TestDiamConfig(t *testing.T) {
 	}
 
 	// Routing rules configuration
-	rr := RoutingRulesConf()
+	rr := GetConfig().RoutingRulesConf()
 	if err != nil {
 		t.Fatal("Could not get Routing Rules", err)
 	}
@@ -101,7 +98,7 @@ func TestDiamConfig(t *testing.T) {
 // Retrieval of some JSON configuration file
 func TestConfigFile(t *testing.T) {
 
-	json, err := Config.GetConfigObjectAsJSon("testFile.json")
+	json, err := GetConfig().GetConfigObjectAsJSon("testFile.json")
 	if err != nil {
 		t.Fatal("Could not get configuration file testFile.json in \"testInstance\" folder", err)
 	}

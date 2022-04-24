@@ -20,13 +20,10 @@ func MyMessageHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMe
 
 func TestMain(m *testing.M) {
 
-	// Initialize logging
-	config.SetupLogger()
-
 	// Initialize the Config Object as done in main.go
 	bootstrapFile := "resources/searchRules.json"
 	instanceName := "unitTestInstance"
-	config.Config.Init(bootstrapFile, instanceName)
+	config.InitConfigurationInstance(bootstrapFile, instanceName)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())
@@ -59,10 +56,10 @@ func TestDiameterPeer(t *testing.T) {
 	defer listener.Close()
 	go func() {
 		conn, _ := listener.Accept()
-		aPeer = NewPassiveDiameterPeer(routerInputChannel, conn, MyMessageHandler)
+		aPeer = NewPassiveDiameterPeer("unitTestInstance", routerInputChannel, conn, MyMessageHandler)
 	}()
 
-	bPeer = NewActiveDiameterPeer(routerInputChannel, bPeerConfig, MyMessageHandler)
+	bPeer = NewActiveDiameterPeer("unitTestInstance", routerInputChannel, bPeerConfig, MyMessageHandler)
 	connectedMsg1 := <-routerInputChannel
 	if p1, ok := connectedMsg1.(PeerUpEvent); !ok {
 		t.Fatal("received non PeerUpEvent")
@@ -143,10 +140,10 @@ func TestDiameterPeerBadClient(t *testing.T) {
 	defer listener.Close()
 	go func() {
 		conn, _ := listener.Accept()
-		aPeer = NewPassiveDiameterPeer(passiveInputChannel, conn, MyMessageHandler)
+		aPeer = NewPassiveDiameterPeer("unitTestInstance", passiveInputChannel, conn, MyMessageHandler)
 	}()
 
-	bPeer = NewActiveDiameterPeer(activeInputChannel, bPeerConfig, MyMessageHandler)
+	bPeer = NewActiveDiameterPeer("unitTestInstance", activeInputChannel, bPeerConfig, MyMessageHandler)
 
 	upMsg := <-passiveInputChannel
 	if _, ok := upMsg.(PeerUpEvent); !ok {

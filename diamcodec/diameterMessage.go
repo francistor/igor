@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+// Uses the default configuration instance
+
 const (
 	// Success
 	DIAMETER_SUCCESS         = 2001
@@ -112,7 +114,7 @@ func (dm *DiameterMessage) ReadFrom(reader io.Reader) (n int64, err error) {
 	}
 	currentIndex += 4
 
-	diameterApplication, ok := config.DDict.AppByCode[dm.ApplicationId]
+	diameterApplication, ok := config.GetDDict().AppByCode[dm.ApplicationId]
 	if ok {
 		dm.ApplicationName = diameterApplication.Name
 		dm.CommandName = diameterApplication.CommandByCode[dm.CommandCode].Name
@@ -166,19 +168,19 @@ func DiameterMessageFromBytes(inputBytes []byte) (DiameterMessage, uint32, error
 func (m *DiameterMessage) Tidy() *DiameterMessage {
 
 	if m.ApplicationId == 0 && m.ApplicationName != "" {
-		m.ApplicationId = config.DDict.AppByName[m.ApplicationName].Code
+		m.ApplicationId = config.GetDDict().AppByName[m.ApplicationName].Code
 	}
 
 	if m.ApplicationId != 0 && m.ApplicationName == "" {
-		m.ApplicationName = config.DDict.AppByCode[m.ApplicationId].Name
+		m.ApplicationName = config.GetDDict().AppByCode[m.ApplicationId].Name
 	}
 
 	if m.CommandCode == 0 && m.CommandName != "" {
-		m.CommandCode = config.DDict.AppByCode[m.ApplicationId].CommandByName[m.CommandName].Code
+		m.CommandCode = config.GetDDict().AppByCode[m.ApplicationId].CommandByName[m.CommandName].Code
 	}
 
 	if m.CommandCode != 0 && m.CommandName == "" {
-		m.CommandName = config.DDict.AppByCode[m.ApplicationId].CommandByCode[m.CommandCode].Name
+		m.CommandName = config.GetDDict().AppByCode[m.ApplicationId].CommandByCode[m.CommandCode].Name
 	}
 
 	return m
@@ -308,7 +310,7 @@ func (m *DiameterMessage) Add(name string, value interface{}) *DiameterMessage {
 	avp, error := NewAVP(name, value)
 
 	if error != nil {
-		config.IgorLogger.Errorf("avp could not be added %s: %v, %s", name, value, error)
+		config.GetLogger().Errorf("avp could not be added %s: %v, %s", name, value, error)
 		return m
 	}
 
@@ -449,7 +451,7 @@ func NewDiameterRequest(appName string, commandName string) (DiameterMessage, er
 	diameterMessage := DiameterMessage{IsRequest: true}
 
 	// Find element in dictionary
-	appDict, ok := config.DDict.AppByName[appName]
+	appDict, ok := config.GetDDict().AppByName[appName]
 	if !ok {
 		return diameterMessage, fmt.Errorf("application %s not found", appName)
 	}
@@ -468,8 +470,8 @@ func NewDiameterRequest(appName string, commandName string) (DiameterMessage, er
 	diameterMessage.E2EId = getE2EId()
 
 	// Add mandatory parameters
-	diameterMessage.Add("Origin-Host", config.DiameterServerConf().DiameterHost)
-	diameterMessage.Add("Origin-Realm", config.DiameterServerConf().DiameterRealm)
+	diameterMessage.Add("Origin-Host", config.GetConfig().DiameterServerConf().DiameterHost)
+	diameterMessage.Add("Origin-Realm", config.GetConfig().DiameterServerConf().DiameterRealm)
 
 	// E2EId and HopByHopId are filled out later
 	return diameterMessage, nil
@@ -489,8 +491,8 @@ func NewDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage {
 	diameterMessage.HopByHopId = diameterRequest.HopByHopId
 
 	// Add mandatory parameters
-	diameterMessage.Add("Origin-Host", config.DiameterServerConf().DiameterHost)
-	diameterMessage.Add("Origin-Realm", config.DiameterServerConf().DiameterRealm)
+	diameterMessage.Add("Origin-Host", config.GetConfig().DiameterServerConf().DiameterHost)
+	diameterMessage.Add("Origin-Realm", config.GetConfig().DiameterServerConf().DiameterRealm)
 
 	return diameterMessage
 }
