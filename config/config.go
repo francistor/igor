@@ -126,7 +126,7 @@ func GetConfigInstance(instanceName string) *ConfigurationManager {
 		}
 	}
 
-	panic("configuraton instance " + instanceName + "not configured")
+	panic("configuraton instance <" + instanceName + "> not configured")
 }
 
 // Retrieves the default configuration instance

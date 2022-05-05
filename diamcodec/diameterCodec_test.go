@@ -636,7 +636,7 @@ func TestJSON(t *testing.T) {
 
 func TestDiameterMessage(t *testing.T) {
 
-	diameterMessage, err := NewDiameterRequest("TestApplication", "TestRequest")
+	diameterMessage, err := NewDefaultDiameterRequest("TestApplication", "TestRequest")
 	if err != nil {
 		t.Errorf("could not create diameter request for application TestAppliciaton and command TestRequest")
 		return
@@ -720,7 +720,7 @@ func TestDiameterMessage(t *testing.T) {
 	}
 
 	// Generate reply message
-	replyMessage := NewDiameterAnswer(&recoveredMessage)
+	replyMessage := NewDefaultDiameterAnswer(&recoveredMessage)
 	if replyMessage.IsRequest {
 		t.Errorf("reply message is a request")
 	}

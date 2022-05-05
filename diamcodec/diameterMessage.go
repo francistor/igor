@@ -446,7 +446,7 @@ func (m *DiameterMessage) GetDateAVP(avpName string) time.Time {
 ///////////////////////////////////////////////////////////////
 // Message constructors
 ///////////////////////////////////////////////////////////////
-func NewDiameterRequest(appName string, commandName string) (DiameterMessage, error) {
+func newDiameterRequest(appName string, commandName string) (DiameterMessage, error) {
 
 	diameterMessage := DiameterMessage{IsRequest: true}
 
@@ -469,16 +469,12 @@ func NewDiameterRequest(appName string, commandName string) (DiameterMessage, er
 	diameterMessage.HopByHopId = getHopByHopId()
 	diameterMessage.E2EId = getE2EId()
 
-	// Add mandatory parameters
-	diameterMessage.Add("Origin-Host", config.GetConfig().DiameterServerConf().DiameterHost)
-	diameterMessage.Add("Origin-Realm", config.GetConfig().DiameterServerConf().DiameterRealm)
-
 	// E2EId and HopByHopId are filled out later
 	return diameterMessage, nil
 
 }
 
-func NewDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage {
+func newDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage {
 
 	diameterMessage := DiameterMessage{}
 
@@ -490,11 +486,51 @@ func NewDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage {
 	diameterMessage.E2EId = diameterRequest.E2EId
 	diameterMessage.HopByHopId = diameterRequest.HopByHopId
 
-	// Add mandatory parameters
-	diameterMessage.Add("Origin-Host", config.GetConfig().DiameterServerConf().DiameterHost)
-	diameterMessage.Add("Origin-Realm", config.GetConfig().DiameterServerConf().DiameterRealm)
-
 	return diameterMessage
+}
+
+// New Diameter Request including default Origin Host and Realm
+func NewDefaultDiameterRequest(appName string, commandName string) (DiameterMessage, error) {
+	dm, err := newDiameterRequest(appName, commandName)
+	if err == nil {
+		// Add mandatory parameters
+		dm.Add("Origin-Host", config.GetConfig().DiameterServerConf().DiameterHost)
+		dm.Add("Origin-Realm", config.GetConfig().DiameterServerConf().DiameterRealm)
+	}
+	return dm, err
+}
+
+// New Diameter Answer including default Origin Host and Realm
+func NewDefaultDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage {
+	dm := newDiameterAnswer(diameterRequest)
+
+	// Add mandatory parameters
+	dm.Add("Origin-Host", config.GetConfig().DiameterServerConf().DiameterHost)
+	dm.Add("Origin-Realm", config.GetConfig().DiameterServerConf().DiameterRealm)
+
+	return dm
+}
+
+// New Diameter Request including instance specific Origin Host and Realm
+func NewInstanceDiameterRequest(ci *config.ConfigurationManager, appName string, commandName string) (DiameterMessage, error) {
+	dm, err := newDiameterRequest(appName, commandName)
+	if err == nil {
+		// Add mandatory parameters
+		dm.Add("Origin-Host", ci.DiameterServerConf().DiameterHost)
+		dm.Add("Origin-Realm", ci.DiameterServerConf().DiameterRealm)
+	}
+	return dm, err
+}
+
+// New Diameter Answer including instance specific Origin Host and Realm
+func NewInstanceDiameterAnswer(ci *config.ConfigurationManager, diameterRequest *DiameterMessage) DiameterMessage {
+	dm := newDiameterAnswer(diameterRequest)
+
+	// Add mandatory parameters
+	dm.Add("Origin-Host", ci.DiameterServerConf().DiameterHost)
+	dm.Add("Origin-Realm", ci.DiameterServerConf().DiameterRealm)
+
+	return dm
 }
 
 // TODO:
@@ -512,7 +548,3 @@ func (dm DiameterMessage) String() string {
 		return string(b)
 	}
 }
-
-///////////////////////////////////////////////////////////////
-// JSON Encoding
-///////////////////////////////////////////////////////////////
