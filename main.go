@@ -143,6 +143,6 @@ func updatePeersTable(instanceName string, controlCh chan interface{}, peersTabl
 }
 
 func MyMessageHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-	answer := diamcodec.NewDiameterAnswer(request)
+	answer := diamcodec.NewDefaultDiameterAnswer(request)
 	return &answer, nil
 }

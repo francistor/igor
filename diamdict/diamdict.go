@@ -122,6 +122,15 @@ func (dd *DiameterDict) GetFromName(name string) (AVPDictItem, error) {
 	return di, nil
 }
 
+// Returns a DiameterCommand given the appid and command code
+func (dd *DiameterDict) GetCommand(appId uint32, commandCode uint32) (DiameterCommand, error) {
+	if command, ok := dd.AppByCode[appId].CommandByCode[commandCode]; !ok {
+		return DiameterCommand{}, fmt.Errorf("appId %d and command %d not found", appId, commandCode)
+	} else {
+		return command, nil
+	}
+}
+
 // Returns a Diameter Dictionary object from its serialized representation
 func NewDictionaryFromJSON(data []byte) *DiameterDict {
 

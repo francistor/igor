@@ -1,5 +1,7 @@
 package diampeer
 
+// TODO: connection cannot be established with peer. DWA not neceived
+
 import (
 	"igor/config"
 	"igor/diamcodec"
@@ -41,7 +43,7 @@ func TestDiameterPeer(t *testing.T) {
 		Port:                    3868,
 		ConnectionPolicy:        "active",
 		OriginNetwork:           "127.0.0.0/8",
-		WatchdogIntervalMillis:  30000,
+		WatchdogIntervalMillis:  300, // Small DWR interval!
 		ConnectionTimeoutMillis: 3000,
 	}
 
@@ -71,6 +73,9 @@ func TestDiameterPeer(t *testing.T) {
 	} else if p2.DiameterHost != "server.igor" {
 		t.Fatalf("received %s as Origin-Host", p2.DiameterHost)
 	}
+
+	// Wait a while to have some DWR exchanged
+	time.Sleep(1 * time.Second)
 
 	// Correct response
 	request, _ := diamcodec.NewDefaultDiameterRequest("TestApplication", "TestRequest")
@@ -160,6 +165,7 @@ func TestDiameterPeerBadActiveClient(t *testing.T) {
 		t.Fatal("received subsequent non PeerUpDownEvent in passive peer")
 	}
 
+	// The active peer gets an error because the origin host reported is not BAD.igor
 	downMsg := <-activeInputChannel
 	if _, ok := downMsg.(PeerDownEvent); !ok {
 		t.Fatal("received non PeerDownEvent")
