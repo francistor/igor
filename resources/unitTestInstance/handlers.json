@@ -1,6 +1,0 @@
-[
-	{"name": "GxHandler", "handler": "yaas.handlers.test.server.GxHandler"},
-	{"name": "NASReqHandler", "handler": "yaas.handlers.test.server.NASReqHandler"},
-	
-	{"name": "RadiusHandler", "handler": "yaas.handlers.test.server.RadiusHandler"}
-]

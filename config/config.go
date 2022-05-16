@@ -50,12 +50,7 @@ type ConfigurationManager struct {
 
 // Slice of configuration managers
 // Except during testing, there will be only one instance, which will be retrieved by GetConfig()
-var configs []*ConfigurationManager
-
-// Called by go once
-func init() {
-	configs = make([]*ConfigurationManager, 0)
-}
+var configs []*ConfigurationManager = make([]*ConfigurationManager, 0)
 
 // Intializes the config object
 // To be called only once, from main function
@@ -63,7 +58,7 @@ func init() {
 func InitConfigurationInstance(bootstrapFile string, instanceName string) {
 
 	// Check not already instantiated
-	for i, _ := range configs {
+	for i := range configs {
 		if configs[i].instanceName == instanceName {
 			panic(instanceName + " already initalized")
 		}
@@ -120,7 +115,7 @@ func InitConfigurationInstance(bootstrapFile string, instanceName string) {
 // Mainly used for testing
 func GetConfigInstance(instanceName string) *ConfigurationManager {
 
-	for i, _ := range configs {
+	for i := range configs {
 		if configs[i].instanceName == instanceName {
 			return configs[i]
 		}
@@ -245,7 +240,7 @@ func (c *ConfigurationManager) readConfigObject(objectName string) (ConfigObject
 		}
 	}
 
-	// Try without instance name.
+	// Try without instance name
 	objectLocation = base + innerName
 	object, err := c.readResource(objectLocation)
 	if err == nil {

@@ -53,7 +53,7 @@ type DiameterRoutingRule struct {
 type DiameterRoutingRules []DiameterRoutingRule
 
 // Finds the appropriate route, taking into account wildcards.
-// If nonLocal is true, force that the router is not local (has no nandler)
+// If nonLocal is true, force that the DiameterPeerManager is not local (has no nandler)
 func (rr DiameterRoutingRules) FindDiameterRoute(realm string, application string, nonLocal bool) (DiameterRoutingRule, error) {
 	for _, rule := range rr {
 		if rule.Realm == "*" || rule.Realm == realm {
@@ -120,7 +120,7 @@ func (dps *DiameterPeers) FindPeer(diameterHost string) (DiameterPeer, error) {
 func (dps *DiameterPeers) ValidateIncomingAddress(host string, address net.IP) bool {
 	for _, peer := range *dps {
 		if peer.OriginNetworkCIDR.Contains(address) {
-			if host != "" && peer.DiameterHost == host {
+			if host == "" || peer.DiameterHost == host {
 				return true
 			}
 		}
@@ -155,7 +155,7 @@ func (c *ConfigurationManager) getDiameterPeers() (DiameterPeers, error) {
 func (c *ConfigurationManager) UpdateDiameterPeers() {
 	dp, error := c.getDiameterPeers()
 	if error != nil {
-		c.IgorLogger.Error("could not retrieve the Peers configuration: %v", error)
+		c.IgorLogger.Errorf("could not retrieve the Peers configuration: %v", error)
 		return
 	}
 	c.currentDiameterPeers = dp

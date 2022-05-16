@@ -1,23 +1,38 @@
 package instrumentation
 
+// The single instance of the metrics server
+var MS *MetricsServer = NewMetricsServer()
+
 type DiameterMetrics map[DiameterMetricKey]uint64
 
-type MetricQuery struct {
-	Name   string
-	Labels map[string]string // If label has a value, filter. If value is "", return in output, do not aggregate. If not present, aggregate
+type Query struct {
+
+	// Name of the metric to query
+	Name string
+
+	// List of labels to aggregate
+	AggLabels []string
+
+	// Map of label/values to filter
+	Filter map[string]string
+
+	// Channel where the response is written
+	RChan chan interface{}
 }
 
 type MetricsServer struct {
 	InputChan chan interface{}
-	QueryChan chan interface{}
+	QueryChan chan Query
 
-	DiameterRequestsReceived DiameterMetrics
-	DiameterAnswersReceived  DiameterMetrics
-	DiameterRequestsTimeout  DiameterMetrics
+	diameterRequestsReceived DiameterMetrics
+	diameterAnswersReceived  DiameterMetrics
+	diameterRequestsTimeout  DiameterMetrics
 
-	DiameterRequestsSent     DiameterMetrics
-	DiameterAnswersSent      DiameterMetrics
-	DiameterAnswersDiscarded DiameterMetrics
+	diameterRequestsSent     DiameterMetrics
+	diameterAnswersSent      DiameterMetrics
+	diameterAnswersDiscarded DiameterMetrics
+
+	diameterPeersTables map[string]DiameterPeersTable
 }
 
 // Returns a set of metrics in which only the properties specified in labels are not zeroed
@@ -117,88 +132,119 @@ func GetFilteredDiameterMetrics(diameterMetrics DiameterMetrics, filter map[stri
 
 // Gets filtered and aggregated metrics
 func GetDiameterMetrics(diameterMetrics DiameterMetrics, filter map[string]string, aggLabels []string) DiameterMetrics {
-	var filteredMetrics DiameterMetrics
-	if filter != nil {
-		filteredMetrics = GetFilteredDiameterMetrics(diameterMetrics, filter)
-	} else {
-		// This makes a copy. Not optimal
-		filteredMetrics = diameterMetrics
-	}
-
-	return GetAggDiameterMetrics(filteredMetrics, aggLabels)
+	return GetAggDiameterMetrics(GetFilteredDiameterMetrics(diameterMetrics, filter), aggLabels)
 }
 
 func NewMetricsServer() *MetricsServer {
-	server := MetricsServer{InputChan: make(chan interface{}), QueryChan: make(chan interface{})}
+	server := MetricsServer{InputChan: make(chan interface{}, 100), QueryChan: make(chan Query, 10)}
 
 	// Initialize Metrics
-	server.DiameterRequestsReceived = make(DiameterMetrics)
-	server.DiameterAnswersReceived = make(DiameterMetrics)
-	server.DiameterRequestsTimeout = make(DiameterMetrics)
+	server.diameterRequestsReceived = make(DiameterMetrics)
+	server.diameterAnswersReceived = make(DiameterMetrics)
+	server.diameterRequestsTimeout = make(DiameterMetrics)
 
-	server.DiameterRequestsSent = make(DiameterMetrics)
-	server.DiameterAnswersSent = make(DiameterMetrics)
-	server.DiameterAnswersDiscarded = make(DiameterMetrics)
+	server.diameterRequestsSent = make(DiameterMetrics)
+	server.diameterAnswersSent = make(DiameterMetrics)
+	server.diameterAnswersDiscarded = make(DiameterMetrics)
+
+	server.diameterPeersTables = make(map[string]DiameterPeersTable, 1)
 
 	// Start receive loop
-	go server.storeLoop()
+	go server.metricServerLoop()
 
 	return &server
 }
 
-func (ms *MetricsServer) storeLoop() {
+// Wrapper to get Diameter Metrics
+func (ms *MetricsServer) DiameterQuery(name string, filter map[string]string, aggLabels []string) DiameterMetrics {
+	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
+	ms.QueryChan <- query
+	return (<-query.RChan).(DiameterMetrics)
+}
 
-	select {
+// Wrapper to get PeersTable
+func (ms *MetricsServer) PeersTableQuery() map[string]DiameterPeersTable {
+	query := Query{Name: "DiameterPeersTables", RChan: make(chan interface{})}
+	ms.QueryChan <- query
+	return (<-query.RChan).(map[string]DiameterPeersTable)
+}
 
-	//case query, ok := <-ms.QueryChan:
+func (ms *MetricsServer) metricServerLoop() {
 
-	case event, ok := <-ms.InputChan:
+	for {
+		select {
 
-		if !ok {
-			break
-		}
+		case query := <-ms.QueryChan:
 
-		switch e := event.(type) {
+			switch query.Name {
+			case "DiameterRequestsReceived":
+				query.RChan <- GetDiameterMetrics(ms.diameterRequestsReceived, query.Filter, query.AggLabels)
+			case "DiameterAnswersReceived":
+				query.RChan <- GetDiameterMetrics(ms.diameterAnswersReceived, query.Filter, query.AggLabels)
+			case "DiameterRequestsTimeout":
+				query.RChan <- GetDiameterMetrics(ms.diameterRequestsTimeout, query.Filter, query.AggLabels)
+			case "DiameterRequestsSent":
+				query.RChan <- GetDiameterMetrics(ms.diameterRequestsSent, query.Filter, query.AggLabels)
+			case "DiameterAnswersSent":
+				query.RChan <- GetDiameterMetrics(ms.diameterAnswersSent, query.Filter, query.AggLabels)
+			case "DiameterAnswersDiscarded":
+				query.RChan <- GetDiameterMetrics(ms.diameterAnswersDiscarded, query.Filter, query.AggLabels)
 
-		// Diameter Events
-		case DiameterRequestReceivedEvent:
-			if curr, ok := ms.DiameterRequestsReceived[e.Key]; !ok {
-				ms.DiameterRequestsReceived[e.Key] = 1
-			} else {
-				ms.DiameterRequestsReceived[e.Key] = curr + 1
-			}
-		case DiameterAnswerReceivedEvent:
-			if curr, ok := ms.DiameterAnswersReceived[e.Key]; !ok {
-				ms.DiameterAnswersReceived[e.Key] = 1
-			} else {
-				ms.DiameterAnswersReceived[e.Key] = curr + 1
-			}
-		case DiameterRequestTimeoutEvent:
-			if curr, ok := ms.DiameterRequestsTimeout[e.Key]; !ok {
-				ms.DiameterRequestsTimeout[e.Key] = 1
-			} else {
-				ms.DiameterRequestsTimeout[e.Key] = curr + 1
-			}
-		case DiameterRequestSentEvent:
-			if curr, ok := ms.DiameterRequestsSent[e.Key]; !ok {
-				ms.DiameterRequestsSent[e.Key] = 1
-			} else {
-				ms.DiameterRequestsSent[e.Key] = curr + 1
-			}
-		case DiameterAnswerSentEvent:
-			if curr, ok := ms.DiameterAnswersSent[e.Key]; !ok {
-				ms.DiameterAnswersSent[e.Key] = 1
-			} else {
-				ms.DiameterAnswersSent[e.Key] = curr + 1
-			}
-		case DiameterAnswerDiscardedEvent:
-			if curr, ok := ms.DiameterRequestsTimeout[e.Key]; !ok {
-				ms.DiameterRequestsTimeout[e.Key] = 1
-			} else {
-				ms.DiameterRequestsTimeout[e.Key] = curr + 1
+			case "DiameterPeersTables":
+				query.RChan <- ms.diameterPeersTables
 			}
 
+			close(query.RChan)
+
+		case event, ok := <-ms.InputChan:
+
+			if !ok {
+				break
+			}
+
+			switch e := event.(type) {
+
+			// Diameter Events
+			case DiameterRequestReceivedEvent:
+				if curr, ok := ms.diameterRequestsReceived[e.Key]; !ok {
+					ms.diameterRequestsReceived[e.Key] = 1
+				} else {
+					ms.diameterRequestsReceived[e.Key] = curr + 1
+				}
+			case DiameterAnswerReceivedEvent:
+				if curr, ok := ms.diameterAnswersReceived[e.Key]; !ok {
+					ms.diameterAnswersReceived[e.Key] = 1
+				} else {
+					ms.diameterAnswersReceived[e.Key] = curr + 1
+				}
+			case DiameterRequestTimeoutEvent:
+				if curr, ok := ms.diameterRequestsTimeout[e.Key]; !ok {
+					ms.diameterRequestsTimeout[e.Key] = 1
+				} else {
+					ms.diameterRequestsTimeout[e.Key] = curr + 1
+				}
+			case DiameterRequestSentEvent:
+				if curr, ok := ms.diameterRequestsSent[e.Key]; !ok {
+					ms.diameterRequestsSent[e.Key] = 1
+				} else {
+					ms.diameterRequestsSent[e.Key] = curr + 1
+				}
+			case DiameterAnswerSentEvent:
+				if curr, ok := ms.diameterAnswersSent[e.Key]; !ok {
+					ms.diameterAnswersSent[e.Key] = 1
+				} else {
+					ms.diameterAnswersSent[e.Key] = curr + 1
+				}
+			case DiameterAnswerDiscardedEvent:
+				if curr, ok := ms.diameterRequestsTimeout[e.Key]; !ok {
+					ms.diameterRequestsTimeout[e.Key] = 1
+				} else {
+					ms.diameterRequestsTimeout[e.Key] = curr + 1
+				}
+
+			case DiameterPeersTableUpdatedEvent:
+				ms.diameterPeersTables[e.InstanceName] = e.Table
+			}
 		}
 	}
-
 }

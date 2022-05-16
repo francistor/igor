@@ -1,0 +1,10 @@
+{
+	"bindAddress": "127.0.0.1",
+	"bindPort": 3867,
+	"diameterHost": "client.igor",
+	"diameterRealm": "igor",
+	"vendorId": 1101,
+	"productName": "Igor",
+	"firmwareRevision": 1,
+	"peerCheckTimeSeconds": 120
+}
