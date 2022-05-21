@@ -16,7 +16,7 @@ type RoutableDiameterRequest struct {
 	Message *diamcodec.DiameterMessage
 
 	// The channel to send the answer or error
-	RC *chan interface{}
+	RChan *chan interface{}
 }
 
 type DiameterPeerWithStatus struct {
@@ -170,8 +170,19 @@ func (pm *DiameterPeerManager) eventLoop() {
 				instrumentation.PushDiameterPeersStatus(pm.instanceName, pm.buildPeersStatusTable())
 			}
 
+			// Diameter Request message to be routed
 		case <-pm.DRChann:
+			/*
+				route, err := config.GetConfigInstance(pm.instanceName).RoutingRulesConf().FindDiameterRoute(
+					m.Message.GetStringAVP("Destination-Realm"),
+					m.Message.ApplicationName,
+					false)
 
+				if err != nil {
+					instrumentation.PushDiameterRequestDiscarded("", m.Message)
+					*m.RChan <- fmt.Errorf("no route found")
+				}
+			*/
 		}
 	}
 }

@@ -24,9 +24,10 @@ type MetricsServer struct {
 	InputChan chan interface{}
 	QueryChan chan Query
 
-	diameterRequestsReceived DiameterMetrics
-	diameterAnswersReceived  DiameterMetrics
-	diameterRequestsTimeout  DiameterMetrics
+	diameterRequestsReceived  DiameterMetrics
+	diameterAnswersReceived   DiameterMetrics
+	diameterRequestsTimeout   DiameterMetrics
+	diameterRequestsDiscarded DiameterMetrics
 
 	diameterRequestsSent     DiameterMetrics
 	diameterAnswersSent      DiameterMetrics
@@ -142,6 +143,7 @@ func NewMetricsServer() *MetricsServer {
 	server.diameterRequestsReceived = make(DiameterMetrics)
 	server.diameterAnswersReceived = make(DiameterMetrics)
 	server.diameterRequestsTimeout = make(DiameterMetrics)
+	server.diameterRequestsDiscarded = make(DiameterMetrics)
 
 	server.diameterRequestsSent = make(DiameterMetrics)
 	server.diameterAnswersSent = make(DiameterMetrics)
@@ -183,6 +185,8 @@ func (ms *MetricsServer) metricServerLoop() {
 				query.RChan <- GetDiameterMetrics(ms.diameterAnswersReceived, query.Filter, query.AggLabels)
 			case "DiameterRequestsTimeout":
 				query.RChan <- GetDiameterMetrics(ms.diameterRequestsTimeout, query.Filter, query.AggLabels)
+			case "DiameterRequestsDiscarded":
+				query.RChan <- GetDiameterMetrics(ms.diameterRequestsDiscarded, query.Filter, query.AggLabels)
 			case "DiameterRequestsSent":
 				query.RChan <- GetDiameterMetrics(ms.diameterRequestsSent, query.Filter, query.AggLabels)
 			case "DiameterAnswersSent":

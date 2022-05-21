@@ -56,8 +56,18 @@ type DiameterRequestTimeoutEvent struct {
 }
 
 // Helper function to send a message to the instrumentation server when a diameter request timeout occurs
-func PushDiameterRequestTimeout(peerName string, diameterMessage *diamcodec.DiameterMessage) {
-	MS.InputChan <- DiameterRequestTimeoutEvent{Key: *DiameterMetricKeyFromMessage(peerName, diameterMessage)}
+func PushDiameterRequestTimeout(peerName string, key DiameterMetricKey) {
+	MS.InputChan <- DiameterRequestTimeoutEvent{Key: key}
+}
+
+// Message sent to instrumentation server when a diameter request is discarded, probably due to no route available
+type DiameterRequestDiscardedEvent struct {
+	Key DiameterMetricKey
+}
+
+// Helper function to send a message to the instrumentation server when a diameter request is discarded
+func PushDiameterRequestDiscarded(peerName string, diameterMessage *diamcodec.DiameterMessage) {
+	MS.InputChan <- DiameterRequestDiscardedEvent{Key: *DiameterMetricKeyFromMessage(peerName, diameterMessage)}
 }
 
 // Message sent to instrumentation server when a diameter request is sent

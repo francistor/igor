@@ -112,7 +112,6 @@ func InitConfigurationInstance(bootstrapFile string, instanceName string) {
 }
 
 // Retrieves a specific configuration instance
-// Mainly used for testing
 func GetConfigInstance(instanceName string) *ConfigurationManager {
 
 	for i := range configs {

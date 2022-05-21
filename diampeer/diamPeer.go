@@ -70,8 +70,12 @@ type PeerUpMsg struct {
 // the channel on which the answer must be written
 type EgressDiameterMessage struct {
 	Message *diamcodec.DiameterMessage
+
 	// nil if a Response or base application
 	RChan *chan interface{}
+
+	// Timeout to set
+	timeout time.Duration
 }
 
 // Message received from a Diameter Peer. May be a Request or an Answer
@@ -129,6 +133,19 @@ type WatchdogMsg struct {
 // If an error is returned, no diameter answer is sent. Implementers should always generate a diameter answer instead
 type MessageHandler func(request *diamcodec.DiameterMessage) (answer *diamcodec.DiameterMessage, err error)
 
+// Context data for an in flight request
+type RequestContext struct {
+
+	// Metric key. The message will not be available in a timeout
+	Key instrumentation.DiameterMetricKey
+
+	// Channel on which the answer will be sent
+	RChan *chan interface{}
+
+	// Timer
+	Timer *time.Timer
+}
+
 // This object abstracts the operations against a Diameter Peer
 // It implements the Actor model: all internal variables are modified
 // from an internal single threaded EventLoop and message passing
@@ -177,7 +194,7 @@ type DiameterPeer struct {
 
 	// Outstanding requests map
 	// Maps HopByHopIds to a channel where the response or a timeout will be sent
-	requestsMap map[uint32]*chan interface{}
+	requestsMap map[uint32]RequestContext
 
 	// Registered Handler for incoming messages
 	handler MessageHandler
@@ -198,7 +215,7 @@ type DiameterPeer struct {
 func NewActiveDiameterPeer(configInstanceName string, oc chan interface{}, peer config.DiameterPeer, handler MessageHandler) *DiameterPeer {
 
 	// Create the Peer struct
-	dp := DiameterPeer{ci: config.GetConfigInstance(configInstanceName), eventLoopChannel: make(chan interface{}, EVENTLOOP_CAPACITY), ControlChannel: oc, PeerConfig: peer, requestsMap: make(map[uint32]*chan interface{}), handler: handler}
+	dp := DiameterPeer{ci: config.GetConfigInstance(configInstanceName), eventLoopChannel: make(chan interface{}, EVENTLOOP_CAPACITY), ControlChannel: oc, PeerConfig: peer, requestsMap: make(map[uint32]RequestContext), handler: handler}
 
 	dp.ci.IgorLogger.Debugf("creating active diameter peer for %s", peer.DiameterHost)
 
@@ -225,7 +242,7 @@ func NewActiveDiameterPeer(configInstanceName string, oc chan interface{}, peer 
 func NewPassiveDiameterPeer(configInstanceName string, oc chan interface{}, conn net.Conn, handler MessageHandler) *DiameterPeer {
 
 	// Create the Peer Struct
-	dp := DiameterPeer{ci: config.GetConfigInstance(configInstanceName), eventLoopChannel: make(chan interface{}, EVENTLOOP_CAPACITY), ControlChannel: oc, connection: conn, requestsMap: make(map[uint32]*chan interface{}), handler: handler}
+	dp := DiameterPeer{ci: config.GetConfigInstance(configInstanceName), eventLoopChannel: make(chan interface{}, EVENTLOOP_CAPACITY), ControlChannel: oc, connection: conn, requestsMap: make(map[uint32]RequestContext), handler: handler}
 
 	dp.ci.IgorLogger.Debugf("creating passive diameter peer for %s", conn.RemoteAddr().String())
 
@@ -414,7 +431,7 @@ func (dp *DiameterPeer) eventLoop() {
 					// Check not duplicate
 					hbhId := v.Message.HopByHopId
 					if _, ok := dp.requestsMap[hbhId]; ok && v.RChan != nil {
-						*v.RChan <- fmt.Errorf("Duplicated HopByHopId")
+						*v.RChan <- fmt.Errorf("duplicated HopByHopId")
 						break
 					}
 
@@ -434,10 +451,18 @@ func (dp *DiameterPeer) eventLoop() {
 					// All good.
 					// If it was a Request, store in the outstanding request map
 					// RChan may be nil if it is a base application message
-					if v.Message.IsRequest && v.RChan != nil {
+					if v.Message.IsRequest {
 						instrumentation.PushDiameterRequestSent(dp.PeerConfig.DiameterHost, v.Message)
 						if v.RChan != nil {
-							dp.requestsMap[v.Message.HopByHopId] = v.RChan
+							// Set timer
+							dp.wg.Add(1)
+							timer := time.AfterFunc(v.timeout, func() {
+								// This will be called if the timer expires
+								dp.eventLoopChannel <- CancelDiameterRequest{HopByHopId: v.Message.HopByHopId}
+								defer dp.wg.Done()
+							})
+
+							dp.requestsMap[v.Message.HopByHopId] = RequestContext{RChan: v.RChan, Timer: timer, Key: *instrumentation.DiameterMetricKeyFromMessage(dp.PeerConfig.DiameterHost, v.Message)}
 						}
 					} else {
 						instrumentation.PushDiameterAnswerSent(dp.PeerConfig.DiameterHost, v.Message)
@@ -504,7 +529,6 @@ func (dp *DiameterPeer) eventLoop() {
 					}
 				} else {
 					// Received an answer
-
 					instrumentation.PushDiameterAnswerReceived(dp.PeerConfig.DiameterHost, v.Message)
 
 					if v.Message.ApplicationId == 0 {
@@ -546,12 +570,21 @@ func (dp *DiameterPeer) eventLoop() {
 						}
 					} else {
 						// Non base answer
-						if respChann, ok := dp.requestsMap[v.Message.HopByHopId]; !ok {
+						if requestContext, ok := dp.requestsMap[v.Message.HopByHopId]; !ok {
 							instrumentation.PushDiameterAnswerDiscarded(dp.PeerConfig.DiameterHost, v.Message)
 							dp.ci.IgorLogger.Errorf("stalled diameter answer: '%v'", *v.Message)
 						} else {
-							*respChann <- v.Message
-							close(*respChann)
+							// Cancel timer
+							if requestContext.Timer.Stop() {
+								// The after func has not been called
+								dp.wg.Done()
+							} else {
+								// Drain the channel
+								<-requestContext.Timer.C
+							}
+							// Send the response
+							*requestContext.RChan <- v.Message
+							close(*requestContext.RChan)
 							delete(dp.requestsMap, v.Message.HopByHopId)
 						}
 					}
@@ -560,12 +593,18 @@ func (dp *DiameterPeer) eventLoop() {
 			case CancelDiameterRequest:
 				dp.ci.IgorLogger.Debugf("Timeout to HopByHopId: <%d>\n", v.HopByHopId)
 				// Timeout is instrumented in the DiameterRequest method
-				respChann, ok := dp.requestsMap[v.HopByHopId]
+				requestContext, ok := dp.requestsMap[v.HopByHopId]
 				if !ok {
 					dp.ci.IgorLogger.Errorf("attempt to cancel an non existing request")
 				} else {
-					close(*respChann)
+					// Send the response
+					*requestContext.RChan <- fmt.Errorf("Timeout")
+					// No more messages will be sent through this channel
+					close(*requestContext.RChan)
+					// Delete the requestmap entry
 					delete(dp.requestsMap, v.HopByHopId)
+					// Update metric
+					instrumentation.PushDiameterRequestTimeout(dp.PeerConfig.DiameterHost, requestContext.Key)
 				}
 
 			case WatchdogMsg:
@@ -655,7 +694,7 @@ func (dp *DiameterPeer) DiameterRequest(dm *diamcodec.DiameterMessage, timeout t
 	}
 
 	if !(*dm).IsRequest {
-		return nil, fmt.Errorf("Diameter message is not a request")
+		return nil, fmt.Errorf("diameter message is not a request")
 	}
 
 	// Make sure the eventLoop channel is not closed until this finishes
@@ -667,28 +706,14 @@ func (dp *DiameterPeer) DiameterRequest(dm *diamcodec.DiameterMessage, timeout t
 	var responseChannel = make(chan interface{})
 
 	// Send myself the message
-	dp.eventLoopChannel <- EgressDiameterMessage{Message: dm, RChan: &responseChannel}
+	dp.eventLoopChannel <- EgressDiameterMessage{Message: dm, RChan: &responseChannel, timeout: timeout}
 
-	// Create the timer
-	timer := time.NewTimer(timeout)
-
-	// Wait for the timer or the response, which can be a DiameterAnswer or an error
-	select {
-	case <-timer.C:
-		dp.eventLoopChannel <- CancelDiameterRequest{HopByHopId: dm.HopByHopId}
-		instrumentation.PushDiameterRequestTimeout(dp.PeerConfig.DiameterHost, dm)
-		return nil, fmt.Errorf("Timeout")
-
-	case r := <-responseChannel:
-		// Prevent the timer from firing
-		timer.Stop()
-
-		switch v := r.(type) {
-		case error:
-			return nil, v
-		case *diamcodec.DiameterMessage:
-			return v, nil
-		}
+	r := <-responseChannel
+	switch v := r.(type) {
+	case error:
+		return nil, v
+	case *diamcodec.DiameterMessage:
+		return v, nil
 	}
 
 	panic("unreachable code in diampeer.DiameterRequest")

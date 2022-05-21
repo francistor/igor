@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 
 	// Initialize the Config Object as done in main.go
 	bootFile := "resources/searchRules.json"
-	instanceName := "unitTestInstance"
+	instanceName := "testServer"
 	InitConfigurationInstance(bootFile, instanceName)
 
 	// Start the server for configuration
@@ -61,8 +61,8 @@ func TestDiamConfig(t *testing.T) {
 
 	// Diameter Peers configuration
 	dp := GetConfig().PeersConf()
-	if dp["superserver.igor"].WatchdogIntervalMillis != 300000 {
-		t.Fatal("WatchdogIntervalMillis was not 30000")
+	if dp["superserver.igorsuperserver"].WatchdogIntervalMillis != 300000 {
+		t.Fatalf("WatchdogIntervalMillis was not 300000 but %d", dp["superserver.igor"].WatchdogIntervalMillis)
 	}
 	peer, err := dp.FindPeer("client.igor")
 	if err != nil {

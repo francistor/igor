@@ -3,7 +3,6 @@ package diamserver
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"igor/config"
 	"igor/instrumentation"
 	"os"
@@ -39,13 +38,20 @@ func TestBasicSetup(t *testing.T) {
 	NewDiameterPeerManager("testClientUnknownClient")
 	NewDiameterPeerManager("testClientUnknownServer")
 
+	// Time to settle connections
 	time.Sleep(1 * time.Second)
 
-	j, _ := json.Marshal(instrumentation.MS.PeersTableQuery())
-	fmt.Println(prettyPrintJSON(j))
+	// Uncomment to debug
+	/*
+		j, _ := json.Marshal(instrumentation.MS.PeersTableQuery())
+		fmt.Println(prettyPrintJSON(j))
+	*/
 
+	// Get the current peer status
 	peerTables := instrumentation.MS.PeersTableQuery()
 
+	// The testClient PeerManager will have an established connection
+	// to server.igor but not one to unreachableserver.igor
 	clientTable := peerTables["testClient"]
 	clientPeerServer := findPeer("server.igor", clientTable)
 	if clientPeerServer.IsEngaged != true {
@@ -56,17 +62,21 @@ func TestBasicSetup(t *testing.T) {
 		t.Error("unreachableserver.igor engaged in client peers table")
 	}
 
+	// The testServer PeerManager will have two established connections
+	// with client.igor and superserver.igorsuperserver
 	serverTable := peerTables["testServer"]
 	serverPeerClient := findPeer("client.igor", serverTable)
 	if serverPeerClient.IsEngaged != true {
 		t.Error("server.igor not engaged in server peers table")
 
 	}
-	serverPeerSuperServer := findPeer("superserver.igor", serverTable)
+	serverPeerSuperServer := findPeer("superserver.igorsuperserver", serverTable)
 	if serverPeerSuperServer.IsEngaged != true {
 		t.Error("badserver.igor engaged in server peers table")
 	}
 
+	// The testSuperServer will have an established connection with
+	// server.igor
 	superserverTable := peerTables["testSuperServer"]
 	superserverPeerServer := findPeer("server.igor", superserverTable)
 	if superserverPeerServer.IsEngaged != true {
@@ -74,12 +84,17 @@ func TestBasicSetup(t *testing.T) {
 	}
 
 	// Bad clients
+	// testClientUnknownClient tries to register with server.igor with
+	// a Diameter-Host name that is not recognized by the server
 	unkClientTable := peerTables["testClientUnknownClient"]
 	clientPeerUnknownClient := findPeer("server.igor", unkClientTable)
 	if clientPeerUnknownClient.IsEngaged != false {
 		t.Error("server.igor engaged in unknownclient peers table")
 	}
 
+	// testClientUnknownServer tries to register with a server in the
+	// same address where server.igor is lisening but expecting another
+	// server name
 	unkServerClientTable := peerTables["testClientUnknownServer"]
 	clientPeerUnknownServer := findPeer("server.igor", unkServerClientTable)
 	if clientPeerUnknownServer.IsEngaged != false {

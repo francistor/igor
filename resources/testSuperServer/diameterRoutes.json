@@ -1,5 +1,4 @@
 [
 	{"realm": "igorserver", "applicationId": "Gx", "handler": "GxHandler"},
-	{"realm": "*", "applicationId": "NASREQ", "handler": "NASReqHandler"},
-	{"realm": "igorsuperserver", "applicationId": "*", "peers": ["superserver.igors"], "policy": "fixed"}
+	{"realm": "*", "applicationId": "NASREQ", "handler": "NASReqHandler"}
 ]
