@@ -658,7 +658,7 @@ func (dp *DiameterPeer) DiameterRequest(dm *diamcodec.DiameterMessage, timeout t
 		return nil, fmt.Errorf("Diameter message is not a request")
 	}
 
-	// Make sure the eventLoop channel is not closed yet
+	// Make sure the eventLoop channel is not closed until this finishes
 	dp.wg.Add(1)
 	defer dp.wg.Done()
 
