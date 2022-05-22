@@ -16,8 +16,16 @@ func MyMessageHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMe
 	answer := diamcodec.NewDefaultDiameterAnswer(request)
 	answer.Add("User-Name", "TestUserNameEcho")
 
-	// Simulate the answer takes some time
-	time.Sleep(300 * time.Millisecond)
+	command := request.GetStringAVP("franciscocardosogil-Command")
+	switch command {
+	case "Slow":
+		// Simulate the answer takes some time
+		time.Sleep(300 * time.Millisecond)
+	case "VerySlow":
+		// Simulate the answer takes more time
+		time.Sleep(5000 * time.Millisecond)
+	}
+
 	return &answer, nil
 }
 
@@ -83,7 +91,7 @@ func TestDiameterPeerOK(t *testing.T) {
 	// Correct response
 	request, _ := diamcodec.NewDefaultDiameterRequest("TestApplication", "TestRequest")
 	request.Add("User-Name", "TestUserNameRequest")
-	response, error := activePeer.DiameterRequest(&request, 2*time.Second)
+	response, error := activePeer.DiameterExhangeWithAnswer(&request, 2*time.Second)
 
 	if error != nil {
 		t.Fatal("bad response", err)
@@ -97,7 +105,8 @@ func TestDiameterPeerOK(t *testing.T) {
 	}
 
 	// Simulate a timeout. The handler takes more time than this
-	_, eTimeout := activePeer.DiameterRequest(&request, 10*time.Millisecond)
+	request.Add("franciscocardosogil-Command", "Slow")
+	_, eTimeout := activePeer.DiameterExhangeWithAnswer(&request, 10*time.Millisecond)
 
 	if eTimeout == nil {
 		t.Fatal("should have got an error")
@@ -106,7 +115,6 @@ func TestDiameterPeerOK(t *testing.T) {
 	}
 
 	// Check metrics
-	// TODO: ------------------------------- Do this properly
 	metrics := instrumentation.MS.DiameterQuery("DiameterRequestsReceived", nil, []string{"AP", "CM"})
 	// Should have received two TestApplication / TestRequest messages
 	k1 := instrumentation.DiameterMetricKey{AP: "TestApplication", CM: "TestRequest"}
@@ -141,8 +149,8 @@ func TestDiameterPeerOK(t *testing.T) {
 	// t.Log(metrics)
 
 	// Disonnect peers
-	passivePeer.Disengage()
-	activePeer.Disengage()
+	passivePeer.SetDown()
+	activePeer.SetDown()
 
 	downEvent1 := <-passiveInputChannel
 	if _, ok := downEvent1.(PeerDownEvent); !ok {

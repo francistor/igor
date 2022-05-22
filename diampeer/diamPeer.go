@@ -72,7 +72,7 @@ type EgressDiameterMessage struct {
 	Message *diamcodec.DiameterMessage
 
 	// nil if a Response or base application
-	RChan *chan interface{}
+	RChan chan interface{}
 
 	// Timeout to set
 	timeout time.Duration
@@ -140,7 +140,7 @@ type RequestContext struct {
 	Key instrumentation.DiameterMetricKey
 
 	// Channel on which the answer will be sent
-	RChan *chan interface{}
+	RChan chan interface{}
 
 	// Timer
 	Timer *time.Timer
@@ -262,10 +262,10 @@ func NewPassiveDiameterPeer(configInstanceName string, oc chan interface{}, conn
 // Terminates the Peer connection and the event loop
 // The object may be recycled
 // A PeerDown message will be sent through the control channel
-func (dp *DiameterPeer) Disengage() {
+func (dp *DiameterPeer) SetDown() {
 	dp.eventLoopChannel <- PeerCloseCommand{}
 
-	dp.ci.IgorLogger.Debugf("%s disengaged", dp.PeerConfig.DiameterHost)
+	dp.ci.IgorLogger.Debugf("%s set down", dp.PeerConfig.DiameterHost)
 }
 
 // Closes the event loop channel
@@ -431,7 +431,7 @@ func (dp *DiameterPeer) eventLoop() {
 					// Check not duplicate
 					hbhId := v.Message.HopByHopId
 					if _, ok := dp.requestsMap[hbhId]; ok && v.RChan != nil {
-						*v.RChan <- fmt.Errorf("duplicated HopByHopId")
+						v.RChan <- fmt.Errorf("duplicated HopByHopId")
 						break
 					}
 
@@ -444,7 +444,7 @@ func (dp *DiameterPeer) eventLoop() {
 
 						// Signal the error in the response channel for the input request
 						if v.Message.IsRequest && v.RChan != nil {
-							*v.RChan <- err
+							v.RChan <- err
 						}
 					}
 
@@ -583,8 +583,8 @@ func (dp *DiameterPeer) eventLoop() {
 								<-requestContext.Timer.C
 							}
 							// Send the response
-							*requestContext.RChan <- v.Message
-							close(*requestContext.RChan)
+							requestContext.RChan <- v.Message
+							close(requestContext.RChan)
 							delete(dp.requestsMap, v.Message.HopByHopId)
 						}
 					}
@@ -598,9 +598,9 @@ func (dp *DiameterPeer) eventLoop() {
 					dp.ci.IgorLogger.Errorf("attempt to cancel an non existing request")
 				} else {
 					// Send the response
-					*requestContext.RChan <- fmt.Errorf("Timeout")
+					requestContext.RChan <- fmt.Errorf("Timeout")
 					// No more messages will be sent through this channel
-					close(*requestContext.RChan)
+					close(requestContext.RChan)
 					// Delete the requestmap entry
 					delete(dp.requestsMap, v.HopByHopId)
 					// Update metric
@@ -682,31 +682,39 @@ func (dp *DiameterPeer) readLoop(ch chan bool) {
 	close(ch)
 }
 
-// Sends a Diameter request and gets the answer or an error (timeout or network error)
-func (dp *DiameterPeer) DiameterRequest(dm *diamcodec.DiameterMessage, timeout time.Duration) (resp *diamcodec.DiameterMessage, e error) {
-
-	// Validations
-	if dm.ApplicationId == 0 {
-		return nil, fmt.Errorf("should not use this method to send a Base Application message")
-	}
-	if dp.status != StatusEngaged {
-		return nil, fmt.Errorf("tried to send a diameter request in a non engaged DiameterPeer. Status is %d", dp.status)
-	}
-
-	if !(*dm).IsRequest {
-		return nil, fmt.Errorf("diameter message is not a request")
-	}
-
+// Sends a Diameter request and gets the answer or error as a message to the specified channel.
+// The response channel is closed just after sending the reponse or error
+func (dp *DiameterPeer) DiameterExchangeWithChannel(dm *diamcodec.DiameterMessage, timeout time.Duration, rc chan interface{}) {
 	// Make sure the eventLoop channel is not closed until this finishes
 	dp.wg.Add(1)
 	defer dp.wg.Done()
+
+	// Validations
+	if dm.ApplicationId == 0 {
+		rc <- fmt.Errorf("should not use this method to send a Base Application message")
+		return
+	}
+	if dp.status != StatusEngaged {
+		rc <- fmt.Errorf("tried to send a diameter request in a non engaged DiameterPeer. Status is %d", dp.status)
+		return
+	}
+	if !(*dm).IsRequest {
+		rc <- fmt.Errorf("diameter message is not a request")
+		return
+	}
+
+	// Send myself the message
+	dp.eventLoopChannel <- EgressDiameterMessage{Message: dm, RChan: rc, timeout: timeout}
+}
+
+// Sends a Diameter request and gets the answer or an error (timeout or network error)
+func (dp *DiameterPeer) DiameterExhangeWithAnswer(dm *diamcodec.DiameterMessage, timeout time.Duration) (resp *diamcodec.DiameterMessage, e error) {
 
 	// This channel will receive the response
 	// It will be closed in the event loop, at the same time as deleting the requestMap entry
 	var responseChannel = make(chan interface{})
 
-	// Send myself the message
-	dp.eventLoopChannel <- EgressDiameterMessage{Message: dm, RChan: &responseChannel, timeout: timeout}
+	dp.DiameterExchangeWithChannel(dm, timeout, responseChannel)
 
 	r := <-responseChannel
 	switch v := r.(type) {
@@ -716,14 +724,14 @@ func (dp *DiameterPeer) DiameterRequest(dm *diamcodec.DiameterMessage, timeout t
 		return v, nil
 	}
 
-	panic("unreachable code in diampeer.DiameterRequest")
+	panic("unreachable code in DiameterExchangeWithResponse")
 }
 
 // Sends the message and executes the handler function when the answer is received
 // In case of error, the response will be nill and e will be non nil
-func (dp *DiameterPeer) DiameterRequestAsync(dm *diamcodec.DiameterMessage, timeout time.Duration, handler func(resp *diamcodec.DiameterMessage, e error)) {
+func (dp *DiameterPeer) DiameterRequestWithAnswerAsync(dm *diamcodec.DiameterMessage, timeout time.Duration, handler func(resp *diamcodec.DiameterMessage, e error)) {
 	go func() {
-		handler(dp.DiameterRequest(dm, timeout))
+		handler(dp.DiameterExhangeWithAnswer(dm, timeout))
 	}()
 }
 

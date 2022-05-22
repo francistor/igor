@@ -1698,6 +1698,11 @@
                         "franciscocardosogil-myIPv6Prefix": {},
                         "franciscocardosogil-myEnumerated": {}
                     }
+                },
+                {
+                    "code": 21,
+                    "name": "Command",
+                    "type": "UTF8String"
                 }
 
             ]
@@ -2154,6 +2159,7 @@
                         "Subscription-Id":{},
                         "User-Name":{},
                         "Framed-IP-Address":{},
+                        "franciscocardosogil-Command":{},
                         "franciscocardosogil-myGroupedInGrouped": {}
                     },
                     "response":

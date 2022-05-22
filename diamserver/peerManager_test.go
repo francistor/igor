@@ -3,7 +3,9 @@ package diamserver
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"igor/config"
+	"igor/diamcodec"
 	"igor/instrumentation"
 	"os"
 	"testing"
@@ -24,11 +26,11 @@ func TestMain(m *testing.M) {
 }
 
 func TestBasicSetup(t *testing.T) {
-	NewDiameterPeerManager("testSuperServer")
+	superServerPM := NewDiameterPeerManager("testSuperServer")
 	time.Sleep(150 * time.Millisecond)
-	NewDiameterPeerManager("testServer")
+	serverPM := NewDiameterPeerManager("testServer")
 	time.Sleep(150 * time.Millisecond)
-	NewDiameterPeerManager("testClient")
+	clientPM := NewDiameterPeerManager("testClient")
 
 	// Bad peers
 	// This sleep time is important. Otherwise another client presenting himself
@@ -100,6 +102,43 @@ func TestBasicSetup(t *testing.T) {
 	if clientPeerUnknownServer.IsEngaged != false {
 		t.Error("server.igor engaged in unknownserver peers table")
 	}
+
+	// Close PeerManagers
+	serverPM.Close()
+	<-serverPM.ManagerDoneChannel
+	t.Log("Server PeerManager terminated")
+
+	superServerPM.Close()
+	<-superServerPM.ManagerDoneChannel
+	t.Log("SuperServer PeerManager terminated")
+
+	clientPM.Close()
+	<-clientPM.ManagerDoneChannel
+	t.Log("Client PeerManager terminated")
+
+}
+
+func TestRouteMessage(t *testing.T) {
+
+	NewDiameterPeerManager("testServer")
+	time.Sleep(150 * time.Millisecond)
+	client := NewDiameterPeerManager("testClient")
+
+	// Some time to settle
+	time.Sleep(200 * time.Millisecond)
+
+	// Build request
+	request, _ := diamcodec.NewDefaultDiameterRequest("TestApplication", "TestRequest")
+	request.Add("Destination-Realm", "igorsuperserver")
+	request.Add("User-Name", "TestUserNameRequest")
+	response := <-client.RouteDiameterRequest(&request, time.Duration(1000*time.Millisecond))
+	switch v := response.(type) {
+	case *diamcodec.DiameterMessage:
+		fmt.Println(v)
+	case error:
+		fmt.Println(v)
+	}
+
 }
 
 // Helper to navigate through peers
