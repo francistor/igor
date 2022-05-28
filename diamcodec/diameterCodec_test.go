@@ -18,7 +18,7 @@ func TestMain(m *testing.M) {
 
 	// Initialize the Config Object as done in main.go
 	bootstrapFile := "resources/searchRules.json"
-	instanceName := "unitTestInstance"
+	instanceName := "testClient"
 	config.InitConfigurationInstance(bootstrapFile, instanceName)
 
 	// Execute the tests and exit

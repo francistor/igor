@@ -6,6 +6,8 @@ import (
 	"net"
 )
 
+///////////////////////////////////////////////////////////////////////////////
+
 type DiameterServerConfig struct {
 	BindAddress          string
 	BindPort             int
@@ -42,10 +44,12 @@ func (c *ConfigurationManager) DiameterServerConf() DiameterServerConfig {
 	return c.currentDiameterServerConfig
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 type DiameterRoutingRule struct {
 	Realm         string
 	ApplicationId string
-	Handler       string   // If has a handler, will be treated locally
+	Handlers      []string // URL to send the request to
 	Peers         []string // Peers to send the request to (handler should be empty)
 	Policy        string   // May be "fixed" or "random"
 }
@@ -58,7 +62,7 @@ func (rr DiameterRoutingRules) FindDiameterRoute(realm string, application strin
 	for _, rule := range rr {
 		if rule.Realm == "*" || rule.Realm == realm {
 			if rule.ApplicationId == "*" || rule.ApplicationId == application {
-				if !nonLocal || (nonLocal && rule.Handler == "") {
+				if !nonLocal || (nonLocal && len(rule.Handlers) == 0) {
 					return rule, nil
 				}
 			}
@@ -91,6 +95,8 @@ func (c *ConfigurationManager) UpdateDiameterRoutingRules() {
 func (c *ConfigurationManager) RoutingRulesConf() DiameterRoutingRules {
 	return c.currentRoutingRules
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 type DiameterPeer struct {
 	DiameterHost            string
@@ -164,10 +170,3 @@ func (c *ConfigurationManager) UpdateDiameterPeers() {
 func (c *ConfigurationManager) PeersConf() DiameterPeers {
 	return c.currentDiameterPeers
 }
-
-type Handler struct {
-	Name    string
-	Handler string
-}
-
-type Handlers []Handler

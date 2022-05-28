@@ -26,6 +26,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestBasicSetup(t *testing.T) {
+	time.Sleep(3 * time.Second)
 	superServerPM := NewDiameterPeerManager("testSuperServer")
 	time.Sleep(150 * time.Millisecond)
 	serverPM := NewDiameterPeerManager("testServer")
@@ -46,7 +47,7 @@ func TestBasicSetup(t *testing.T) {
 	// Uncomment to debug
 	/*
 		j, _ := json.Marshal(instrumentation.MS.PeersTableQuery())
-		fmt.Println(prettyPrintJSON(j))
+		fmt.Println(PrettyPrintJSON(j))
 	*/
 
 	// Get the current peer status
@@ -118,6 +119,8 @@ func TestBasicSetup(t *testing.T) {
 
 }
 
+// Client will send message to Server, which will handle locally
+// The two types of routes are tested here
 func TestRouteMessage(t *testing.T) {
 
 	NewDiameterPeerManager("testServer")
@@ -138,7 +141,6 @@ func TestRouteMessage(t *testing.T) {
 	case error:
 		fmt.Println(v)
 	}
-
 }
 
 // Helper to navigate through peers
@@ -154,7 +156,7 @@ func findPeer(diameterHost string, table instrumentation.DiameterPeersTable) ins
 }
 
 // Helper to show JSON to humans
-func prettyPrintJSON(j []byte) string {
+func PrettyPrintJSON(j []byte) string {
 	var jBytes bytes.Buffer
 	if err := json.Indent(&jBytes, j, "", "    "); err != nil {
 		return "<bad json>"
