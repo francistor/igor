@@ -642,10 +642,10 @@ func TestDiameterMessage(t *testing.T) {
 		return
 	}
 	sessionIdAVP, _ := NewAVP("Session-Id", "my-session-id")
-	originHostAVP, _ := NewAVP("Origin-Host", "server.igor")
-	originRealmAVP, _ := NewAVP("Origin-Realm", "igor")
-	destinationHostAVP, _ := NewAVP("Destination-Host", "server.igor")
-	destinationRealmAVP, _ := NewAVP("Destination-Realm", "igor")
+	originHostAVP, _ := NewAVP("Origin-Host", "server.igorserver")
+	originRealmAVP, _ := NewAVP("Origin-Realm", "igorserver")
+	destinationHostAVP, _ := NewAVP("Destination-Host", "server.igorserver")
+	destinationRealmAVP, _ := NewAVP("Destination-Realm", "igorserver")
 	groupedInGroupedAVP, _ := NewAVP("franciscocardosogil-myGroupedInGrouped", nil)
 	groupedAVP, _ := NewAVP("franciscocardosogil-myGrouped", nil)
 	intAVP, _ := NewAVP("franciscocardosogil-myInteger32", 1)

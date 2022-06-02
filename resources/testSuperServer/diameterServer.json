@@ -2,7 +2,7 @@
 	"bindAddress": "127.0.0.1",
 	"bindPort": 3869,
 	"diameterHost": "superserver.igorsuperserver",
-	"diameterRealm": "igor",
+	"diameterRealm": "igorsuperserver",
 	"vendorId": 1101,
 	"productName": "Igor",
 	"firmwareRevision": 1,

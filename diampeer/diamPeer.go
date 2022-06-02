@@ -28,7 +28,7 @@ const (
 
 // Ouput Events (control channel)
 
-// Sent to the DiameterPeerManager, via the output channel passed as parameter, to signal
+// Sent to the Router, via the output channel passed as parameter, to signal
 // that the Peer object is down and should be recycled
 // If the reason is an error (e.g. bad response from the other, communication problem),
 // etc. the Error field will be not null
@@ -39,11 +39,11 @@ type PeerDownEvent struct {
 	Error error
 }
 
-// Sent to the DiameterPeerManager, via the output channel passed as parameter, to signal
+// Sent to the Router, via the output channel passed as parameter, to signal
 // that the Peer object is ready to be used, that is, after the CER/CEA has been
 // completed. If the Peer is passive, the DiameterHost attribute will be non nil
 // and set as the reported DiameterHost.
-// The DiameterPeerManager should check that there is no other Peer for the same DiameterHost,
+// The Router should check that there is no other Peer for the same DiameterHost,
 // otherwise closing this peer
 type PeerUpEvent struct {
 	// Myself
@@ -52,7 +52,7 @@ type PeerUpEvent struct {
 	DiameterHost string
 }
 
-// Sent to the DiameterPeermanager when a new connection arrives
+// Sent to the Router when a new connection arrives
 type NewConnectionEvent struct {
 	connection net.Conn
 }
@@ -84,10 +84,11 @@ type IngressDiameterMessage struct {
 	Message *diamcodec.DiameterMessage
 }
 
-// Timeout expired waiting for a Diameter Answer
+// Timeout expired waiting for a Diameter Answer or any other cancellation reason
 // The HopByHopId will hold the key in the requestsMap
 type CancelDiameterRequest struct {
 	HopByHopId uint32
+	Reason     error
 }
 
 // Send internally to force a disconnection, moving the Peer to
@@ -178,7 +179,7 @@ type DiameterPeer struct {
 	// can be closed
 	readLoopChannel chan bool
 
-	// Passed as parameter. To report events to the DiameterPeerManager
+	// Passed as parameter. To report events to the Router
 	ControlChannel chan interface{}
 
 	// The Status of the object (one of the const defined above)
@@ -346,7 +347,7 @@ func (dp *DiameterPeer) eventLoop() {
 
 			// Connect goroutine reports connection could not be established
 			// the DiameterPeer will terminate the event loop, send the Down event
-			// and the DiameterPeerManager must recycle it
+			// and the Router must recycle it
 			case ConnectionErrorMsg:
 
 				dp.ci.IgorLogger.Errorf("connection error %s", v.Error)
@@ -356,7 +357,7 @@ func (dp *DiameterPeer) eventLoop() {
 
 			// readLoop goroutine reports the connection is closed
 			// the DiameterPeer will terminate the event loop, send the Down event
-			// and the DiameterPeerManager must recycle it
+			// and the Router must recycle it
 			case ReadEOFMsg:
 
 				if dp.status < StatusClosing {
@@ -370,7 +371,7 @@ func (dp *DiameterPeer) eventLoop() {
 
 			// readLoop goroutine reports a read error
 			// the DiameterPeer will terminate the event loop, send the Down event
-			// and the DiameterPeerManager must recycle it
+			// and the Router must recycle it
 			case ReadErrorMsg:
 
 				if dp.status < StatusClosing {
@@ -458,7 +459,7 @@ func (dp *DiameterPeer) eventLoop() {
 							dp.wg.Add(1)
 							timer := time.AfterFunc(v.timeout, func() {
 								// This will be called if the timer expires
-								dp.eventLoopChannel <- CancelDiameterRequest{HopByHopId: v.Message.HopByHopId}
+								dp.eventLoopChannel <- CancelDiameterRequest{HopByHopId: v.Message.HopByHopId, Reason: fmt.Errorf("Timeout")}
 								defer dp.wg.Done()
 							})
 
@@ -521,7 +522,10 @@ func (dp *DiameterPeer) eventLoop() {
 							resp, err := dp.handler(v.Message)
 							if err != nil {
 								dp.ci.IgorLogger.Error(err)
-								// Answer is not sent back!
+								// Send an error UNABLE_TO_COMPLY
+								errorResp := diamcodec.NewInstanceDiameterAnswer(dp.ci, v.Message)
+								errorResp.Add("Result-Code", diamcodec.DIAMETER_UNABLE_TO_COMPLY)
+								dp.eventLoopChannel <- EgressDiameterMessage{Message: &errorResp}
 							} else {
 								dp.eventLoopChannel <- EgressDiameterMessage{Message: resp}
 							}
@@ -591,14 +595,14 @@ func (dp *DiameterPeer) eventLoop() {
 				}
 
 			case CancelDiameterRequest:
-				dp.ci.IgorLogger.Debugf("Timeout to HopByHopId: <%d>\n", v.HopByHopId)
+				dp.ci.IgorLogger.Debugf("Cancelling HopByHopId: <%d>\n", v.HopByHopId)
 				// Timeout is instrumented in the DiameterRequest method
 				requestContext, ok := dp.requestsMap[v.HopByHopId]
 				if !ok {
 					dp.ci.IgorLogger.Errorf("attempt to cancel an non existing request")
 				} else {
 					// Send the response
-					requestContext.RChan <- fmt.Errorf("Timeout")
+					requestContext.RChan <- v.Reason
 					// No more messages will be sent through this channel
 					close(requestContext.RChan)
 					// Delete the requestmap entry

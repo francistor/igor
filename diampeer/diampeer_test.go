@@ -48,7 +48,7 @@ func TestDiameterPeerOK(t *testing.T) {
 	var activePeer *DiameterPeer
 
 	activePeerConfig := config.DiameterPeer{
-		DiameterHost:            "server.igor",
+		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
 		ConnectionPolicy:        "active",
@@ -75,13 +75,13 @@ func TestDiameterPeerOK(t *testing.T) {
 	passiveUp := <-passiveInputChannel
 	if pu, ok := passiveUp.(PeerUpEvent); !ok {
 		t.Fatal("received non PeerUpEvent for passive peer")
-	} else if pu.DiameterHost != "client.igor" {
+	} else if pu.DiameterHost != "client.igorclient" {
 		t.Fatalf("received %s as Origin-Host", pu.DiameterHost)
 	}
 	activeUp := <-activeInputChannel
 	if au, ok := activeUp.(PeerUpEvent); !ok {
 		t.Fatal("received non PeerUpEvent for active peer")
-	} else if au.DiameterHost != "server.igor" {
+	} else if au.DiameterHost != "server.igorserver" {
 		t.Fatalf("received %s as Origin-Host", au.DiameterHost)
 	}
 
@@ -137,7 +137,7 @@ func TestDiameterPeerOK(t *testing.T) {
 
 	// Aggregate timeouts per Peer
 	metrics = instrumentation.MS.DiameterQuery("DiameterRequestsTimeout", nil, []string{"Peer"})
-	k3 := instrumentation.DiameterMetricKey{Peer: "server.igor"}
+	k3 := instrumentation.DiameterMetricKey{Peer: "server.igorserver"}
 	if metric, ok := metrics[k3]; !ok {
 		t.Fatal("bad timeouts metrics")
 	} else {
@@ -173,7 +173,7 @@ func TestDiameterPeerBadServerName(t *testing.T) {
 	// The passive peer will receive a connection from client.igor that will succeed
 	// The active peer will establish a connection with unkserver.igor but the CEA will report server.igor
 	activePeerConfig := config.DiameterPeer{
-		DiameterHost:            "unkserver.igor",
+		DiameterHost:            "unkserver.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
 		ConnectionPolicy:        "active",
@@ -228,7 +228,7 @@ func TestDiameterPeerBadClientName(t *testing.T) {
 	// The passive peer reports an error (unkclient.igor not known),
 
 	activePeerConfig := config.DiameterPeer{
-		DiameterHost:            "server.igor",
+		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
 		ConnectionPolicy:        "active",
@@ -273,7 +273,7 @@ func TestDiameterPeerUnableToConnect(t *testing.T) {
 
 	// The active client tries to connect to an unavailable server
 	activePeerConfig := config.DiameterPeer{
-		DiameterHost:            "server.igor",
+		DiameterHost:            "server.igorserver",
 		IPAddress:               "1.0.0.1",
 		Port:                    3868,
 		ConnectionPolicy:        "active",
@@ -301,7 +301,7 @@ func TestBadOriginNetwork(t *testing.T) {
 	var activePeer *DiameterPeer
 
 	activePeerConfig := config.DiameterPeer{
-		DiameterHost:            "server.igor",
+		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
 		ConnectionPolicy:        "active",

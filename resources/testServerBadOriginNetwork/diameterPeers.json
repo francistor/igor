@@ -1,6 +1,6 @@
 [
 	{
-        "diameterHost": "client.igor",
+        "diameterHost": "client.igorclient",
         "IPAddress": "127.0.0.1",
         "port": 3867,
 		"connectionPolicy": "passive",
@@ -9,7 +9,7 @@
 		"originNetwork": "1.0.0.0/8"
 	},
 	{
-        "diameterHost": "superserver.igor",
+        "diameterHost": "superserver.igorsuperserver",
         "IPAddress": "localhost",
         "port": 3869,
 		"connectionPolicy": "active",

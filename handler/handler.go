@@ -16,8 +16,8 @@ type DiameterHandler struct {
 }
 
 // Creates a new DiameterHandler object
-func NewDiameterHandler(i string) DiameterHandler {
-	return DiameterHandler{instanceName: i}
+func NewDiameterHandler(instanceName string) DiameterHandler {
+	return DiameterHandler{instanceName: instanceName}
 }
 
 // Execute the DiameterHandler. This function blocks. Should be executed

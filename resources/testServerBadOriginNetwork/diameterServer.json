@@ -1,8 +1,8 @@
 {
 	"bindAddress": "127.0.0.1",
 	"bindPort": 3868,
-	"diameterHost": "server.igor",
-	"diameterRealm": "igor",
+	"diameterHost": "server.igorserver",
+	"diameterRealm": "igorserver",
 	"vendorId": 1101,
 	"productName": "Igor",
 	"firmwareRevision": 1,

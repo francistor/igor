@@ -1,6 +1,6 @@
 [
 	{
-        "diameterHost": "server.igor",
+        "diameterHost": "server.igorserver",
         "IPAddress": "127.0.0.1",
         "port": 3868,
 		"connectionPolicy": "active",
@@ -9,7 +9,7 @@
 		"originNetwork": "0.0.0.0/0"
 	},
 	{
-        "diameterHost": "unreachableserver.igor",
+        "diameterHost": "unreachableserver.igorserver",
         "IPAddress": "1.0.0.1",
         "port": 3868,
 		"connectionPolicy": "active",
