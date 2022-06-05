@@ -60,15 +60,13 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get Header
 	if err := binary.Read(reader, binary.BigEndian, &avp.Code); err != nil {
-		config.GetLogger().Error("could not decode the AVP code field")
-		return 0, err
+		return 0, fmt.Errorf("could not decode the AVP code field: %w", err)
 	}
 	currentIndex += 4
 
 	// Get Flags
 	if err := binary.Read(reader, binary.BigEndian, &flags); err != nil {
-		config.GetLogger().Error("could not decode the AVP flags field")
-		return currentIndex, err
+		return currentIndex, fmt.Errorf("could not decode the AVP flags field: %w", err)
 	}
 	isVendorSpecific = flags&0x80 != 0
 	avp.IsMandatory = flags&0x40 != 0
@@ -76,13 +74,11 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get Len
 	if err := binary.Read(reader, binary.BigEndian, &lenHigh); err != nil {
-		config.GetLogger().Error("could not decode the AVP len (high) field")
-		return currentIndex, err
+		return currentIndex, fmt.Errorf("could not decode the AVP len (high) field: %w", err)
 	}
 	currentIndex += 1
 	if err := binary.Read(reader, binary.BigEndian, &lenLow); err != nil {
-		config.GetLogger().Error("could not decode the len (low) code field")
-		return currentIndex, err
+		return currentIndex, fmt.Errorf("could not decode the len (low) code field: %w", err)
 	}
 	currentIndex += 2
 
@@ -101,8 +97,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	if isVendorSpecific {
 		if err := binary.Read(reader, binary.BigEndian, &avp.VendorId); err != nil {
-			config.GetLogger().Error("could not decode the vendor id code field")
-			return currentIndex, err
+			return currentIndex, fmt.Errorf("could not decode the vendor id code field: %w", err)
 		}
 		currentIndex += 4
 		dataLen = avpLen - 12
@@ -196,15 +191,13 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		var addrType uint16
 		var padding uint16
 		if err := binary.Read(reader, binary.BigEndian, &addrType); err != nil {
-			config.GetLogger().Error("bad address value (decoding type)")
-			return currentIndex, err
+			return currentIndex, fmt.Errorf("bad address value (decoding type): %w", err)
 		}
 		if addrType == 1 {
 			var ipv4Addr [4]byte
 			// IPv4
 			if err := binary.Read(reader, binary.BigEndian, &ipv4Addr); err != nil {
-				config.GetLogger().Error("bad address value (decoding ipv4 value)")
-				return currentIndex + 2, err
+				return currentIndex + 2, fmt.Errorf("bad address value (decoding ipv4 value): %w", err)
 			}
 			avp.Value = net.IP(ipv4Addr[:])
 			// Drain 2 bytes
@@ -215,8 +208,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 			// IPv6
 			var ipv6Addr [16]byte
 			if err := binary.Read(reader, binary.BigEndian, &ipv6Addr); err != nil {
-				config.GetLogger().Error("bad address value (decoding ipv6 value)")
-				return currentIndex + 2, err
+				return currentIndex + 2, fmt.Errorf("bad address value (decoding ipv6 value): %w", err)
 			}
 			avp.Value = net.IP(ipv6Addr[:])
 			// Drain 2 bytes
@@ -264,16 +256,13 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		var padding uint16
 		address := make([]byte, 16)
 		if err := binary.Read(reader, binary.BigEndian, &dummy); err != nil {
-			config.GetLogger().Error("could not read the dummy byte in ipv6 prefix")
-			return currentIndex, err
+			return currentIndex, fmt.Errorf("could not read the dummy byte in ipv6 prefix: %w", err)
 		}
 		if err := binary.Read(reader, binary.BigEndian, &prefixLen); err != nil {
-			config.GetLogger().Error("could not read the prefix len byte in ipv6 prefix")
-			return currentIndex + 1, err
+			return currentIndex + 1, fmt.Errorf("could not read the prefix len byte in ipv6 prefix: %w", err)
 		}
 		if err := binary.Read(reader, binary.BigEndian, &address); err != nil {
-			config.GetLogger().Error("could not write the address in ipv6 prefix")
-			return currentIndex + 2, err
+			return currentIndex + 2, fmt.Errorf("could not write the address in ipv6 prefi: %w", err)
 		}
 
 		// Drain 2 bytes

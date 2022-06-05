@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"igor/config"
-	"igor/handler"
 )
 
 func main() {
@@ -15,11 +14,8 @@ func main() {
 	flag.Parse()
 
 	// Initialize the Config Object
-	config.InitConfigurationInstance(*bootPtr, *instancePtr)
+	config.InitPolicyConfigInstance(*bootPtr, *instancePtr, true)
 
 	// Get logger
 	// logger := config.GetConfigInstance(*instancePtr).IgorLogger
-
-	handler := handler.DiameterHandler{}
-	handler.Run()
 }

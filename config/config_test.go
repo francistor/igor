@@ -19,10 +19,15 @@ func httpServer() {
 
 func TestMain(m *testing.M) {
 
-	// Initialize the Config Object as done in main.go
+	// Initialize the Config Objects
 	bootFile := "resources/searchRules.json"
 	instanceName := "testServer"
-	InitConfigurationInstance(bootFile, instanceName)
+
+	// Initialization should happen this way
+	// First, initialize the Policy or Handler instance
+	// Then, initialize the logger
+	// Finally, proceed with the radius and diameter dictionaries
+	InitPolicyConfigInstance(bootFile, instanceName, true)
 
 	// Start the server for configuration
 	go httpServer()
@@ -40,7 +45,7 @@ func TestObjectRetrieval(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := GetConfig().GetConfigObject(objectName)
+			_, err := GetPolicyConfig().CM.GetConfigObject(objectName)
 			t.Log("Got configuration object")
 			if err != nil {
 				panic(err)
@@ -54,13 +59,13 @@ func TestObjectRetrieval(t *testing.T) {
 func TestDiamConfig(t *testing.T) {
 
 	// Diameter Server Configuration
-	dsc := GetConfig().DiameterServerConf()
+	dsc := GetPolicyConfig().DiameterServerConf()
 	if dsc.BindAddress != "127.0.0.1" {
 		t.Fatalf("Could not get BindAddress or was not %s", "127.0.0.1")
 	}
 
 	// Diameter Peers configuration
-	dp := GetConfig().PeersConf()
+	dp := GetPolicyConfig().PeersConf()
 	if dp["superserver.igorsuperserver"].WatchdogIntervalMillis != 300000 {
 		t.Fatalf("WatchdogIntervalMillis was not 300000 but %d", dp["superserver.igorsuperserver"].WatchdogIntervalMillis)
 	}
@@ -73,7 +78,7 @@ func TestDiamConfig(t *testing.T) {
 	}
 
 	// Routing rules configuration
-	rr := GetConfig().RoutingRulesConf()
+	rr := GetPolicyConfig().RoutingRulesConf()
 	if err != nil {
 		t.Fatal("Could not get Routing Rules", err)
 	}
@@ -98,7 +103,7 @@ func TestDiamConfig(t *testing.T) {
 // Retrieval of some JSON configuration file
 func TestConfigFile(t *testing.T) {
 
-	json, err := GetConfig().GetConfigObjectAsJSon("testFile.json")
+	json, err := GetPolicyConfig().CM.GetConfigObjectAsJson("testFile.json")
 	if err != nil {
 		t.Fatal("Could not get configuration file testFile.json in \"testInstance\" folder", err)
 	}

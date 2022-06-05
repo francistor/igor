@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"igor/config"
 	"igor/diamcodec"
+	"igor/handler"
 	"igor/instrumentation"
 	"os"
 	"testing"
@@ -14,18 +15,18 @@ import (
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
-	config.InitConfigurationInstance("resources/searchRules.json", "testServer")
-	config.InitConfigurationInstance("resources/searchRules.json", "testClient")
-	config.InitConfigurationInstance("resources/searchRules.json", "testSuperServer")
-	config.InitConfigurationInstance("resources/searchRules.json", "testClientUnknownClient")
-	config.InitConfigurationInstance("resources/searchRules.json", "testClientUnknownServer")
+	config.InitPolicyConfigInstance("resources/searchRules.json", "testServer", true)
+	config.InitPolicyConfigInstance("resources/searchRules.json", "testClient", false)
+	config.InitPolicyConfigInstance("resources/searchRules.json", "testSuperServer", false)
+	config.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", false)
+	config.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", false)
+	config.InitHandlerConfigInstance("resources/searchRules.json", "testServer", false)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())
 }
 
 func TestBasicSetup(t *testing.T) {
-	time.Sleep(3 * time.Second)
 	superServerPM := NewRouter("testSuperServer")
 	time.Sleep(150 * time.Millisecond)
 	serverPM := NewRouter("testServer")
@@ -105,15 +106,15 @@ func TestBasicSetup(t *testing.T) {
 
 	// Close Routers
 	serverPM.Close()
-	<-serverPM.ManagerDoneChannel
+	<-serverPM.RouterDoneChannel
 	t.Log("Server Router terminated")
 
 	superServerPM.Close()
-	<-superServerPM.ManagerDoneChannel
+	<-superServerPM.RouterDoneChannel
 	t.Log("SuperServer Router terminated")
 
 	clientPM.Close()
-	<-clientPM.ManagerDoneChannel
+	<-clientPM.RouterDoneChannel
 	t.Log("Client Router terminated")
 
 }
@@ -122,6 +123,11 @@ func TestBasicSetup(t *testing.T) {
 // The two types of routes are tested here
 func TestRouteMessage(t *testing.T) {
 
+	// Start handler
+	handler.NewHandler("testServer")
+	time.Sleep(150 * time.Millisecond)
+
+	// Start Routers
 	NewRouter("testServer")
 	time.Sleep(150 * time.Millisecond)
 	client := NewRouter("testClient")

@@ -54,8 +54,11 @@ func TestMain(m *testing.M) {
 
 	// Initialize the Config Object as done in main.go
 	bootstrapFile := "resources/searchRules.json"
-	instanceName := "testClient"
-	config.InitConfigurationInstance(bootstrapFile, instanceName)
+	instanceName := "testServer"
+	config.InitHandlerConfigInstance(bootstrapFile, instanceName, true)
+
+	// TODO: Needed to generate answers with origin diameter server name
+	config.InitPolicyConfigInstance(bootstrapFile, instanceName, false)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())
@@ -63,7 +66,7 @@ func TestMain(m *testing.M) {
 
 func TestBasicHandler(t *testing.T) {
 
-	handler := NewDiameterHandler("testClient")
+	handler := NewHandler("testServer")
 	go handler.Run()
 
 	time.Sleep(200 * time.Millisecond)

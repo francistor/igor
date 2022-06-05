@@ -78,10 +78,10 @@ type Router struct {
 	diameterRequestsChan chan RoutableDiameterRequest
 
 	// To send commands to the Router
-	managerControlChannel chan interface{}
+	routerControlChannel chan interface{}
 
 	// To signal that the Router has shut down
-	ManagerDoneChannel chan struct{}
+	RouterDoneChannel chan struct{}
 
 	// HTTP2 client
 	http2Client http.Client
@@ -91,13 +91,13 @@ type Router struct {
 func NewRouter(instanceName string) *Router {
 
 	router := Router{
-		instanceName:          instanceName,
-		diameterPeersTable:    make(map[string]DiameterPeerWithStatus),
-		peerTableTicker:       time.NewTicker(60 * time.Second),
-		peerControlChannel:    make(chan interface{}, 10),
-		diameterRequestsChan:  make(chan RoutableDiameterRequest, 10),
-		managerControlChannel: make(chan interface{}),
-		ManagerDoneChannel:    make(chan struct{}),
+		instanceName:         instanceName,
+		diameterPeersTable:   make(map[string]DiameterPeerWithStatus),
+		peerTableTicker:      time.NewTicker(60 * time.Second),
+		peerControlChannel:   make(chan interface{}, 10),
+		diameterRequestsChan: make(chan RoutableDiameterRequest, 10),
+		routerControlChannel: make(chan interface{}),
+		RouterDoneChannel:    make(chan struct{}),
 	}
 
 	// Configure client
@@ -115,16 +115,16 @@ func NewRouter(instanceName string) *Router {
 
 // Starts the closing process. It will set in StatusClosing stauts. The
 func (router *Router) Close() {
-	router.managerControlChannel <- RouterCloseCommand{}
+	router.routerControlChannel <- RouterCloseCommand{}
 }
 
 // Actor model event loop
 func (router *Router) eventLoop() {
 
-	logger := config.GetConfigInstance(router.instanceName).IgorLogger
+	logger := config.GetLogger()
 
 	// Server socket
-	listener, err := net.Listen("tcp4", fmt.Sprintf(":%d", config.GetConfigInstance(router.instanceName).DiameterServerConf().BindPort))
+	listener, err := net.Listen("tcp4", fmt.Sprintf(":%d", config.GetPolicyConfigInstance(router.instanceName).DiameterServerConf().BindPort))
 	if err != nil {
 		panic(err)
 	}
@@ -149,7 +149,7 @@ func (router *Router) eventLoop() {
 			logger.Infof("accepted connection from %s", remoteAddr)
 
 			remoteIPAddr, _ := net.ResolveIPAddr("", remoteAddr)
-			peersConf := config.GetConfigInstance(router.instanceName).PeersConf()
+			peersConf := config.GetPolicyConfigInstance(router.instanceName).PeersConf()
 			if !peersConf.ValidateIncomingAddress("", remoteIPAddr.IP) {
 				logger.Infof("invalid peer %s\n", remoteIPAddr)
 				connection.Close()
@@ -174,7 +174,7 @@ routerEventLoop:
 		select {
 
 		// Handle lifecycle messages for this Router
-		case m := <-router.managerControlChannel:
+		case m := <-router.routerControlChannel:
 			switch m.(type) {
 			case RouterCloseCommand:
 				// Set the status
@@ -200,7 +200,7 @@ routerEventLoop:
 
 				// If here, all peers are not up
 				// Signal to the outside
-				router.ManagerDoneChannel <- struct{}{}
+				router.RouterDoneChannel <- struct{}{}
 				break routerEventLoop
 			}
 
@@ -282,14 +282,14 @@ routerEventLoop:
 
 					// If here, all peers are not up
 					// Signal to the outside
-					router.ManagerDoneChannel <- struct{}{}
+					router.RouterDoneChannel <- struct{}{}
 					break routerEventLoop
 				}
 			}
 
 			// Diameter Request message to be routed
 		case rdr := <-router.diameterRequestsChan:
-			route, err := config.GetConfigInstance(router.instanceName).RoutingRulesConf().FindDiameterRoute(
+			route, err := config.GetPolicyConfigInstance(router.instanceName).RoutingRulesConf().FindDiameterRoute(
 				rdr.Message.GetStringAVP("Destination-Realm"),
 				rdr.Message.ApplicationName,
 				false)
@@ -379,7 +379,7 @@ routerEventLoop:
 					}
 
 					// All good. Answer
-					rdr.RChan <- diameterAnswer
+					rdr.RChan <- &diameterAnswer
 
 				}(rdr.RChan, rdr.Message)
 
@@ -393,19 +393,6 @@ routerEventLoop:
 
 // Sends a DiameterMessage and returns a channel for the response or error
 // TODO: Make sure that the response channel is closed
-func (router *Router) RouteDiameterRequest2(request *diamcodec.DiameterMessage, timeout time.Duration) chan interface{} {
-	responseChannel := make(chan interface{})
-
-	routableRequest := RoutableDiameterRequest{
-		Message: request,
-		RChan:   responseChannel,
-		Timeout: timeout,
-	}
-	router.diameterRequestsChan <- routableRequest
-
-	return responseChannel
-}
-
 func (router *Router) RouteDiameterRequest(request *diamcodec.DiameterMessage, timeout time.Duration) (*diamcodec.DiameterMessage, error) {
 	responseChannel := make(chan interface{})
 
@@ -455,7 +442,7 @@ func (router *Router) updatePeersTable() {
 	}
 
 	// Get the current configuration
-	diameterPeersConf := config.GetConfigInstance(router.instanceName).PeersConf()
+	diameterPeersConf := config.GetPolicyConfigInstance(router.instanceName).PeersConf()
 
 	// Force non configured peers to disengage
 	// The real removal from the table will take place when the PeerDownEvent is received
@@ -501,7 +488,7 @@ func (router *Router) buildPeersStatusTable() instrumentation.DiameterPeersTable
 			connectionPolicy = peerStatus.Peer.PeerConfig.ConnectionPolicy
 		} else {
 			// Take from configuration
-			diameterPeersConf := config.GetConfigInstance(router.instanceName).PeersConf()
+			diameterPeersConf := config.GetPolicyConfigInstance(router.instanceName).PeersConf()
 			peerConfig := diameterPeersConf[diameterHost]
 			ipAddress = peerConfig.IPAddress
 			connectionPolicy = peerConfig.ConnectionPolicy

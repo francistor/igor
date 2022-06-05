@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"igor/config"
 	"igor/diamcodec"
 	"io/ioutil"
@@ -9,22 +10,25 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type DiameterHandlerFunction func(request diamcodec.DiameterMessage) (diamcodec.DiameterMessage, error)
-
-type DiameterHandler struct {
-	instanceName string
+type Handler struct {
+	// Holds the configuration instance for this DiameterPeer
+	ci *config.HandlerConfigurationManager
 }
 
 // Creates a new DiameterHandler object
-func NewDiameterHandler(instanceName string) DiameterHandler {
-	return DiameterHandler{instanceName: instanceName}
+func NewHandler(instanceName string) Handler {
+	h := Handler{ci: config.GetHandlerConfigInstance(instanceName)}
+
+	// TODO: Close gracefully
+	go h.Run()
+	return h
 }
 
 // Execute the DiameterHandler. This function blocks. Should be executed
 // in a goroutine.
-func (dh *DiameterHandler) Run() {
+func (dh *Handler) Run() {
 
-	logger := config.GetConfigInstance(dh.instanceName).IgorLogger
+	logger := config.GetLogger()
 
 	// Configure Server
 	r := gin.Default()
@@ -51,6 +55,8 @@ func (dh *DiameterHandler) Run() {
 		c.JSON(200, answer)
 	})
 
-	r.RunTLS("localhost:8080", "/home/francisco/cert.pem", "/home/francisco/key.pem")
+	bindAddrPort := fmt.Sprintf("%s:%d", dh.ci.HandlerConf().BindAddress, dh.ci.HandlerConf().BindPort)
+
+	r.RunTLS(bindAddrPort, "/home/francisco/cert.pem", "/home/francisco/key.pem")
 	// r.Run("localhost:8080")
 }

@@ -3,15 +3,12 @@ package config
 import (
 	"encoding/json"
 	"errors"
-	"igor/diamdict"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"regexp"
 	"strings"
 	"sync"
-
-	"go.uber.org/zap"
 )
 
 // Type ConfigObject holds both the raw text and the
@@ -39,107 +36,41 @@ type ConfigurationManager struct {
 	objectCache sync.Map
 	sRules      searchRules
 	inFlight    sync.Map
-
-	IgorLogger   *zap.SugaredLogger
-	DiameterDict *diamdict.DiameterDict
-
-	currentDiameterServerConfig DiameterServerConfig
-	currentRoutingRules         DiameterRoutingRules
-	currentDiameterPeers        DiameterPeers
 }
 
-// Slice of configuration managers
-// Except during testing, there will be only one instance, which will be retrieved by GetConfig()
-var configs []*ConfigurationManager = make([]*ConfigurationManager, 0)
-
-// Intializes the config object
-// To be called only once, from main function
-// The instanceName must be unique
-func InitConfigurationInstance(bootstrapFile string, instanceName string) {
-
-	// Check not already instantiated
-	for i := range configs {
-		if configs[i].instanceName == instanceName {
-			panic(instanceName + " already initalized")
-		}
+// Creates and initializes a ConfigurationManager
+func NewConfigurationManager(bootstrapFile string, instanceName string) ConfigurationManager {
+	return ConfigurationManager{
+		instanceName:  instanceName,
+		bootstrapFile: bootstrapFile,
+		objectCache:   sync.Map{},
+		inFlight:      sync.Map{},
 	}
+}
 
-	// Better to create asap
-	config := ConfigurationManager{}
-	config.objectCache = sync.Map{}
-	configs = append(configs, &config)
-
-	config.bootstrapFile = bootstrapFile
-	config.instanceName = instanceName
-
-	// Intialize logger
-	config.IgorLogger = setupLogger()
-	config.IgorLogger.Debugw("Init with instace name", "instance", instanceName)
-
+func (c *ConfigurationManager) FillSearchRules(bootstrapFile string) {
 	// Get the search rules object
-	rules, err := config.readResource(bootstrapFile)
+	rules, err := c.readResource(bootstrapFile)
 	if err != nil {
 		panic("Could not retrieve the bootstrap file in " + bootstrapFile)
 	}
 
-	config.IgorLogger.Debugw("Read bootstrap file", "contents", rules)
-
 	// Decode Search Rules
-	json.Unmarshal([]byte(rules), &config.sRules)
-	if len(config.sRules) == 0 {
+	json.Unmarshal([]byte(rules), &c.sRules)
+	if len(c.sRules) == 0 {
 		panic("Could not decode the Search Rules")
 	}
-	for i, sr := range config.sRules {
+	for i, sr := range c.sRules {
 		// Add the compiled regular expression for each rule
-		config.sRules[i].Regex, err = regexp.Compile(sr.NameRegex)
+		c.sRules[i].Regex, err = regexp.Compile(sr.NameRegex)
 		if err != nil {
 			panic("Could not compile Search Rule Regex " + sr.NameRegex)
 		}
 	}
-
-	// Load dictionaries
-	diamDictJSON, err := config.GetConfigObjectAsText("diameterDictionary.json")
-	if err != nil {
-		panic("Could not read diameterDictionary.json")
-	}
-
-	config.DiameterDict = diamdict.NewDictionaryFromJSON([]byte(diamDictJSON))
-
-	// Load diameter configuraton
-	config.UpdateDiameterServerConfig()
-	config.UpdateDiameterPeers()
-	config.UpdateDiameterRoutingRules()
-}
-
-// Retrieves a specific configuration instance
-func GetConfigInstance(instanceName string) *ConfigurationManager {
-
-	for i := range configs {
-		if configs[i].instanceName == instanceName {
-			return configs[i]
-		}
-	}
-
-	panic("configuraton instance <" + instanceName + "> not configured")
-}
-
-// Retrieves the default configuration instance
-func GetConfig() *ConfigurationManager {
-	return configs[0]
-}
-
-// Retrieves the diameter dictionary of the default configuration instance
-func GetDDict() *diamdict.DiameterDict {
-	return configs[0].DiameterDict
-}
-
-// Retrieves the logger of the default configuration instance
-func GetLogger() *zap.SugaredLogger {
-	return configs[0].IgorLogger
 }
 
 // Returns the configuration object as a parsed Json
-func (c *ConfigurationManager) GetConfigObjectAsJSon(objectName string) (interface{}, error) {
+func (c *ConfigurationManager) GetConfigObjectAsJson(objectName string) (interface{}, error) {
 	co, err := c.GetConfigObject(objectName)
 	if err == nil {
 		return co.Json, nil
@@ -172,16 +103,21 @@ func (c *ConfigurationManager) GetConfigObject(objectName string) (ConfigObject,
 	// from the remote and store in cache. The first requesting goroutine will push the
 	// Once to the map, the others will retrieve the once already pushed. The executing
 	// Once will delete the entry from the Inflight map
+
+	// Only one Once will be stored in the inFlight map. Late request will create a Once
+	// that will not be used
 	var once sync.Once
 	var flightOncePtr, _ = c.inFlight.LoadOrStore(objectName, &once)
 
 	// Once function
 	var retriever = func() {
 		obj, err := c.readConfigObject(objectName)
-		if err != nil {
-			c.IgorLogger.Errorw("could not read config object", "name", objectName, "error", err)
-		} else {
+		if err == nil {
 			c.objectCache.Store(objectName, obj)
+		} else {
+			if logger := GetLogger(); logger != nil {
+				GetLogger().Errorf("error retrieving %s: %v", err)
+			}
 		}
 		c.inFlight.Delete(objectName)
 	}
@@ -269,14 +205,11 @@ func (c *ConfigurationManager) readResource(location string) (string, error) {
 
 	} else {
 
-		c.IgorLogger.Debugw("Reading Configuration file", "fileName", os.Getenv("IGOR_CONFIG_BASE")+location)
 		resp, err := ioutil.ReadFile(os.Getenv("IGOR_CONFIG_BASE") + location)
 		if err != nil {
-			c.IgorLogger.Debugw("resource not found", "file", location, "error", err)
 			return "", err
 		}
-		c.IgorLogger.Debugw("resource found", "file", location)
-		return string(resp), err
+		return string(resp), nil
 	}
 }
 
