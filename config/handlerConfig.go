@@ -38,7 +38,7 @@ func InitHandlerConfigInstance(bootstrapFile string, instanceName string, isDefa
 		initDictionaries(&handlerConfig.CM)
 	}
 
-	// Load diameter configuraton
+	// Load handler configuraton
 	handlerConfig.UpdateHandlerConfig()
 
 	return &handlerConfig

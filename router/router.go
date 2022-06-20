@@ -394,7 +394,7 @@ routerEventLoop:
 // Sends a DiameterMessage and returns a channel for the response or error
 // TODO: Make sure that the response channel is closed
 func (router *Router) RouteDiameterRequest(request *diamcodec.DiameterMessage, timeout time.Duration) (*diamcodec.DiameterMessage, error) {
-	responseChannel := make(chan interface{})
+	responseChannel := make(chan interface{}, 1)
 
 	routableRequest := RoutableDiameterRequest{
 		Message: request,
@@ -414,7 +414,7 @@ func (router *Router) RouteDiameterRequest(request *diamcodec.DiameterMessage, t
 }
 
 func (router *Router) RouteDiameterRequestAsync(request *diamcodec.DiameterMessage, timeout time.Duration, handler func(resp *diamcodec.DiameterMessage, e error)) {
-	responseChannel := make(chan interface{})
+	responseChannel := make(chan interface{}, 1)
 
 	routableRequest := RoutableDiameterRequest{
 		Message: request,

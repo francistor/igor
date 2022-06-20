@@ -416,5 +416,4 @@ func TestRequestsCancellation(t *testing.T) {
 	// Close
 	activePeer.Close()
 	passivePeer.Close()
-
 }
