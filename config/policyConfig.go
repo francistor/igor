@@ -118,19 +118,19 @@ type DiameterRoutingRule struct {
 type DiameterRoutingRules []DiameterRoutingRule
 
 // Finds the appropriate route, taking into account wildcards.
-// If nonLocal is true, force that the Router is not local (has no nandler)
-func (rr DiameterRoutingRules) FindDiameterRoute(realm string, application string, nonLocal bool) (DiameterRoutingRule, error) {
+// If remote is true, force that the route is not local (has no nandler, it is sent to other peer)
+func (rr DiameterRoutingRules) FindDiameterRoute(realm string, application string, remote bool) (DiameterRoutingRule, error) {
 	for _, rule := range rr {
 		if rule.Realm == "*" || rule.Realm == realm {
 			if rule.ApplicationId == "*" || rule.ApplicationId == application {
-				if !nonLocal || (nonLocal && len(rule.Handlers) == 0) {
+				if !remote || (remote && len(rule.Handlers) == 0) {
 					return rule, nil
 				}
 			}
 		}
 	}
 
-	return DiameterRoutingRule{}, fmt.Errorf("rule not found for realm %s, application %s, nonLocal: %t", realm, application, nonLocal)
+	return DiameterRoutingRule{}, fmt.Errorf("rule not found for realm %s, application %s, remote: %t", realm, application, remote)
 }
 
 // Retrieves the Routes configuration

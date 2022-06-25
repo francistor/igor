@@ -24,14 +24,20 @@ type MetricsServer struct {
 	InputChan chan interface{}
 	QueryChan chan Query
 
-	diameterRequestsReceived  DiameterMetrics
-	diameterAnswersReceived   DiameterMetrics
-	diameterRequestsTimeout   DiameterMetrics
-	diameterRequestsDiscarded DiameterMetrics
-
-	diameterRequestsSent     DiameterMetrics
+	// Server
+	diameterRequestsReceived DiameterMetrics
 	diameterAnswersSent      DiameterMetrics
-	diameterAnswersDiscarded DiameterMetrics
+
+	// Client
+	diameterRequestsSent    DiameterMetrics
+	diameterAnswersReceived DiameterMetrics
+	diameterRequestsTimeout DiameterMetrics
+	diameterAnswersStalled  DiameterMetrics
+
+	// Router
+	diameterRouteNotFound   DiameterMetrics
+	diameterNoAvailablePeer DiameterMetrics
+	diameterHandlerError    DiameterMetrics
 
 	diameterPeersTables map[string]DiameterPeersTable
 }
@@ -82,42 +88,43 @@ func GetFilteredDiameterMetrics(diameterMetrics DiameterMetrics, filter map[stri
 
 		// Check all the items in the filter. If mismatch, get out of the outer loop
 		match := true
+	outer:
 		for key := range filter {
 			switch key {
 			case "Peer":
 				if metricKey.Peer != filter["Peer"] {
 					match = false
-					break
+					break outer
 				}
 			case "OH":
 				if metricKey.OH != filter["OH"] {
 					match = false
-					break
+					break outer
 				}
 			case "OR":
 				if metricKey.OR != filter["OR"] {
 					match = false
-					break
+					break outer
 				}
 			case "DH":
 				if metricKey.DH != filter["DH"] {
 					match = false
-					break
+					break outer
 				}
 			case "DR":
 				if metricKey.DR != filter["DR"] {
 					match = false
-					break
+					break outer
 				}
 			case "AP":
 				if metricKey.AP != filter["AP"] {
 					match = false
-					break
+					break outer
 				}
 			case "CM":
 				if metricKey.CM != filter["CM"] {
 					match = false
-					break
+					break outer
 				}
 			}
 		}
@@ -141,13 +148,16 @@ func NewMetricsServer() *MetricsServer {
 
 	// Initialize Metrics
 	server.diameterRequestsReceived = make(DiameterMetrics)
-	server.diameterAnswersReceived = make(DiameterMetrics)
-	server.diameterRequestsTimeout = make(DiameterMetrics)
-	server.diameterRequestsDiscarded = make(DiameterMetrics)
+	server.diameterAnswersSent = make(DiameterMetrics)
 
 	server.diameterRequestsSent = make(DiameterMetrics)
-	server.diameterAnswersSent = make(DiameterMetrics)
-	server.diameterAnswersDiscarded = make(DiameterMetrics)
+	server.diameterAnswersReceived = make(DiameterMetrics)
+	server.diameterRequestsTimeout = make(DiameterMetrics)
+	server.diameterAnswersStalled = make(DiameterMetrics)
+
+	server.diameterRouteNotFound = make(DiameterMetrics)
+	server.diameterNoAvailablePeer = make(DiameterMetrics)
+	server.diameterHandlerError = make(DiameterMetrics)
 
 	server.diameterPeersTables = make(map[string]DiameterPeersTable, 1)
 
@@ -181,18 +191,24 @@ func (ms *MetricsServer) metricServerLoop() {
 			switch query.Name {
 			case "DiameterRequestsReceived":
 				query.RChan <- GetDiameterMetrics(ms.diameterRequestsReceived, query.Filter, query.AggLabels)
+			case "DiameterAnswersSent":
+				query.RChan <- GetDiameterMetrics(ms.diameterAnswersSent, query.Filter, query.AggLabels)
+
+			case "DiameterRequestsSent":
+				query.RChan <- GetDiameterMetrics(ms.diameterRequestsSent, query.Filter, query.AggLabels)
 			case "DiameterAnswersReceived":
 				query.RChan <- GetDiameterMetrics(ms.diameterAnswersReceived, query.Filter, query.AggLabels)
 			case "DiameterRequestsTimeout":
 				query.RChan <- GetDiameterMetrics(ms.diameterRequestsTimeout, query.Filter, query.AggLabels)
-			case "DiameterRequestsDiscarded":
-				query.RChan <- GetDiameterMetrics(ms.diameterRequestsDiscarded, query.Filter, query.AggLabels)
-			case "DiameterRequestsSent":
-				query.RChan <- GetDiameterMetrics(ms.diameterRequestsSent, query.Filter, query.AggLabels)
-			case "DiameterAnswersSent":
+			case "DiameterAnswersStalled":
 				query.RChan <- GetDiameterMetrics(ms.diameterAnswersSent, query.Filter, query.AggLabels)
-			case "DiameterAnswersDiscarded":
-				query.RChan <- GetDiameterMetrics(ms.diameterAnswersDiscarded, query.Filter, query.AggLabels)
+
+			case "DiameterRouteNotFound":
+				query.RChan <- GetDiameterMetrics(ms.diameterRouteNotFound, query.Filter, query.AggLabels)
+			case "DiameterNoAvailablePeer":
+				query.RChan <- GetDiameterMetrics(ms.diameterNoAvailablePeer, query.Filter, query.AggLabels)
+			case "DiameterHandlerError":
+				query.RChan <- GetDiameterMetrics(ms.diameterHandlerError, query.Filter, query.AggLabels)
 
 			case "DiameterPeersTables":
 				query.RChan <- ms.diameterPeersTables
@@ -209,43 +225,67 @@ func (ms *MetricsServer) metricServerLoop() {
 			switch e := event.(type) {
 
 			// Diameter Events
-			case DiameterRequestReceivedEvent:
+			case PeerDiameterRequestReceivedEvent:
 				if curr, ok := ms.diameterRequestsReceived[e.Key]; !ok {
 					ms.diameterRequestsReceived[e.Key] = 1
 				} else {
 					ms.diameterRequestsReceived[e.Key] = curr + 1
 				}
-			case DiameterAnswerReceivedEvent:
-				if curr, ok := ms.diameterAnswersReceived[e.Key]; !ok {
-					ms.diameterAnswersReceived[e.Key] = 1
-				} else {
-					ms.diameterAnswersReceived[e.Key] = curr + 1
-				}
-			case DiameterRequestTimeoutEvent:
-				if curr, ok := ms.diameterRequestsTimeout[e.Key]; !ok {
-					ms.diameterRequestsTimeout[e.Key] = 1
-				} else {
-					ms.diameterRequestsTimeout[e.Key] = curr + 1
-				}
-			case DiameterRequestSentEvent:
-				if curr, ok := ms.diameterRequestsSent[e.Key]; !ok {
-					ms.diameterRequestsSent[e.Key] = 1
-				} else {
-					ms.diameterRequestsSent[e.Key] = curr + 1
-				}
-			case DiameterAnswerSentEvent:
+			case PeerDiameterAnswerSentEvent:
 				if curr, ok := ms.diameterAnswersSent[e.Key]; !ok {
 					ms.diameterAnswersSent[e.Key] = 1
 				} else {
 					ms.diameterAnswersSent[e.Key] = curr + 1
 				}
-			case DiameterAnswerDiscardedEvent:
+
+			case PeerDiameterRequestSentEvent:
+				if curr, ok := ms.diameterRequestsSent[e.Key]; !ok {
+					ms.diameterRequestsSent[e.Key] = 1
+				} else {
+					ms.diameterRequestsSent[e.Key] = curr + 1
+				}
+
+			case PeerDiameterAnswerReceivedEvent:
+				if curr, ok := ms.diameterAnswersReceived[e.Key]; !ok {
+					ms.diameterAnswersReceived[e.Key] = 1
+				} else {
+					ms.diameterAnswersReceived[e.Key] = curr + 1
+				}
+
+			case PeerDiameterRequestTimeoutEvent:
 				if curr, ok := ms.diameterRequestsTimeout[e.Key]; !ok {
 					ms.diameterRequestsTimeout[e.Key] = 1
 				} else {
 					ms.diameterRequestsTimeout[e.Key] = curr + 1
 				}
 
+			case PeerDiameterAnswerStalledEvent:
+				if curr, ok := ms.diameterAnswersStalled[e.Key]; !ok {
+					ms.diameterAnswersStalled[e.Key] = 1
+				} else {
+					ms.diameterAnswersStalled[e.Key] = curr + 1
+				}
+
+			case RouterRouteNotFoundEvent:
+				if curr, ok := ms.diameterRouteNotFound[e.Key]; !ok {
+					ms.diameterRouteNotFound[e.Key] = 1
+				} else {
+					ms.diameterRouteNotFound[e.Key] = curr + 1
+				}
+			case RouterNoAvailablePeerEvent:
+				if curr, ok := ms.diameterNoAvailablePeer[e.Key]; !ok {
+					ms.diameterNoAvailablePeer[e.Key] = 1
+				} else {
+					ms.diameterNoAvailablePeer[e.Key] = curr + 1
+				}
+			case RouterHandlerError:
+				if curr, ok := ms.diameterHandlerError[e.Key]; !ok {
+					ms.diameterHandlerError[e.Key] = 1
+				} else {
+					ms.diameterHandlerError[e.Key] = curr + 1
+				}
+
+			// PeersTable
 			case DiameterPeersTableUpdatedEvent:
 				ms.diameterPeersTables[e.InstanceName] = e.Table
 			}

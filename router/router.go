@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/http2"
@@ -22,24 +23,43 @@ import (
 type RouterCloseCommand struct {
 }
 
+// The Diameter Peer table is a map of this kind of elements
 type DiameterPeerWithStatus struct {
+	// Pointer to the corresponding DiamterPeer
 	Peer *diampeer.DiameterPeer
-	// True when the PeerUp command has been received
+
+	// True when the Peer may admit requests, that is, when the PeerUp command has been received
 	IsEngaged bool
+
 	// True as soon as the Peer is created, and a PeerDown event must be received to signal that it can be closed
-	IsUp             bool
+	IsUp bool
+
+	// For reporting purposes
 	LastStatusChange time.Time
 	LastError        error
 }
 
+// Statuses of the Router
 const (
-	StatusOperational = 0
-	StatusClosing     = 1
+	StatusOperational = int32(0)
+	StatusClosing     = int32(1)
 )
+
+// Size of the channel for getting messages to route
+// TODO: Anything other than 0 or 1 should be explained
+const DIAMETER_REQUESTS_QUEUE_SIZE = 16
+
+// Size of the channel for getting peer control messages
+// TODO: Anything other than 0 or 1 should be explained
+const PEER_CONTROL_QUEUE_SIZE = 16
+
+// Timeout in seconds for http2 handlers
+const HTTP_TIMEOUT_SECONDS = 10
 
 // Represents a Diameter Message to be routed, either to a handler
 // or to another Diameter Peer
 type RoutableDiameterRequest struct {
+	// Pointer to the actual Diameter message
 	Message *diamcodec.DiameterMessage
 
 	// The channel to send the answer or error
@@ -58,26 +78,27 @@ type Router struct {
 	instanceName string
 
 	// Stauts of the Router
-	status int
+	status int32
 
 	// Accepter of incoming connections
 	listener net.Listener
 
-	// Holds the Peers Table. Initially emtpy
-	// Passive peers with the other party not yet identified will not be here
+	// Holds the Peers Table.
+	// One entry for each configured peer or for peers now not configured but still not received
+	// the PeerDown event
 	diameterPeersTable map[string]DiameterPeerWithStatus
 
 	// Time to check the peer status. Reload configuration and check if new connections
 	// need to be established or closed
 	peerTableTicker *time.Ticker
 
-	// Passed to the DiameterPeers to receive lifecycle events
+	// Passed to the DiameterPeers to receive back lifecycle events
 	peerControlChannel chan interface{}
 
-	// Exposed to retreive Diameter Requests
+	// Used to retreive Diameter Requests
 	diameterRequestsChan chan RoutableDiameterRequest
 
-	// To send commands to the Router
+	// To send commands to this Router
 	routerControlChannel chan interface{}
 
 	// To signal that the Router has shut down
@@ -94,26 +115,27 @@ func NewRouter(instanceName string) *Router {
 		instanceName:         instanceName,
 		diameterPeersTable:   make(map[string]DiameterPeerWithStatus),
 		peerTableTicker:      time.NewTicker(60 * time.Second),
-		peerControlChannel:   make(chan interface{}, 10),
-		diameterRequestsChan: make(chan RoutableDiameterRequest, 10),
+		peerControlChannel:   make(chan interface{}, PEER_CONTROL_QUEUE_SIZE),
+		diameterRequestsChan: make(chan RoutableDiameterRequest, DIAMETER_REQUESTS_QUEUE_SIZE),
 		routerControlChannel: make(chan interface{}),
 		RouterDoneChannel:    make(chan struct{}),
 	}
 
-	// Configure client
+	// Configure client for handlers
 	transportCfg := &http2.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
 	}
 
 	// Create an http client with timeout and http2 transport
-	router.http2Client = http.Client{Timeout: 2 * time.Second, Transport: transportCfg}
+	router.http2Client = http.Client{Timeout: HTTP_TIMEOUT_SECONDS * time.Second, Transport: transportCfg}
 
 	go router.eventLoop()
 
 	return &router
 }
 
-// Starts the closing process. It will set in StatusClosing stauts. The
+// Starts the closing process. It will set in StatusClosing stauts and wait for the peers to finish
+// before sending the Done message to the RouterDoneChannel
 func (router *Router) Close() {
 	router.routerControlChannel <- RouterCloseCommand{}
 }
@@ -133,15 +155,16 @@ func (router *Router) eventLoop() {
 
 	// Accepter loop
 	go func() {
+		logger.Info("diameter server accepting connections")
 		for {
-			logger.Info("diameter server accepting connections")
 			connection, err := router.listener.Accept()
 			if err != nil {
-				if router.status != StatusClosing {
-					logger.Info("error accepting connection")
+				// Use atomic to avoid races
+				if atomic.LoadInt32(&router.status); router.status != StatusClosing {
+					logger.Info("error accepting connection", err)
 					panic(err)
 				}
-				// Finish acceptor loop
+				// We are closing business. Finish acceptor loop
 				return
 			}
 
@@ -157,11 +180,18 @@ func (router *Router) eventLoop() {
 			}
 
 			// Create peer for the accepted connection and start it
-			// The addition to the peers table will be done later
-			// after the PeerUp is received and checking that there is not a duplicate
-			diampeer.NewPassiveDiameterPeer(router.instanceName, router.peerControlChannel, connection, func(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-				return router.RouteDiameterRequest(request, 0)
-			})
+			// The addition to the peers table will be done later,
+			// after the PeerUp evventis received and checking that there is not a duplicate.
+			// Declares, as handler for the Peer, a function that injects here a message to be routed!
+			diampeer.NewPassiveDiameterPeer(
+				router.instanceName,
+				router.peerControlChannel,
+				connection,
+				// The handler injects me the message
+				func(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
+					return router.RouteDiameterRequest(request, 0)
+				},
+			)
 		}
 	}()
 
@@ -173,14 +203,14 @@ routerEventLoop:
 	messageHandler:
 		select {
 
-		// Handle lifecycle messages for this Router
+		// Handle peer lifecycle messages for this Router
 		case m := <-router.routerControlChannel:
 			switch m.(type) {
 			case RouterCloseCommand:
 				// Set the status
-				router.status = StatusClosing
+				atomic.StoreInt32(&router.status, StatusClosing)
 
-				// Close the listener
+				// Close the listener. The acceptor loop will exit
 				router.listener.Close()
 
 				// Close all peers that are up
@@ -238,8 +268,8 @@ routerEventLoop:
 						logger.Infof("updating peer entry for %s", v.DiameterHost)
 					}
 
-					// If we are closing the shop, instructs clients to leave
-					if router.status == StatusClosing {
+					// If we are closing the shop, set peer down
+					if atomic.LoadInt32(&router.status) == StatusClosing {
 						v.Sender.SetDown()
 					}
 				} else {
@@ -248,6 +278,7 @@ routerEventLoop:
 					v.Sender.SetDown()
 				}
 
+				// Update the PeersTable in instrumentation
 				instrumentation.PushDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
 
 			case diampeer.PeerDownEvent:
@@ -256,8 +287,8 @@ routerEventLoop:
 				go v.Sender.Close()
 
 				// Look for peer based on pointer identity, not OriginHost identity
-				// Mark as disengaged. Ignore if not found (might be unconfigured)
-				// or taken over by another peer
+				// Mark as disengaged. Ignore if not found (might be unconfigured
+				// or taken over by another peer)
 				for originHost, existingPeer := range router.diameterPeersTable {
 					if existingPeer.Peer == v.Sender {
 						existingPeer.IsEngaged = false
@@ -269,10 +300,17 @@ routerEventLoop:
 					}
 				}
 
+				// If origin-host now not in configuration, remove from peers table. It was there
+				// temporarily, until the PeerDown event is received
+				diameterPeersConf := config.GetPolicyConfigInstance(router.instanceName).PeersConf()
+				if peer, found := diameterPeersConf[v.Sender.PeerConfig.DiameterHost]; !found {
+					delete(router.diameterPeersTable, peer.DiameterHost)
+				}
+
 				instrumentation.PushDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
 
 				// Check if we must exit
-				if router.status == StatusClosing {
+				if atomic.LoadInt32(&router.status) == StatusClosing {
 					// Check if we can exit
 					for peer := range router.diameterPeersTable {
 						if router.diameterPeersTable[peer].IsUp {
@@ -295,7 +333,7 @@ routerEventLoop:
 				false)
 
 			if err != nil {
-				instrumentation.PushDiameterRequestDiscarded("", rdr.Message)
+				instrumentation.PushRouterRouteNotFound("", rdr.Message)
 				rdr.RChan <- fmt.Errorf("request not sent: no route found")
 				break messageHandler
 			}
@@ -321,7 +359,7 @@ routerEventLoop:
 				}
 
 				// If here, could not find a peer
-				instrumentation.PushDiameterRequestDiscarded("", rdr.Message)
+				instrumentation.PushRouterNoAvailablePeer("", rdr.Message)
 				rdr.RChan <- fmt.Errorf("resquest not sent: no engaged peer")
 				close(rdr.RChan)
 
@@ -334,6 +372,7 @@ routerEventLoop:
 				rand.Seed(time.Now().UnixNano())
 				rand.Shuffle(len(destinationURLs), func(i, j int) { destinationURLs[i], destinationURLs[j] = destinationURLs[j], destinationURLs[i] })
 
+				// Send to the handler asynchronously
 				go func(respChan chan interface{}, diameterRequest *diamcodec.DiameterMessage) {
 
 					// Make sure the response channel is closed
@@ -437,7 +476,7 @@ func (router *Router) RouteDiameterRequestAsync(request *diamcodec.DiameterMessa
 func (router *Router) updatePeersTable() {
 
 	// Do nothing if we are closing
-	if router.status == StatusClosing {
+	if atomic.LoadInt32(&router.status) == StatusClosing {
 		return
 	}
 

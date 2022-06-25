@@ -21,5 +21,8 @@ func initDictionaries(cm *ConfigurationManager) {
 
 // Used globally to get access to the diameter dictionary
 func GetDDict() *diamdict.DiameterDict {
+	if diameterDict == nil {
+		panic("uninitialized diamter dictionary. Use initDictionaries first")
+	}
 	return diameterDict
 }

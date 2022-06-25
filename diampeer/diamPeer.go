@@ -512,7 +512,7 @@ func (dp *DiameterPeer) eventLoop() {
 					// If it was a Request, store in the outstanding request map
 					// RChan may be nil if it is a base application message
 					if v.Message.IsRequest {
-						instrumentation.PushDiameterRequestSent(dp.PeerConfig.DiameterHost, v.Message)
+						instrumentation.PushPeerDiameterRequestSent(dp.PeerConfig.DiameterHost, v.Message)
 						if v.RChan != nil {
 							// Set timer
 							dp.wg.Add(1)
@@ -522,10 +522,10 @@ func (dp *DiameterPeer) eventLoop() {
 								defer dp.wg.Done()
 							})
 
-							dp.requestsMap[v.Message.HopByHopId] = RequestContext{RChan: v.RChan, Timer: timer, Key: *instrumentation.DiameterMetricKeyFromMessage(dp.PeerConfig.DiameterHost, v.Message)}
+							dp.requestsMap[v.Message.HopByHopId] = RequestContext{RChan: v.RChan, Timer: timer, Key: instrumentation.DiameterMetricKeyFromMessage(dp.PeerConfig.DiameterHost, v.Message)}
 						}
 					} else {
-						instrumentation.PushDiameterAnswerSent(dp.PeerConfig.DiameterHost, v.Message)
+						instrumentation.PushPeerDiameterAnswerSent(dp.PeerConfig.DiameterHost, v.Message)
 					}
 
 				} else {
@@ -539,7 +539,7 @@ func (dp *DiameterPeer) eventLoop() {
 
 				if v.Message.IsRequest {
 
-					instrumentation.PushDiameterRequestReceived(dp.PeerConfig.DiameterHost, v.Message)
+					instrumentation.PushPeerDiameterRequestReceived(dp.PeerConfig.DiameterHost, v.Message)
 
 					// Check if it is a Base application message (code for Base application is 0)
 					if v.Message.ApplicationId == 0 {
@@ -592,7 +592,7 @@ func (dp *DiameterPeer) eventLoop() {
 					}
 				} else {
 					// Received an answer
-					instrumentation.PushDiameterAnswerReceived(dp.PeerConfig.DiameterHost, v.Message)
+					instrumentation.PushPeerDiameterAnswerReceived(dp.PeerConfig.DiameterHost, v.Message)
 
 					if v.Message.ApplicationId == 0 {
 						// Base answer
@@ -634,7 +634,7 @@ func (dp *DiameterPeer) eventLoop() {
 					} else {
 						// Non base answer
 						if requestContext, ok := dp.requestsMap[v.Message.HopByHopId]; !ok {
-							instrumentation.PushDiameterAnswerDiscarded(dp.PeerConfig.DiameterHost, v.Message)
+							instrumentation.PushPeerDiameterAnswerStalled(dp.PeerConfig.DiameterHost, v.Message)
 							config.GetLogger().Errorf("stalled diameter answer: '%v'", *v.Message)
 						} else {
 							// Cancel timer
@@ -666,7 +666,7 @@ func (dp *DiameterPeer) eventLoop() {
 					// Delete the requestmap entry
 					delete(dp.requestsMap, v.HopByHopId)
 					// Update metric
-					instrumentation.PushDiameterRequestTimeout(dp.PeerConfig.DiameterHost, requestContext.Key)
+					instrumentation.PushPeerDiameterRequestTimeout(dp.PeerConfig.DiameterHost, requestContext.Key)
 				}
 
 			case WatchdogMsg:

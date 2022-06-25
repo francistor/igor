@@ -28,7 +28,9 @@ type searchRule struct {
 type searchRules []searchRule
 
 // Holds a configuration instance
-// To be retrieved
+// To be embedded in a handlerConfig or policyConfig
+// Includes the basic methods to manage configuration files
+// without interpreting them.
 type ConfigurationManager struct {
 	instanceName  string
 	bootstrapFile string
