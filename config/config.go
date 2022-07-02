@@ -11,46 +11,74 @@ import (
 	"sync"
 )
 
+// General utilities to read configuration files, locally or via http
+
 // Type ConfigObject holds both the raw text and the
 // Unmarshalled JSON if applicable
 type ConfigObject struct {
-	Json    interface{}
-	RawText string
+	Json     interface{}
+	RawBytes []byte
 }
 
 // Types for Search Rules
 type searchRule struct {
+	// Regex for the name of the object. If matching, we'll try to locate
+	// it prepending the Base property to compose the URL (file or http)
 	NameRegex string
-	Base      string
-	Regex     *regexp.Regexp
+
+	// Compiled form of NameRegex
+	Regex *regexp.Regexp
+
+	// Can be a URL or a path
+	Base string
 }
 
+// Tye applicable Search Rules
 type searchRules []searchRule
 
 // Holds a configuration instance
-// To be embedded in a handlerConfig or policyConfig
+// To be embedded in a handlerConfig or policyConfig object
 // Includes the basic methods to manage configuration files
 // without interpreting them.
 type ConfigurationManager struct {
-	instanceName  string
+
+	// Configuration objects are to be searched for in a path that contains
+	// the instanceName first and, if not found, in a path without it. This
+	// way a general configuration can be overriden
+	instanceName string
+
+	// The bootstrap file is the first configuration file read, and it contains
+	// the rules for searching other files
 	bootstrapFile string
 
+	// The contents of the bootstrapFile are parsed here
+	sRules searchRules
+
+	// Cache of the configuration files already red
 	objectCache sync.Map
-	sRules      searchRules
-	inFlight    sync.Map
+
+	// inFlight contains a map of object names to Once objects that will retrieve the object
+	// from the remote and store in cache.
+	inFlight sync.Map
 }
 
 // Creates and initializes a ConfigurationManager
 func NewConfigurationManager(bootstrapFile string, instanceName string) ConfigurationManager {
-	return ConfigurationManager{
+	cm := ConfigurationManager{
 		instanceName:  instanceName,
 		bootstrapFile: bootstrapFile,
 		objectCache:   sync.Map{},
 		inFlight:      sync.Map{},
 	}
+
+	cm.fillSearchRules(bootstrapFile)
+
+	return cm
 }
 
-func (c *ConfigurationManager) FillSearchRules(bootstrapFile string) {
+// Reads the bootstrap file and fills the search rules for the Configuration Manager
+// To be called upon instantiation
+func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	// Get the search rules object
 	rules, err := c.readResource(bootstrapFile)
 	if err != nil {
@@ -58,7 +86,7 @@ func (c *ConfigurationManager) FillSearchRules(bootstrapFile string) {
 	}
 
 	// Decode Search Rules
-	json.Unmarshal([]byte(rules), &c.sRules)
+	json.Unmarshal(rules, &c.sRules)
 	if len(c.sRules) == 0 {
 		panic("Could not decode the Search Rules")
 	}
@@ -72,8 +100,8 @@ func (c *ConfigurationManager) FillSearchRules(bootstrapFile string) {
 }
 
 // Returns the configuration object as a parsed Json
-func (c *ConfigurationManager) GetConfigObjectAsJson(objectName string) (interface{}, error) {
-	co, err := c.GetConfigObject(objectName)
+func (c *ConfigurationManager) GetConfigObjectAsJson(objectName string, refresh bool) (interface{}, error) {
+	co, err := c.GetConfigObject(objectName, refresh)
 	if err == nil {
 		return co.Json, nil
 	} else {
@@ -82,22 +110,24 @@ func (c *ConfigurationManager) GetConfigObjectAsJson(objectName string) (interfa
 }
 
 // Returns the raw text of the configuration object
-func (c *ConfigurationManager) GetConfigObjectAsText(objectName string) (string, error) {
-	co, err := c.GetConfigObject(objectName)
+func (c *ConfigurationManager) GetConfigObjectAsText(objectName string, refresh bool) ([]byte, error) {
+	co, err := c.GetConfigObject(objectName, refresh)
 	if err == nil {
-		return co.RawText, nil
+		return co.RawBytes, nil
 	} else {
-		return "", err
+		return nil, err
 	}
 }
 
 // Retrieves the object form the cache or tries to get it from the remote
 // and caches it if not found
-func (c *ConfigurationManager) GetConfigObject(objectName string) (ConfigObject, error) {
+func (c *ConfigurationManager) GetConfigObject(objectName string, refresh bool) (ConfigObject, error) {
 	// Try cache
-	obj, found := c.objectCache.Load(objectName)
-	if found {
-		return obj.(ConfigObject), nil
+	if !refresh {
+		obj, found := c.objectCache.Load(objectName)
+		if found {
+			return obj.(ConfigObject), nil
+		}
 	}
 
 	// Not found. Retrieve
@@ -128,7 +158,7 @@ func (c *ConfigurationManager) GetConfigObject(objectName string) (ConfigObject,
 	flightOncePtr.(*sync.Once).Do(retriever)
 
 	// Try again
-	obj, found = c.objectCache.Load(objectName)
+	obj, found := c.objectCache.Load(objectName)
 	if found {
 		return obj.(ConfigObject), nil
 	} else {
@@ -173,7 +203,7 @@ func (c *ConfigurationManager) readConfigObject(objectName string) (ConfigObject
 		objectLocation = base + c.instanceName + "/" + innerName
 		object, err := c.readResource(objectLocation)
 		if err == nil {
-			return newConfigObjectFromString(object), nil
+			return newConfigObjectFromBytes(object), nil
 		}
 	}
 
@@ -181,7 +211,7 @@ func (c *ConfigurationManager) readConfigObject(objectName string) (ConfigObject
 	objectLocation = base + innerName
 	object, err := c.readResource(objectLocation)
 	if err == nil {
-		configObject = newConfigObjectFromString(object)
+		configObject = newConfigObjectFromBytes(object)
 	}
 
 	return configObject, err
@@ -189,40 +219,40 @@ func (c *ConfigurationManager) readConfigObject(objectName string) (ConfigObject
 
 // Reads the configuration item from the specified location, which may be
 // a file or an http url
-func (c *ConfigurationManager) readResource(location string) (string, error) {
+func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 
 	if strings.HasPrefix(location, "http") {
 
 		// Location is a http URL
 		resp, err := http.Get(location)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		return string(body), nil
+		return body, nil
 
 	} else {
 
 		resp, err := ioutil.ReadFile(os.Getenv("IGOR_CONFIG_BASE") + location)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		return string(resp), nil
+		return resp, nil
 	}
 }
 
 // Takes a raw string and turns it into a ConfigObject, which is
 // trying to parse the string as Json and returing both the
 // original string and the JSON in a composite ConfigObject
-func newConfigObjectFromString(object string) ConfigObject {
+func newConfigObjectFromBytes(object []byte) ConfigObject {
 	configObject := ConfigObject{
-		RawText: object,
+		RawBytes: object,
 	}
-	json.Unmarshal([]byte(object), &configObject.Json)
+	json.Unmarshal(object, &configObject.Json)
 
 	return configObject
 }

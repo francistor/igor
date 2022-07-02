@@ -34,10 +34,10 @@ func initLogger(cm *ConfigurationManager) {
 		}`
 
 	// Retrieve the log configuration
-	jConfig, err := cm.GetConfigObjectAsText("log.json")
+	jConfig, err := cm.GetConfigObjectAsText("log.json", false)
 	if err != nil {
 		fmt.Println("using default logging configuration")
-		jConfig = defaultLogConfig
+		jConfig = []byte(defaultLogConfig)
 	}
 
 	var cfg zap.Config

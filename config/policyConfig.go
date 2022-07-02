@@ -32,9 +32,6 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefau
 	policyConfig := PolicyConfigurationManager{CM: NewConfigurationManager(bootstrapFile, instanceName)}
 	policyConfigs = append(policyConfigs, &policyConfig)
 
-	// Rules
-	policyConfig.CM.FillSearchRules(bootstrapFile)
-
 	// Initialize logger and dictionary, if default
 	if isDefault {
 		initLogger(&policyConfig.CM)
@@ -84,11 +81,11 @@ type DiameterServerConfig struct {
 // Retrieves the diameter server configuration
 func (c *PolicyConfigurationManager) getDiameterServerConfig() (DiameterServerConfig, error) {
 	dsc := DiameterServerConfig{}
-	dc, err := c.CM.GetConfigObject("diameterServer.json")
+	dc, err := c.CM.GetConfigObject("diameterServer.json", true)
 	if err != nil {
 		return dsc, err
 	}
-	json.Unmarshal([]byte(dc.RawText), &dsc)
+	json.Unmarshal(dc.RawBytes, &dsc)
 	return dsc, nil
 }
 
@@ -136,11 +133,11 @@ func (rr DiameterRoutingRules) FindDiameterRoute(realm string, application strin
 // Retrieves the Routes configuration
 func (c *PolicyConfigurationManager) getDiameterRoutingRules() (DiameterRoutingRules, error) {
 	var routingRules []DiameterRoutingRule
-	rr, err := c.CM.GetConfigObject("diameterRoutes.json")
+	rr, err := c.CM.GetConfigObject("diameterRoutes.json", true)
 	if err != nil {
 		return routingRules, err
 	}
-	json.Unmarshal([]byte(rr.RawText), &routingRules)
+	json.Unmarshal(rr.RawBytes, &routingRules)
 	return routingRules, nil
 }
 
@@ -200,11 +197,11 @@ func (c *PolicyConfigurationManager) getDiameterPeers() (DiameterPeers, error) {
 	var peers []DiameterPeer
 	peersMap := make(map[string]DiameterPeer)
 
-	dp, err := c.CM.GetConfigObject("diameterPeers.json")
+	dp, err := c.CM.GetConfigObject("diameterPeers.json", true)
 	if err != nil {
 		return peersMap, err
 	}
-	json.Unmarshal([]byte(dp.RawText), &peers)
+	json.Unmarshal(dp.RawBytes, &peers)
 
 	// Cooking
 	for i := range peers {

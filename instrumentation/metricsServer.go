@@ -1,5 +1,13 @@
 package instrumentation
 
+// Buffer for the channel to receive the events
+const INPUT_QUEUE_SIZE = 100
+
+// Buffer for the channel to receive the queries
+const QUERY_QUEUE_SIZE = 10
+
+type ResetMetricsEvent struct{}
+
 // The single instance of the metrics server
 var MS *MetricsServer = NewMetricsServer()
 
@@ -82,6 +90,13 @@ func GetAggDiameterMetrics(diameterMetrics DiameterMetrics, aggLabels []string) 
 // Returns only the items in the metrics whose values correspond to the filter, which specifies
 // values for certain labels
 func GetFilteredDiameterMetrics(diameterMetrics DiameterMetrics, filter map[string]string) DiameterMetrics {
+
+	// If no filter specified, do nothing
+	if filter == nil {
+		return diameterMetrics
+	}
+
+	// We'll put the output here
 	outMetrics := make(DiameterMetrics)
 
 	for metricKey := range diameterMetrics {
@@ -144,21 +159,10 @@ func GetDiameterMetrics(diameterMetrics DiameterMetrics, filter map[string]strin
 }
 
 func NewMetricsServer() *MetricsServer {
-	server := MetricsServer{InputChan: make(chan interface{}, 100), QueryChan: make(chan Query, 10)}
+	server := MetricsServer{InputChan: make(chan interface{}, INPUT_QUEUE_SIZE), QueryChan: make(chan Query, QUERY_QUEUE_SIZE)}
 
 	// Initialize Metrics
-	server.diameterRequestsReceived = make(DiameterMetrics)
-	server.diameterAnswersSent = make(DiameterMetrics)
-
-	server.diameterRequestsSent = make(DiameterMetrics)
-	server.diameterAnswersReceived = make(DiameterMetrics)
-	server.diameterRequestsTimeout = make(DiameterMetrics)
-	server.diameterAnswersStalled = make(DiameterMetrics)
-
-	server.diameterRouteNotFound = make(DiameterMetrics)
-	server.diameterNoAvailablePeer = make(DiameterMetrics)
-	server.diameterHandlerError = make(DiameterMetrics)
-
+	server.resetMetrics()
 	server.diameterPeersTables = make(map[string]DiameterPeersTable, 1)
 
 	// Start receive loop
@@ -167,11 +171,36 @@ func NewMetricsServer() *MetricsServer {
 	return &server
 }
 
+// Empties all the counters
+func (ms *MetricsServer) resetMetrics() {
+	ms.diameterRequestsReceived = make(DiameterMetrics)
+	ms.diameterAnswersSent = make(DiameterMetrics)
+
+	ms.diameterRequestsSent = make(DiameterMetrics)
+	ms.diameterAnswersReceived = make(DiameterMetrics)
+	ms.diameterRequestsTimeout = make(DiameterMetrics)
+	ms.diameterAnswersStalled = make(DiameterMetrics)
+
+	ms.diameterRouteNotFound = make(DiameterMetrics)
+	ms.diameterNoAvailablePeer = make(DiameterMetrics)
+	ms.diameterHandlerError = make(DiameterMetrics)
+}
+
+// Wrapper to reset Diameter Metrics
+func (ms *MetricsServer) ResetMetrics() {
+	ms.InputChan <- ResetMetricsEvent{}
+}
+
 // Wrapper to get Diameter Metrics
 func (ms *MetricsServer) DiameterQuery(name string, filter map[string]string, aggLabels []string) DiameterMetrics {
 	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
 	ms.QueryChan <- query
-	return (<-query.RChan).(DiameterMetrics)
+	v, ok := (<-query.RChan).(DiameterMetrics)
+	if ok {
+		return v
+	} else {
+		return DiameterMetrics{}
+	}
 }
 
 // Wrapper to get PeersTable
@@ -223,6 +252,9 @@ func (ms *MetricsServer) metricServerLoop() {
 			}
 
 			switch e := event.(type) {
+
+			case ResetMetricsEvent:
+				ms.resetMetrics()
 
 			// Diameter Events
 			case PeerDiameterRequestReceivedEvent:

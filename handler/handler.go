@@ -6,18 +6,19 @@ import (
 	"igor/config"
 	"igor/diamcodec"
 	"io/ioutil"
-
-	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
 type Handler struct {
-	// Holds the configuration instance for this DiameterPeer
+	// Holds the configuration instance for this Handler
 	ci *config.HandlerConfigurationManager
 }
 
 // Creates a new DiameterHandler object
 func NewHandler(instanceName string) Handler {
 	h := Handler{ci: config.GetHandlerConfigInstance(instanceName)}
+
+	http.HandleFunc("/diameterRequest", handleDiameterRequest)
 
 	// TODO: Close gracefully
 	go h.Run()
@@ -30,33 +31,43 @@ func (dh *Handler) Run() {
 
 	logger := config.GetLogger()
 
-	// Configure Server
-	r := gin.Default()
-
-	r.POST("/diameterRequest", func(c *gin.Context) {
-
-		// Get the Diameter Request
-		jRequest, err := ioutil.ReadAll(c.Request.Body)
-		if err != nil {
-			logger.Error("error reading request %s", err)
-			c.AbortWithError(500, err)
-			return
-		}
-		var request diamcodec.DiameterMessage
-		json.Unmarshal(jRequest, &request)
-
-		// Generate the Diameter Answer
-		answer, err := EmptyHandler(request)
-		if err != nil {
-			logger.Error("error handling request %s", err)
-			c.AbortWithError(500, err)
-			return
-		}
-		c.JSON(200, answer)
-	})
-
 	bindAddrPort := fmt.Sprintf("%s:%d", dh.ci.HandlerConf().BindAddress, dh.ci.HandlerConf().BindPort)
 
-	r.RunTLS(bindAddrPort, "/home/francisco/cert.pem", "/home/francisco/key.pem")
-	// r.Run("localhost:8080")
+	logger.Infof("listening in %s", bindAddrPort)
+	http.ListenAndServeTLS(bindAddrPort, "/home/francisco/cert.pem", "/home/francisco/key.pem", nil)
+
+}
+
+func handleDiameterRequest(w http.ResponseWriter, req *http.Request) {
+
+	logger := config.GetLogger()
+
+	// Get the Diameter Request
+	jRequest, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		logger.Error("error reading request %s", err)
+		w.Write([]byte(err.Error()))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	var request diamcodec.DiameterMessage
+	json.Unmarshal(jRequest, &request)
+
+	// Generate the Diameter Answer
+	answer, err := EmptyHandler(request)
+	if err != nil {
+		logger.Errorf("error handling request %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	jAnswer, err := json.Marshal(answer)
+	if err != nil {
+		logger.Errorf("error marshaling response %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	w.Write(jAnswer)
+	w.WriteHeader(http.StatusOK)
 }

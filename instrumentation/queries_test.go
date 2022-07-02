@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestMetricsQuery(t *testing.T) {
+func TestAggregations(t *testing.T) {
 
 	key1 := DiameterMetricKey{
 		Peer: "Peer1",

@@ -81,14 +81,17 @@ func TestBasicHandler(t *testing.T) {
 	// resp, err := client.Get("https://127.0.0.1:8080/diameterRequest")
 	httpResp, err := client.Post("https://127.0.0.1:8080/diameterRequest", "application/json", strings.NewReader(jDiameterMessage))
 	if err != nil {
-		fmt.Printf("Error %s", err)
-		return
+		t.Fatalf("Error posting request %s", err)
 	}
 	defer httpResp.Body.Close()
 
 	jsonAnswer, err := ioutil.ReadAll(httpResp.Body)
 	if err != nil {
 		t.Fatalf("error reading response %s", err)
+	}
+
+	if httpResp.StatusCode != http.StatusOK {
+		t.Fatalf("got status code %d", httpResp.StatusCode)
 	}
 
 	// Unserialize to Diameter Message

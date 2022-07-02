@@ -11,7 +11,7 @@ var diameterDict *diamdict.DiameterDict
 func initDictionaries(cm *ConfigurationManager) {
 
 	// Load dictionaries
-	diamDictJSON, err := cm.GetConfigObjectAsText("diameterDictionary.json")
+	diamDictJSON, err := cm.GetConfigObjectAsText("diameterDictionary.json", false)
 	if err != nil {
 		panic("Could not read diameterDictionary.json")
 	}

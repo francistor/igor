@@ -29,9 +29,6 @@ func InitHandlerConfigInstance(bootstrapFile string, instanceName string, isDefa
 	handlerConfig := HandlerConfigurationManager{CM: NewConfigurationManager(bootstrapFile, instanceName)}
 	handlerConfigs = append(handlerConfigs, &handlerConfig)
 
-	// Rules
-	handlerConfig.CM.FillSearchRules(bootstrapFile)
-
 	// Initialize logger and dictionary, if default
 	if isDefault {
 		initLogger(&handlerConfig.CM)
@@ -64,18 +61,20 @@ func GetHandlerConfig() *HandlerConfigurationManager {
 ///////////////////////////////////////////////////////////////////////////////
 
 type HandlerConfig struct {
-	BindAddress string
-	BindPort    int
+	BindAddress     string
+	BindPort        int
+	RouterIPAddress string
+	RouterPort      int
 }
 
 // Retrieves the handler configuration
 func (c *HandlerConfigurationManager) getHandlerConfig() (HandlerConfig, error) {
 	hc := HandlerConfig{}
-	h, err := c.CM.GetConfigObject("handler.json")
+	h, err := c.CM.GetConfigObject("handler.json", true)
 	if err != nil {
 		return hc, err
 	}
-	json.Unmarshal([]byte(h.RawText), &hc)
+	json.Unmarshal(h.RawBytes, &hc)
 	return hc, nil
 }
 

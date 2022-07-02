@@ -23,11 +23,8 @@ func TestMain(m *testing.M) {
 	bootFile := "resources/searchRules.json"
 	instanceName := "testServer"
 
-	// Initialization should happen this way
-	// First, initialize the Policy or Handler instance
-	// Then, initialize the logger
-	// Finally, proceed with the radius and diameter dictionaries
 	InitPolicyConfigInstance(bootFile, instanceName, true)
+	InitHandlerConfigInstance(bootFile, instanceName, false)
 
 	// Start the server for configuration
 	go httpServer()
@@ -45,7 +42,7 @@ func TestObjectRetrieval(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := GetPolicyConfig().CM.GetConfigObject(objectName)
+			_, err := GetPolicyConfig().CM.GetConfigObject(objectName, true)
 			t.Log("Got configuration object")
 			if err != nil {
 				panic(err)
@@ -100,10 +97,26 @@ func TestDiamConfig(t *testing.T) {
 	}
 }
 
+func TestHandlerConfig(t *testing.T) {
+	hc := GetHandlerConfig().HandlerConf()
+	if hc.BindAddress != "0.0.0.0" {
+		t.Fatalf("Could not get BindAddress or was not %s", "0.0.0.0")
+	}
+	if hc.BindPort != 8080 {
+		t.Fatalf("Could not get BindPort or was not %d", 8080)
+	}
+	if hc.RouterIPAddress != "127.0.0.1" {
+		t.Fatalf("Could not get RouterIPAddress or was not %s", "127.0.0.1")
+	}
+	if hc.RouterPort != 23868 {
+		t.Fatalf("Could not get RouterPort or was not %d", 23868)
+	}
+}
+
 // Retrieval of some JSON configuration file
 func TestConfigFile(t *testing.T) {
 
-	json, err := GetPolicyConfig().CM.GetConfigObjectAsJson("testFile.json")
+	json, err := GetPolicyConfig().CM.GetConfigObjectAsJson("testFile.json", true)
 	if err != nil {
 		t.Fatal("Could not get configuration file testFile.json in \"testInstance\" folder", err)
 	}
