@@ -14,7 +14,8 @@ import (
 )
 
 func MyMessageHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-	answer := diamcodec.NewDefaultDiameterAnswer(request)
+	answer := diamcodec.NewDiameterAnswer(request)
+	answer.AddOriginAVPs(config.GetPolicyConfig())
 	answer.Add("User-Name", "TestUserNameEcho")
 
 	command := request.GetStringAVP("franciscocardosogil-Command")
@@ -90,7 +91,8 @@ func TestDiameterPeerOK(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Correct response
-	request, _ := diamcodec.NewDefaultDiameterRequest("TestApplication", "TestRequest")
+	request, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
+	request.AddOriginAVPs(config.GetPolicyConfig())
 	request.Add("User-Name", "TestUserNameRequest")
 	response, error := activePeer.DiameterExhangeWithAnswer(&request, 2*time.Second)
 
@@ -386,9 +388,11 @@ func TestRequestsCancellation(t *testing.T) {
 	}
 
 	// Simulate two long requests
-	request1, _ := diamcodec.NewDefaultDiameterRequest("TestApplication", "TestRequest")
+	request1, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
+	request1.AddOriginAVPs(config.GetPolicyConfig())
 	request1.Add("franciscocardosogil-Command", "Slow")
-	request2, _ := diamcodec.NewDefaultDiameterRequest("TestApplication", "TestRequest")
+	request2, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
+	request2.AddOriginAVPs(config.GetPolicyConfig())
 	request2.Add("franciscocardosogil-Command", "Slow")
 
 	rc1 := make(chan interface{}, 1)

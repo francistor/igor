@@ -443,10 +443,18 @@ func (m *DiameterMessage) GetDateAVP(avpName string) time.Time {
 	return avp.GetDate()
 }
 
+// Helper function to add Origin-Host and Origin-Realm attributes
+func (dm *DiameterMessage) AddOriginAVPs(ci *config.PolicyConfigurationManager) *DiameterMessage {
+	// Add mandatory parameters
+	dm.Add("Origin-Host", ci.DiameterServerConf().DiameterHost)
+	dm.Add("Origin-Realm", ci.DiameterServerConf().DiameterRealm)
+	return dm
+}
+
 ///////////////////////////////////////////////////////////////
 // Message constructors
 ///////////////////////////////////////////////////////////////
-func newDiameterRequest(appName string, commandName string) (DiameterMessage, error) {
+func NewDiameterRequest(appName string, commandName string) (DiameterMessage, error) {
 
 	diameterMessage := DiameterMessage{IsRequest: true}
 
@@ -474,7 +482,7 @@ func newDiameterRequest(appName string, commandName string) (DiameterMessage, er
 
 }
 
-func newDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage {
+func NewDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage {
 
 	diameterMessage := DiameterMessage{}
 
@@ -489,8 +497,9 @@ func newDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage {
 	return diameterMessage
 }
 
+/*
 // New Diameter Request including default Origin Host and Realm
-func NewDefaultDiameterRequest(appName string, commandName string) (DiameterMessage, error) {
+func NewDefaultDiameterRequest2(appName string, commandName string) (DiameterMessage, error) {
 	dm, err := newDiameterRequest(appName, commandName)
 	if err == nil {
 		// Add mandatory parameters
@@ -501,7 +510,7 @@ func NewDefaultDiameterRequest(appName string, commandName string) (DiameterMess
 }
 
 // New Diameter Answer including default Origin Host and Realm
-func NewDefaultDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage {
+func NewDefaultDiameterAnswer2(diameterRequest *DiameterMessage) DiameterMessage {
 	dm := newDiameterAnswer(diameterRequest)
 
 	// Add mandatory parameters
@@ -512,7 +521,7 @@ func NewDefaultDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage 
 }
 
 // New Diameter Request including instance specific Origin Host and Realm
-func NewInstanceDiameterRequest(ci *config.PolicyConfigurationManager, appName string, commandName string) (DiameterMessage, error) {
+func NewInstanceDiameterRequest2(ci *config.PolicyConfigurationManager, appName string, commandName string) (DiameterMessage, error) {
 	dm, err := newDiameterRequest(appName, commandName)
 	if err == nil {
 		// Add mandatory parameters
@@ -523,7 +532,7 @@ func NewInstanceDiameterRequest(ci *config.PolicyConfigurationManager, appName s
 }
 
 // New Diameter Answer including instance specific Origin Host and Realm
-func NewInstanceDiameterAnswer(ci *config.PolicyConfigurationManager, diameterRequest *DiameterMessage) DiameterMessage {
+func NewInstanceDiameterAnswer2(ci *config.PolicyConfigurationManager, diameterRequest *DiameterMessage) DiameterMessage {
 	dm := newDiameterAnswer(diameterRequest)
 
 	// Add mandatory parameters
@@ -532,6 +541,7 @@ func NewInstanceDiameterAnswer(ci *config.PolicyConfigurationManager, diameterRe
 
 	return dm
 }
+*/
 
 // TODO:
 func CopyDiameterMessage(diameterMessage *DiameterMessage) DiameterMessage {

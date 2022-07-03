@@ -13,12 +13,12 @@ import (
 	"time"
 )
 
+// Initialization
+var bootstrapFile = "resources/searchRules.json"
+var instanceName = "testClient"
+
 // Initializer of the test suite.
 func TestMain(m *testing.M) {
-
-	// Initialization
-	bootstrapFile := "resources/searchRules.json"
-	instanceName := "testClient"
 	config.InitPolicyConfigInstance(bootstrapFile, instanceName, true)
 
 	// Execute the tests and exit
@@ -636,7 +636,10 @@ func TestJSON(t *testing.T) {
 
 func TestDiameterMessage(t *testing.T) {
 
-	diameterMessage, err := NewDefaultDiameterRequest("TestApplication", "TestRequest")
+	var ci = config.GetPolicyConfig()
+
+	diameterMessage, err := NewDiameterRequest("TestApplication", "TestRequest")
+	diameterMessage.AddOriginAVPs(ci)
 	if err != nil {
 		t.Errorf("could not create diameter request for application TestAppliciaton and command TestRequest")
 		return
@@ -720,7 +723,8 @@ func TestDiameterMessage(t *testing.T) {
 	}
 
 	// Generate reply message
-	replyMessage := NewDefaultDiameterAnswer(&recoveredMessage)
+	replyMessage := NewDiameterAnswer(&recoveredMessage)
+	replyMessage.AddOriginAVPs(ci)
 	if replyMessage.IsRequest {
 		t.Errorf("reply message is a request")
 	}

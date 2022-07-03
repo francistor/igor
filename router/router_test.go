@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"igor/config"
 	"igor/diamcodec"
-	"igor/handler"
+	"igor/handlerfunctions"
+	"igor/httphandler"
 	"igor/instrumentation"
 	"os"
 	"testing"
@@ -124,7 +125,7 @@ func TestBasicSetup(t *testing.T) {
 func TestRouteMessage(t *testing.T) {
 
 	// Start handler
-	handler.NewHandler("testServer")
+	httphandler.NewHttpHandler("testServer", handlerfunctions.EmptyHandler)
 	time.Sleep(150 * time.Millisecond)
 
 	// Start Routers
@@ -136,7 +137,8 @@ func TestRouteMessage(t *testing.T) {
 	time.Sleep(1000 * time.Millisecond)
 
 	// Build request
-	request, _ := diamcodec.NewDefaultDiameterRequest("TestApplication", "TestRequest")
+	request, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
+	request.AddOriginAVPs(config.GetPolicyConfig())
 	request.Add("Destination-Realm", "igorsuperserver")
 	request.Add("User-Name", "TestUserNameRequest")
 	response, err := client.RouteDiameterRequest(&request, time.Duration(1000*time.Millisecond))

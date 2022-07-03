@@ -347,7 +347,8 @@ func (dp *DiameterPeer) eventLoop() {
 				dp.status = StatusConnected
 
 				// Active Peer. We'll send the CER
-				cer, err := diamcodec.NewInstanceDiameterRequest(dp.ci, "Base", "Capabilities-Exchange")
+				cer, err := diamcodec.NewDiameterRequest("Base", "Capabilities-Exchange")
+				cer.AddOriginAVPs(dp.ci)
 				if err != nil {
 					panic("could not create a CER")
 				}
@@ -558,12 +559,14 @@ func (dp *DiameterPeer) eventLoop() {
 							}
 
 						case "Device-Watchdog":
-							dwa := diamcodec.NewInstanceDiameterAnswer(dp.ci, v.Message)
+							dwa := diamcodec.NewDiameterAnswer(v.Message)
+							dwa.AddOriginAVPs(dp.ci)
 							dwa.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
 							dp.eventLoopChannel <- EgressDiameterMsg{Message: &dwa}
 
 						case "Disconnect-Peer":
-							dpa := diamcodec.NewInstanceDiameterAnswer(dp.ci, v.Message)
+							dpa := diamcodec.NewDiameterAnswer(v.Message)
+							dpa.AddOriginAVPs(dp.ci)
 							dp.eventLoopChannel <- EgressDiameterMsg{Message: &dpa}
 							dp.eventLoopChannel <- PeerCloseCommandMsg{}
 							dp.status = StatusTerminating
@@ -582,7 +585,8 @@ func (dp *DiameterPeer) eventLoop() {
 							if err != nil {
 								config.GetLogger().Error(err)
 								// Send an error UNABLE_TO_COMPLY
-								errorResp := diamcodec.NewInstanceDiameterAnswer(dp.ci, v.Message)
+								errorResp := diamcodec.NewDiameterAnswer(v.Message)
+								errorResp.AddOriginAVPs(dp.ci)
 								errorResp.Add("Result-Code", diamcodec.DIAMETER_UNABLE_TO_COMPLY)
 								dp.eventLoopChannel <- EgressDiameterMsg{Message: &errorResp}
 							} else {
@@ -680,7 +684,8 @@ func (dp *DiameterPeer) eventLoop() {
 				}
 
 				// Create request
-				dwr, err := diamcodec.NewInstanceDiameterRequest(dp.ci, "Base", "Device-Watchdog")
+				dwr, err := diamcodec.NewDiameterRequest("Base", "Device-Watchdog")
+				dwr.AddOriginAVPs(dp.ci)
 				if err != nil {
 					panic("could not create a DWR")
 				}
@@ -830,7 +835,8 @@ func (dp *DiameterPeer) handleCER(request *diamcodec.DiameterMessage) (string, e
 				// Grab the peer configuration
 				dp.PeerConfig = peerConfig
 
-				cea := diamcodec.NewInstanceDiameterAnswer(dp.ci, request)
+				cea := diamcodec.NewDiameterAnswer(request)
+				cea.AddOriginAVPs(dp.ci)
 				cea.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
 				dp.pushCEAttributes(&cea)
 				dp.eventLoopChannel <- EgressDiameterMsg{Message: &cea}
@@ -851,7 +857,8 @@ func (dp *DiameterPeer) handleCER(request *diamcodec.DiameterMessage) (string, e
 
 	if sendErrorMessage {
 		// Send error message before disconnecting
-		cea := diamcodec.NewInstanceDiameterAnswer(dp.ci, request)
+		cea := diamcodec.NewDiameterAnswer(request)
+		cea.AddOriginAVPs(dp.ci)
 		cea.Add("Result-Code", diamcodec.DIAMETER_UNKNOWN_PEER)
 		dp.eventLoopChannel <- EgressDiameterMsg{Message: &cea}
 	}

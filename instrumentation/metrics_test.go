@@ -25,8 +25,10 @@ func TestMetrics(t *testing.T) {
 	MS.ResetMetrics()
 	time.Sleep(100 * time.Millisecond)
 
-	diameterRequest, _ := diamcodec.NewDefaultDiameterRequest("TestApplication", "TestRequest")
-	diameterAnswer := diamcodec.NewDefaultDiameterAnswer(&diameterRequest)
+	diameterRequest, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
+	diameterRequest.AddOriginAVPs(config.GetPolicyConfig())
+	diameterAnswer := diamcodec.NewDiameterAnswer(&diameterRequest)
+	diameterAnswer.AddOriginAVPs(config.GetPolicyConfig())
 
 	// Generate some metrics
 	PushPeerDiameterRequestReceived("testPeer", &diameterRequest)

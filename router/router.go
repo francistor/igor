@@ -1,15 +1,13 @@
 package router
 
 import (
-	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"igor/config"
 	"igor/diamcodec"
 	"igor/diampeer"
+	"igor/httphandler"
 	"igor/instrumentation"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -77,6 +75,9 @@ type Router struct {
 	// Configuration instance
 	instanceName string
 
+	// Configuration instance object
+	ci *config.PolicyConfigurationManager
+
 	// Stauts of the Router
 	status int32
 
@@ -113,6 +114,7 @@ func NewRouter(instanceName string) *Router {
 
 	router := Router{
 		instanceName:         instanceName,
+		ci:                   config.GetPolicyConfigInstance(instanceName),
 		diameterPeersTable:   make(map[string]DiameterPeerWithStatus),
 		peerTableTicker:      time.NewTicker(60 * time.Second),
 		peerControlChannel:   make(chan interface{}, PEER_CONTROL_QUEUE_SIZE),
@@ -146,7 +148,7 @@ func (router *Router) eventLoop() {
 	logger := config.GetLogger()
 
 	// Server socket
-	listener, err := net.Listen("tcp4", fmt.Sprintf(":%d", config.GetPolicyConfigInstance(router.instanceName).DiameterServerConf().BindPort))
+	listener, err := net.Listen("tcp4", fmt.Sprintf(":%d", router.ci.DiameterServerConf().BindPort))
 	if err != nil {
 		panic(err)
 	}
@@ -172,7 +174,7 @@ func (router *Router) eventLoop() {
 			logger.Infof("accepted connection from %s", remoteAddr)
 
 			remoteIPAddr, _ := net.ResolveIPAddr("", remoteAddr)
-			peersConf := config.GetPolicyConfigInstance(router.instanceName).PeersConf()
+			peersConf := router.ci.PeersConf()
 			if !peersConf.ValidateIncomingAddress("", remoteIPAddr.IP) {
 				logger.Infof("invalid peer %s\n", remoteIPAddr)
 				connection.Close()
@@ -302,7 +304,7 @@ routerEventLoop:
 
 				// If origin-host now not in configuration, remove from peers table. It was there
 				// temporarily, until the PeerDown event is received
-				diameterPeersConf := config.GetPolicyConfigInstance(router.instanceName).PeersConf()
+				diameterPeersConf := router.ci.PeersConf()
 				if peer, found := diameterPeersConf[v.Sender.PeerConfig.DiameterHost]; !found {
 					delete(router.diameterPeersTable, peer.DiameterHost)
 				}
@@ -327,7 +329,7 @@ routerEventLoop:
 
 			// Diameter Request message to be routed
 		case rdr := <-router.diameterRequestsChan:
-			route, err := config.GetPolicyConfigInstance(router.instanceName).RoutingRulesConf().FindDiameterRoute(
+			route, err := router.ci.RoutingRulesConf().FindDiameterRoute(
 				rdr.Message.GetStringAVP("Destination-Realm"),
 				rdr.Message.ApplicationName,
 				false)
@@ -378,47 +380,16 @@ routerEventLoop:
 					// Make sure the response channel is closed
 					defer close(respChan)
 
-					// Serialize the message
-					jsonRequest, err := json.Marshal(diameterRequest)
+					answer, err := httphandler.HttpDiameterRequest(router.http2Client, destinationURLs[0], diameterRequest)
 					if err != nil {
-						logger.Errorf("unable to marshal message to json %s", err)
-						rdr.RChan <- fmt.Errorf("unable to marshal message to json %s", err)
-						return
-					}
-
-					// Send the request to the Handler
-					httpResp, err := router.http2Client.Post(destinationURLs[0], "application/json", bytes.NewReader(jsonRequest))
-					if err != nil {
-						logger.Errorf("handler %s error %s", destinationURLs[0], err)
+						logger.Error(err.Error())
 						rdr.RChan <- err
-						return
+					} else {
+						// Add the Origin-Host and Origin-Realm, that are not set by the handler
+						// because it lacks that configuration
+						answer.AddOriginAVPs(router.ci)
+						rdr.RChan <- answer
 					}
-					defer httpResp.Body.Close()
-
-					if httpResp.StatusCode != 200 {
-						logger.Errorf("handler %s returned status code %d", httpResp.StatusCode)
-						rdr.RChan <- fmt.Errorf("handler %s returned status code %d", destinationURLs[0], httpResp.StatusCode)
-						return
-					}
-
-					jsonAnswer, err := ioutil.ReadAll(httpResp.Body)
-					if err != nil {
-						logger.Errorf("error reading response from %s %s", destinationURLs[0], err)
-						rdr.RChan <- err
-						return
-					}
-
-					// Unserialize to Diameter Message
-					var diameterAnswer diamcodec.DiameterMessage
-					err = json.Unmarshal(jsonAnswer, &diameterAnswer)
-					if err != nil {
-						logger.Errorf("error unmarshaling response from %s %s", destinationURLs[0], err)
-						rdr.RChan <- err
-						return
-					}
-
-					// All good. Answer
-					rdr.RChan <- &diameterAnswer
 
 				}(rdr.RChan, rdr.Message)
 
@@ -481,7 +452,7 @@ func (router *Router) updatePeersTable() {
 	}
 
 	// Get the current configuration
-	diameterPeersConf := config.GetPolicyConfigInstance(router.instanceName).PeersConf()
+	diameterPeersConf := router.ci.PeersConf()
 
 	// Force non configured peers to disengage
 	// The real removal from the table will take place when the PeerDownEvent is received
@@ -527,7 +498,7 @@ func (router *Router) buildPeersStatusTable() instrumentation.DiameterPeersTable
 			connectionPolicy = peerStatus.Peer.PeerConfig.ConnectionPolicy
 		} else {
 			// Take from configuration
-			diameterPeersConf := config.GetPolicyConfigInstance(router.instanceName).PeersConf()
+			diameterPeersConf := router.ci.PeersConf()
 			peerConfig := diameterPeersConf[diameterHost]
 			ipAddress = peerConfig.IPAddress
 			connectionPolicy = peerConfig.ConnectionPolicy
