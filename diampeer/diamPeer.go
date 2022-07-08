@@ -128,13 +128,13 @@ type WatchdogMsg struct {
 
 // Type for functions that handle the diameter requests received
 // If an error is returned, no diameter answer is sent. Implementers should always generate a diameter answer instead
-type MessageHandler func(request *diamcodec.DiameterMessage) (answer *diamcodec.DiameterMessage, err error)
+type MessageHandler func(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error)
 
 // Context data for an in flight request
 type RequestContext struct {
 
 	// Metric key. Used because the message will not be available in a timeout
-	Key instrumentation.DiameterMetricKey
+	Key instrumentation.PeerDiameterMetricKey
 
 	// Channel on which the answer will be sent
 	RChan chan interface{}
@@ -523,7 +523,7 @@ func (dp *DiameterPeer) eventLoop() {
 								defer dp.wg.Done()
 							})
 
-							dp.requestsMap[v.Message.HopByHopId] = RequestContext{RChan: v.RChan, Timer: timer, Key: instrumentation.DiameterMetricKeyFromMessage(dp.PeerConfig.DiameterHost, v.Message)}
+							dp.requestsMap[v.Message.HopByHopId] = RequestContext{RChan: v.RChan, Timer: timer, Key: instrumentation.PeerDiameterMetricFromMessage(dp.PeerConfig.DiameterHost, v.Message)}
 						}
 					} else {
 						instrumentation.PushPeerDiameterAnswerSent(dp.PeerConfig.DiameterHost, v.Message)

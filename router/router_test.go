@@ -28,11 +28,11 @@ func TestMain(m *testing.M) {
 }
 
 func TestBasicSetup(t *testing.T) {
-	superServerPM := NewRouter("testSuperServer")
+	superServerRouter := NewRouter("testSuperServer")
 	time.Sleep(150 * time.Millisecond)
-	serverPM := NewRouter("testServer")
+	serverRouter := NewRouter("testServer")
 	time.Sleep(150 * time.Millisecond)
-	clientPM := NewRouter("testClient")
+	clientRouter := NewRouter("testClient")
 
 	// Bad peers
 	// This sleep time is important. Otherwise another client presenting himself
@@ -106,16 +106,16 @@ func TestBasicSetup(t *testing.T) {
 	}
 
 	// Close Routers
-	serverPM.Close()
-	<-serverPM.RouterDoneChannel
+	serverRouter.Close()
+	<-serverRouter.RouterDoneChannel
 	t.Log("Server Router terminated")
 
-	superServerPM.Close()
-	<-superServerPM.RouterDoneChannel
+	superServerRouter.Close()
+	<-superServerRouter.RouterDoneChannel
 	t.Log("SuperServer Router terminated")
 
-	clientPM.Close()
-	<-clientPM.RouterDoneChannel
+	clientRouter.Close()
+	<-clientRouter.RouterDoneChannel
 	t.Log("Client Router terminated")
 
 }
@@ -134,10 +134,13 @@ func TestRouteMessage(t *testing.T) {
 	client := NewRouter("testClient")
 
 	// Some time to settle
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	// Build request
-	request, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
+	request, err := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
+	if err != nil {
+		t.Fatalf("NewDiameterRequest error %s", err)
+	}
 	request.AddOriginAVPs(config.GetPolicyConfig())
 	request.Add("Destination-Realm", "igorsuperserver")
 	request.Add("User-Name", "TestUserNameRequest")
@@ -146,6 +149,16 @@ func TestRouteMessage(t *testing.T) {
 		t.Fatalf("route message returned error %s", err)
 	} else if response.GetIntAVP("Result-Code") != diamcodec.DIAMETER_SUCCESS {
 		t.Fatalf("Result-Code not succes %d", response.GetIntAVP("Result-Code"))
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	cm := instrumentation.MS.HttpClientQuery("HttpClientExchanges", nil, []string{})
+	if cm[instrumentation.HttpClientMetricKey{}] != 1 {
+		t.Fatalf("Client Exchanges was not 1")
+	}
+	hm := instrumentation.MS.HttpHandlerQuery("HttpHandlerExchanges", nil, []string{})
+	if hm[instrumentation.HttpHandlerMetricKey{}] != 1 {
+		t.Fatalf("Handler Exchanges was not 1")
 	}
 }
 

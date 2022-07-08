@@ -11,7 +11,9 @@ type ResetMetricsEvent struct{}
 // The single instance of the metrics server
 var MS *MetricsServer = NewMetricsServer()
 
-type DiameterMetrics map[DiameterMetricKey]uint64
+type PeerDiameterMetrics map[PeerDiameterMetricKey]uint64
+type HttpClientMetrics map[HttpClientMetricKey]uint64
+type HttpHandlerMetrics map[HttpHandlerMetricKey]uint64
 
 type Query struct {
 
@@ -33,32 +35,43 @@ type MetricsServer struct {
 	QueryChan chan Query
 
 	// Server
-	diameterRequestsReceived DiameterMetrics
-	diameterAnswersSent      DiameterMetrics
+	diameterRequestsReceived PeerDiameterMetrics
+	diameterAnswersSent      PeerDiameterMetrics
 
 	// Client
-	diameterRequestsSent    DiameterMetrics
-	diameterAnswersReceived DiameterMetrics
-	diameterRequestsTimeout DiameterMetrics
-	diameterAnswersStalled  DiameterMetrics
+	diameterRequestsSent    PeerDiameterMetrics
+	diameterAnswersReceived PeerDiameterMetrics
+	diameterRequestsTimeout PeerDiameterMetrics
+	diameterAnswersStalled  PeerDiameterMetrics
 
 	// Router
-	diameterRouteNotFound   DiameterMetrics
-	diameterNoAvailablePeer DiameterMetrics
-	diameterHandlerError    DiameterMetrics
+	diameterRouteNotFound   PeerDiameterMetrics
+	diameterNoAvailablePeer PeerDiameterMetrics
+	diameterHandlerError    PeerDiameterMetrics
 
+	// HttpClient
+	httpClientExchanges HttpClientMetrics
+
+	// HttpHandler
+	httpHandlerExchanges HttpHandlerMetrics
+
+	// One PeerTable per instance
 	diameterPeersTables map[string]DiameterPeersTable
 }
 
+////////////////////////////////////////////////////////////
+// Diameter Metrics
+////////////////////////////////////////////////////////////
+
 // Returns a set of metrics in which only the properties specified in labels are not zeroed
 // and the values are aggregated over the rest of labels
-func GetAggDiameterMetrics(diameterMetrics DiameterMetrics, aggLabels []string) DiameterMetrics {
-	outMetrics := make(DiameterMetrics)
+func GetAggPeerDiameterMetrics(peerDiameterMetrics PeerDiameterMetrics, aggLabels []string) PeerDiameterMetrics {
+	outMetrics := make(PeerDiameterMetrics)
 
 	// Iterate through the items in the metrics map, group & add by the value of the labels
-	for metricKey, v := range diameterMetrics {
+	for metricKey, v := range peerDiameterMetrics {
 		// metricKey will contain the values of the labels that we are aggregating by, the others are zeroed (not initialized)
-		mk := DiameterMetricKey{}
+		mk := PeerDiameterMetricKey{}
 		for _, key := range aggLabels {
 			switch key {
 			case "Peer":
@@ -89,17 +102,17 @@ func GetAggDiameterMetrics(diameterMetrics DiameterMetrics, aggLabels []string) 
 
 // Returns only the items in the metrics whose values correspond to the filter, which specifies
 // values for certain labels
-func GetFilteredDiameterMetrics(diameterMetrics DiameterMetrics, filter map[string]string) DiameterMetrics {
+func GetFilteredPeerDiameterMetrics(peerDiameterMetrics PeerDiameterMetrics, filter map[string]string) PeerDiameterMetrics {
 
 	// If no filter specified, do nothing
 	if filter == nil {
-		return diameterMetrics
+		return peerDiameterMetrics
 	}
 
 	// We'll put the output here
-	outMetrics := make(DiameterMetrics)
+	outMetrics := make(PeerDiameterMetrics)
 
-	for metricKey := range diameterMetrics {
+	for metricKey := range peerDiameterMetrics {
 
 		// Check all the items in the filter. If mismatch, get out of the outer loop
 		match := true
@@ -146,7 +159,7 @@ func GetFilteredDiameterMetrics(diameterMetrics DiameterMetrics, filter map[stri
 
 		// Filter match
 		if match {
-			outMetrics[metricKey] = diameterMetrics[metricKey]
+			outMetrics[metricKey] = peerDiameterMetrics[metricKey]
 		}
 	}
 
@@ -154,9 +167,148 @@ func GetFilteredDiameterMetrics(diameterMetrics DiameterMetrics, filter map[stri
 }
 
 // Gets filtered and aggregated metrics
-func GetDiameterMetrics(diameterMetrics DiameterMetrics, filter map[string]string, aggLabels []string) DiameterMetrics {
-	return GetAggDiameterMetrics(GetFilteredDiameterMetrics(diameterMetrics, filter), aggLabels)
+func GetPeerDiameterMetrics(peerDiameterMetrics PeerDiameterMetrics, filter map[string]string, aggLabels []string) PeerDiameterMetrics {
+	return GetAggPeerDiameterMetrics(GetFilteredPeerDiameterMetrics(peerDiameterMetrics, filter), aggLabels)
 }
+
+////////////////////////////////////////////////////////////
+// Http Client Metrics
+////////////////////////////////////////////////////////////
+
+func GetAggHttpClientMetrics(httpClientMetrics HttpClientMetrics, aggLabels []string) HttpClientMetrics {
+	outMetrics := make(HttpClientMetrics)
+
+	// Iterate through the items in the metrics map, group & add by the value of the labels
+	for metricKey, v := range httpClientMetrics {
+		// mk will contain the values of the labels that we are aggregating by, the others are zeroed (not initialized)
+		mk := HttpClientMetricKey{}
+		for _, key := range aggLabels {
+			switch key {
+			case "Endpoint":
+				mk.Endpoint = metricKey.Endpoint
+			case "ErrorCode":
+				mk.ErrorCode = metricKey.ErrorCode
+			}
+		}
+		if m, found := outMetrics[mk]; found {
+			outMetrics[mk] = m + v
+		} else {
+			outMetrics[mk] = v
+		}
+	}
+
+	return outMetrics
+}
+
+func GetFilteredHttpClientMetrics(httpClientMetrics HttpClientMetrics, filter map[string]string) HttpClientMetrics {
+
+	// If no filter specified, do nothing
+	if filter == nil {
+		return httpClientMetrics
+	}
+
+	// We'll put the output here
+	outMetrics := make(HttpClientMetrics)
+
+	for metricKey := range httpClientMetrics {
+
+		// Check all the items in the filter. If mismatch, get out of the loop
+		match := true
+	outer:
+		for key := range filter {
+			switch key {
+			case "Endpoint":
+				if metricKey.Endpoint != filter["Endpoint"] {
+					match = false
+					break outer
+				}
+			case "ErrorCode":
+				if metricKey.ErrorCode != filter["ErrorCode"] {
+					match = false
+					break outer
+				}
+			}
+		}
+
+		// Filter match
+		if match {
+			outMetrics[metricKey] = httpClientMetrics[metricKey]
+		}
+	}
+
+	return outMetrics
+}
+
+func GetHttpClientMetrics(httpClientMetrics HttpClientMetrics, filter map[string]string, aggLabels []string) HttpClientMetrics {
+	return GetAggHttpClientMetrics(GetFilteredHttpClientMetrics(httpClientMetrics, filter), aggLabels)
+}
+
+////////////////////////////////////////////////////////////
+// Http Handler Metrics
+////////////////////////////////////////////////////////////
+
+func GetAggHttpHandlerMetrics(httpHandlerMetrics HttpHandlerMetrics, aggLabels []string) HttpHandlerMetrics {
+	outMetrics := make(HttpHandlerMetrics)
+
+	// Iterate through the items in the metrics map, group & add by the value of the labels
+	for metricKey, v := range httpHandlerMetrics {
+		// metricKey will contain the values of the labels that we are aggregating by, the others are zeroed (not initialized)
+		mk := HttpHandlerMetricKey{}
+		for _, key := range aggLabels {
+			switch key {
+			case "ErrorCode":
+				mk.ErrorCode = metricKey.ErrorCode
+			}
+		}
+		if m, found := outMetrics[mk]; found {
+			outMetrics[mk] = m + v
+		} else {
+			outMetrics[mk] = v
+		}
+	}
+
+	return outMetrics
+}
+
+func GetFilteredHttpHandlerMetrics(httpHandlerMetrics HttpHandlerMetrics, filter map[string]string) HttpHandlerMetrics {
+
+	// If no filter specified, do nothing
+	if filter == nil {
+		return httpHandlerMetrics
+	}
+
+	// We'll put the output here
+	outMetrics := make(HttpHandlerMetrics)
+
+	for metricKey := range httpHandlerMetrics {
+
+		// Check all the items in the filter. If mismatch, get out of the loop
+		match := true
+	outer:
+		for key := range filter {
+			switch key {
+			case "ErrorCode":
+				if metricKey.ErrorCode != filter["ErrorCode"] {
+					match = false
+					break outer
+				}
+			}
+		}
+
+		// Filter match
+		if match {
+			outMetrics[metricKey] = httpHandlerMetrics[metricKey]
+		}
+	}
+
+	return outMetrics
+}
+
+func GetHttpHandlerMetrics(httpHandlerMetrics HttpHandlerMetrics, filter map[string]string, aggLabels []string) HttpHandlerMetrics {
+	return GetAggHttpHandlerMetrics(GetFilteredHttpHandlerMetrics(httpHandlerMetrics, filter), aggLabels)
+}
+
+//////////////////////////////////////////////////////////////////////////////////
 
 func NewMetricsServer() *MetricsServer {
 	server := MetricsServer{InputChan: make(chan interface{}, INPUT_QUEUE_SIZE), QueryChan: make(chan Query, QUERY_QUEUE_SIZE)}
@@ -173,17 +325,21 @@ func NewMetricsServer() *MetricsServer {
 
 // Empties all the counters
 func (ms *MetricsServer) resetMetrics() {
-	ms.diameterRequestsReceived = make(DiameterMetrics)
-	ms.diameterAnswersSent = make(DiameterMetrics)
+	ms.diameterRequestsReceived = make(PeerDiameterMetrics)
+	ms.diameterAnswersSent = make(PeerDiameterMetrics)
 
-	ms.diameterRequestsSent = make(DiameterMetrics)
-	ms.diameterAnswersReceived = make(DiameterMetrics)
-	ms.diameterRequestsTimeout = make(DiameterMetrics)
-	ms.diameterAnswersStalled = make(DiameterMetrics)
+	ms.diameterRequestsSent = make(PeerDiameterMetrics)
+	ms.diameterAnswersReceived = make(PeerDiameterMetrics)
+	ms.diameterRequestsTimeout = make(PeerDiameterMetrics)
+	ms.diameterAnswersStalled = make(PeerDiameterMetrics)
 
-	ms.diameterRouteNotFound = make(DiameterMetrics)
-	ms.diameterNoAvailablePeer = make(DiameterMetrics)
-	ms.diameterHandlerError = make(DiameterMetrics)
+	ms.diameterRouteNotFound = make(PeerDiameterMetrics)
+	ms.diameterNoAvailablePeer = make(PeerDiameterMetrics)
+	ms.diameterHandlerError = make(PeerDiameterMetrics)
+
+	ms.httpClientExchanges = make(HttpClientMetrics)
+
+	ms.httpHandlerExchanges = make(HttpHandlerMetrics)
 }
 
 // Wrapper to reset Diameter Metrics
@@ -192,14 +348,38 @@ func (ms *MetricsServer) ResetMetrics() {
 }
 
 // Wrapper to get Diameter Metrics
-func (ms *MetricsServer) DiameterQuery(name string, filter map[string]string, aggLabels []string) DiameterMetrics {
+func (ms *MetricsServer) DiameterQuery(name string, filter map[string]string, aggLabels []string) PeerDiameterMetrics {
 	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
 	ms.QueryChan <- query
-	v, ok := (<-query.RChan).(DiameterMetrics)
+	v, ok := (<-query.RChan).(PeerDiameterMetrics)
 	if ok {
 		return v
 	} else {
-		return DiameterMetrics{}
+		return PeerDiameterMetrics{}
+	}
+}
+
+// Wrapper to get HttpClient metrics
+func (ms *MetricsServer) HttpClientQuery(name string, filter map[string]string, aggLabels []string) HttpClientMetrics {
+	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
+	ms.QueryChan <- query
+	v, ok := (<-query.RChan).(HttpClientMetrics)
+	if ok {
+		return v
+	} else {
+		return HttpClientMetrics{}
+	}
+}
+
+// Wrapper to get HttpHandler metrics
+func (ms *MetricsServer) HttpHandlerQuery(name string, filter map[string]string, aggLabels []string) HttpHandlerMetrics {
+	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
+	ms.QueryChan <- query
+	v, ok := (<-query.RChan).(HttpHandlerMetrics)
+	if ok {
+		return v
+	} else {
+		return HttpHandlerMetrics{}
 	}
 }
 
@@ -219,25 +399,31 @@ func (ms *MetricsServer) metricServerLoop() {
 
 			switch query.Name {
 			case "DiameterRequestsReceived":
-				query.RChan <- GetDiameterMetrics(ms.diameterRequestsReceived, query.Filter, query.AggLabels)
+				query.RChan <- GetPeerDiameterMetrics(ms.diameterRequestsReceived, query.Filter, query.AggLabels)
 			case "DiameterAnswersSent":
-				query.RChan <- GetDiameterMetrics(ms.diameterAnswersSent, query.Filter, query.AggLabels)
+				query.RChan <- GetPeerDiameterMetrics(ms.diameterAnswersSent, query.Filter, query.AggLabels)
 
 			case "DiameterRequestsSent":
-				query.RChan <- GetDiameterMetrics(ms.diameterRequestsSent, query.Filter, query.AggLabels)
+				query.RChan <- GetPeerDiameterMetrics(ms.diameterRequestsSent, query.Filter, query.AggLabels)
 			case "DiameterAnswersReceived":
-				query.RChan <- GetDiameterMetrics(ms.diameterAnswersReceived, query.Filter, query.AggLabels)
+				query.RChan <- GetPeerDiameterMetrics(ms.diameterAnswersReceived, query.Filter, query.AggLabels)
 			case "DiameterRequestsTimeout":
-				query.RChan <- GetDiameterMetrics(ms.diameterRequestsTimeout, query.Filter, query.AggLabels)
+				query.RChan <- GetPeerDiameterMetrics(ms.diameterRequestsTimeout, query.Filter, query.AggLabels)
 			case "DiameterAnswersStalled":
-				query.RChan <- GetDiameterMetrics(ms.diameterAnswersSent, query.Filter, query.AggLabels)
+				query.RChan <- GetPeerDiameterMetrics(ms.diameterAnswersSent, query.Filter, query.AggLabels)
 
 			case "DiameterRouteNotFound":
-				query.RChan <- GetDiameterMetrics(ms.diameterRouteNotFound, query.Filter, query.AggLabels)
+				query.RChan <- GetPeerDiameterMetrics(ms.diameterRouteNotFound, query.Filter, query.AggLabels)
 			case "DiameterNoAvailablePeer":
-				query.RChan <- GetDiameterMetrics(ms.diameterNoAvailablePeer, query.Filter, query.AggLabels)
+				query.RChan <- GetPeerDiameterMetrics(ms.diameterNoAvailablePeer, query.Filter, query.AggLabels)
 			case "DiameterHandlerError":
-				query.RChan <- GetDiameterMetrics(ms.diameterHandlerError, query.Filter, query.AggLabels)
+				query.RChan <- GetPeerDiameterMetrics(ms.diameterHandlerError, query.Filter, query.AggLabels)
+
+			case "HttpClientExchanges":
+				query.RChan <- GetHttpClientMetrics(ms.httpClientExchanges, query.Filter, query.AggLabels)
+
+			case "HttpHandlerExchanges":
+				query.RChan <- GetHttpHandlerMetrics(ms.httpHandlerExchanges, query.Filter, query.AggLabels)
 
 			case "DiameterPeersTables":
 				query.RChan <- ms.diameterPeersTables
@@ -315,6 +501,22 @@ func (ms *MetricsServer) metricServerLoop() {
 					ms.diameterHandlerError[e.Key] = 1
 				} else {
 					ms.diameterHandlerError[e.Key] = curr + 1
+				}
+
+				// Client Metrics
+			case HttpClientExchangeEvent:
+				if curr, ok := ms.httpClientExchanges[e.Key]; !ok {
+					ms.httpClientExchanges[e.Key] = 1
+				} else {
+					ms.httpClientExchanges[e.Key] = curr + 1
+				}
+
+				// HandlerMetrics
+			case HttpHandlerExchangeEvent:
+				if curr, ok := ms.httpHandlerExchanges[e.Key]; !ok {
+					ms.httpHandlerExchanges[e.Key] = 1
+				} else {
+					ms.httpHandlerExchanges[e.Key] = curr + 1
 				}
 
 			// PeersTable

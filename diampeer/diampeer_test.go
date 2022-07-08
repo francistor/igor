@@ -120,7 +120,7 @@ func TestDiameterPeerOK(t *testing.T) {
 	// Check metrics
 	metrics := instrumentation.MS.DiameterQuery("DiameterRequestsReceived", nil, []string{"AP", "CM"})
 	// Should have received two TestApplication / TestRequest messages
-	k1 := instrumentation.DiameterMetricKey{AP: "TestApplication", CM: "TestRequest"}
+	k1 := instrumentation.PeerDiameterMetricKey{AP: "TestApplication", CM: "TestRequest"}
 	if metric, ok := metrics[k1]; !ok {
 		t.Fatal("bad metrics for TestApplication and TestRequest")
 	} else {
@@ -129,7 +129,7 @@ func TestDiameterPeerOK(t *testing.T) {
 		}
 	}
 	// Should have received several Base / Device-Watchdog
-	k2 := instrumentation.DiameterMetricKey{AP: "Base", CM: "Device-Watchdog"}
+	k2 := instrumentation.PeerDiameterMetricKey{AP: "Base", CM: "Device-Watchdog"}
 	if metric, ok := metrics[k2]; !ok {
 		t.Fatal("bad metrics for Base and Device-Watchdog")
 	} else {
@@ -140,7 +140,7 @@ func TestDiameterPeerOK(t *testing.T) {
 
 	// Aggregate timeouts per Peer
 	metrics = instrumentation.MS.DiameterQuery("DiameterRequestsTimeout", nil, []string{"Peer"})
-	k3 := instrumentation.DiameterMetricKey{Peer: "server.igorserver"}
+	k3 := instrumentation.PeerDiameterMetricKey{Peer: "server.igorserver"}
 	if metric, ok := metrics[k3]; !ok {
 		t.Fatal("bad timeouts metrics")
 	} else {

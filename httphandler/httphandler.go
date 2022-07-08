@@ -1,9 +1,13 @@
 package httphandler
 
 import (
+	"encoding/json"
 	"fmt"
 	"igor/config"
 	"igor/diamcodec"
+	"igor/diampeer"
+	"igor/instrumentation"
+	"io/ioutil"
 	"net/http"
 )
 
@@ -13,10 +17,10 @@ type HttpHandler struct {
 }
 
 // Creates a new DiameterHandler object
-func NewHttpHandler(instanceName string, handler func(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error)) HttpHandler {
+func NewHttpHandler(instanceName string, handler diampeer.MessageHandler) HttpHandler {
 	h := HttpHandler{ci: config.GetHandlerConfigInstance(instanceName)}
 
-	http.HandleFunc("/diameterRequest", getDiamterRequestHandler(handler))
+	http.HandleFunc("/diameterRequest", getDiameterRequestHandler(handler))
 
 	// TODO: Close gracefully
 	go h.Run()
@@ -35,38 +39,51 @@ func (dh *HttpHandler) Run() {
 	http.ListenAndServeTLS(bindAddrPort, "/home/francisco/cert.pem", "/home/francisco/key.pem", nil)
 }
 
-/*
-func handleDiameterRequest2(w http.ResponseWriter, req *http.Request) {
+// Given a Diameter Handler function, builds an http handler that unserializes, executes the handler and serializes the response
+func getDiameterRequestHandler(handlerFunc diampeer.MessageHandler) func(w http.ResponseWriter, req *http.Request) {
 
-	logger := config.GetLogger()
+	h := func(w http.ResponseWriter, req *http.Request) {
+		logger := config.GetLogger()
 
-	// Get the Diameter Request
-	jRequest, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		logger.Error("error reading request %s", err)
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	var request diamcodec.DiameterMessage
-	json.Unmarshal(jRequest, &request)
+		// Get the Diameter Request
+		jRequest, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			logger.Error("error reading request %s", err)
+			w.Write([]byte(err.Error()))
+			w.WriteHeader(http.StatusInternalServerError)
+			instrumentation.PushHttpHandlerExchange(NETWORK_ERROR)
+			return
+		}
+		var request diamcodec.DiameterMessage
+		if err = json.Unmarshal(jRequest, &request); err != nil {
+			logger.Error("error unmarshalling request %s", err)
+			w.Write([]byte(err.Error()))
+			w.WriteHeader(http.StatusInternalServerError)
+			instrumentation.PushHttpHandlerExchange(UNSERIALIZATION_ERROR)
+			return
+		}
 
-	// Generate the Diameter Answer
-	answer, err := handlerfunctions.EmptyHandler(&request)
-	if err != nil {
-		logger.Errorf("error handling request %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
+		// Generate the Diameter Answer, invoking the passed function
+		answer, err := handlerFunc(&request)
+		if err != nil {
+			logger.Errorf("error handling request %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			instrumentation.PushHttpHandlerExchange(HANDLER_FUNCTION_ERROR)
+			return
+		}
+		jAnswer, err := json.Marshal(answer)
+		if err != nil {
+			logger.Errorf("error marshaling response %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			instrumentation.PushHttpHandlerExchange(SERIALIZATION_ERROR)
+			return
+		}
+		w.Write(jAnswer)
+		w.WriteHeader(http.StatusOK)
 	}
-	jAnswer, err := json.Marshal(answer)
-	if err != nil {
-		logger.Errorf("error marshaling response %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	w.Write(jAnswer)
-	w.WriteHeader(http.StatusOK)
+
+	instrumentation.PushHttpHandlerExchange(SUCCESS)
+	return h
 }
-*/

@@ -4,9 +4,9 @@ import (
 	"testing"
 )
 
-func TestAggregations(t *testing.T) {
+func TestDiameterAggregations(t *testing.T) {
 
-	key1 := DiameterMetricKey{
+	key1 := PeerDiameterMetricKey{
 		Peer: "Peer1",
 		OH:   "OH1",
 		OR:   "OR1",
@@ -16,7 +16,7 @@ func TestAggregations(t *testing.T) {
 		CM:   "CM1",
 	}
 
-	key2 := DiameterMetricKey{
+	key2 := PeerDiameterMetricKey{
 		Peer: "Peer2",
 		OH:   "OH2",
 		OR:   "OR2",
@@ -26,7 +26,7 @@ func TestAggregations(t *testing.T) {
 		CM:   "CM2",
 	}
 
-	key3 := DiameterMetricKey{
+	key3 := PeerDiameterMetricKey{
 		Peer: "Peer1",
 		OH:   "OH3",
 		OR:   "OR3",
@@ -36,7 +36,7 @@ func TestAggregations(t *testing.T) {
 		CM:   "CM3",
 	}
 
-	key4 := DiameterMetricKey{
+	key4 := PeerDiameterMetricKey{
 		Peer: "Peer1",
 		OH:   "OH4",
 		OR:   "OR4",
@@ -46,7 +46,7 @@ func TestAggregations(t *testing.T) {
 		CM:   "CM1",
 	}
 
-	key5 := DiameterMetricKey{
+	key5 := PeerDiameterMetricKey{
 		Peer: "Peer1",
 		OH:   "OH1",
 		OR:   "OR5",
@@ -56,20 +56,63 @@ func TestAggregations(t *testing.T) {
 		CM:   "CM1",
 	}
 
-	myMetrics := DiameterMetrics{key1: 1, key2: 1, key3: 1, key4: 1, key5: 1}
+	myMetrics := PeerDiameterMetrics{key1: 1, key2: 1, key3: 1, key4: 1, key5: 1}
 
-	outMetrics1 := GetAggDiameterMetrics(myMetrics, []string{"Peer", "CM"})
+	outMetrics1 := GetAggPeerDiameterMetrics(myMetrics, []string{"Peer", "CM"})
 
-	if outMetrics1[DiameterMetricKey{Peer: "Peer1", CM: "CM1"}] != 3 {
-		t.Errorf("aggregation should be 3 but got %d", outMetrics1[DiameterMetricKey{Peer: "Peer1", CM: "CM1"}])
+	if outMetrics1[PeerDiameterMetricKey{Peer: "Peer1", CM: "CM1"}] != 3 {
+		t.Errorf("aggregation should be 3 but got %d", outMetrics1[PeerDiameterMetricKey{Peer: "Peer1", CM: "CM1"}])
 	}
-	if outMetrics1[DiameterMetricKey{Peer: "Peer1", CM: "CM3"}] != 1 {
-		t.Errorf("aggregation should be 1 but got %d", outMetrics1[DiameterMetricKey{Peer: "Peer1", CM: "CM3"}])
+	if outMetrics1[PeerDiameterMetricKey{Peer: "Peer1", CM: "CM3"}] != 1 {
+		t.Errorf("aggregation should be 1 but got %d", outMetrics1[PeerDiameterMetricKey{Peer: "Peer1", CM: "CM3"}])
 	}
 
-	filteredMetrics := GetFilteredDiameterMetrics(myMetrics, map[string]string{"OH": "OH1"})
-	outMetrics2 := GetAggDiameterMetrics(filteredMetrics, []string{"Peer", "CM"})
-	if outMetrics2[DiameterMetricKey{Peer: "Peer1", CM: "CM1"}] != 2 {
-		t.Errorf("aggregation should be 2 but got %d", outMetrics2[DiameterMetricKey{Peer: "Peer1", CM: "CM1"}])
+	filteredMetrics := GetFilteredPeerDiameterMetrics(myMetrics, map[string]string{"OH": "OH1"})
+	outMetrics2 := GetAggPeerDiameterMetrics(filteredMetrics, []string{"Peer", "CM"})
+	if outMetrics2[PeerDiameterMetricKey{Peer: "Peer1", CM: "CM1"}] != 2 {
+		t.Errorf("aggregation should be 2 but got %d", outMetrics2[PeerDiameterMetricKey{Peer: "Peer1", CM: "CM1"}])
+	}
+}
+
+func TestHttpClientAggregations(t *testing.T) {
+
+	key1 := HttpClientMetricKey{
+		Endpoint:  "http://localhost1",
+		ErrorCode: "200",
+	}
+
+	key2 := HttpClientMetricKey{
+		Endpoint:  "http://localhost2",
+		ErrorCode: "200",
+	}
+
+	key3 := HttpClientMetricKey{
+		Endpoint:  "http://localhost2",
+		ErrorCode: "500",
+	}
+
+	myMetrics := HttpClientMetrics{key1: 1, key2: 1, key3: 1}
+
+	outMetrics := GetHttpClientMetrics(myMetrics, map[string]string{"ErrorCode": "200"}, []string{"ErrorCode"})
+	if outMetrics[HttpClientMetricKey{ErrorCode: "200"}] != 2 {
+		t.Errorf("aggregation should be 2 but got %d", outMetrics[HttpClientMetricKey{ErrorCode: "200"}])
+	}
+}
+
+func TestHttpHandlerAggregations(t *testing.T) {
+
+	key1 := HttpHandlerMetricKey{
+		ErrorCode: "200",
+	}
+
+	key2 := HttpHandlerMetricKey{
+		ErrorCode: "500",
+	}
+
+	myMetrics := HttpHandlerMetrics{key1: 1, key2: 1}
+
+	outMetrics := GetHttpHandlerMetrics(myMetrics, map[string]string{"ErrorCode": "200"}, []string{"ErrorCode"})
+	if outMetrics[HttpHandlerMetricKey{ErrorCode: "200"}] != 1 {
+		t.Errorf("aggregation should be 2 but got %d", outMetrics[HttpHandlerMetricKey{ErrorCode: "200"}])
 	}
 }
