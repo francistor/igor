@@ -38,7 +38,7 @@ func TestDiamDict(t *testing.T) {
 		t.Errorf("Service-Type Name was not Service-Type")
 	}
 	if avp.DiameterType != Enumerated {
-		t.Errorf("Service-Type Type was not type UTF8String")
+		t.Errorf("Service-Type Type was not type Enumerated")
 	}
 	if avp.VendorId != 0 {
 		t.Errorf("Service-Type Vendor was not 0")
@@ -85,5 +85,19 @@ func TestDiamDict(t *testing.T) {
 	}
 	if app.CommandByName["Credit-Control"].Response["3GPP-Online"].MaxOccurs != 1 {
 		t.Errorf("Gx Command Credit-Control Response 3GPP-Online MaxOccurs is not 1")
+	}
+}
+
+func TestUnknownDiameterAVP(t *testing.T) {
+	// Read the full Diameter Dictionary
+	jsonDict, _ := os.ReadFile("/home/francisco/igor/resources/diameterDictionary.json")
+	diameterDict := NewDictionaryFromJSON(jsonDict)
+
+	avp, err := diameterDict.GetFromName("Igor-Nothing")
+	if err == nil {
+		t.Errorf("Igor-Nothing was found")
+	}
+	if avp.Name != "UNKNOWN" {
+		t.Errorf("Igor-Nothing name is not UNKNOWN")
 	}
 }

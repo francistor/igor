@@ -136,7 +136,9 @@ func NewDictionaryFromJSON(data []byte) *DiameterDict {
 
 	// Unmarshall from JSON
 	var jDict jDiameterDict
-	json.Unmarshal(data, &jDict)
+	if err := json.Unmarshal(data, &jDict); err != nil {
+		panic("bad diameter dictionary format " + err.Error())
+	}
 
 	// Build the dictionary
 	var dict DiameterDict
@@ -195,6 +197,21 @@ type jDiameterAVP struct {
 	Type       string
 	EnumValues map[string]int
 	Group      map[string]GroupedProperties
+}
+
+type jDiameterVendorAVPs struct {
+	VendorId   uint32
+	Attributes []jDiameterAVP
+}
+
+type jDiameterDict struct {
+	Version int
+	Vendors []struct {
+		VendorId   uint32
+		VendorName string
+	}
+	Avps         []jDiameterVendorAVPs
+	Applications []DiameterApplication
 }
 
 func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
@@ -266,19 +283,4 @@ func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
 		EnumCodes:    codes,
 		Group:        javp.Group,
 	}
-}
-
-type jDiameterVendorAVPs struct {
-	VendorId   uint32
-	Attributes []jDiameterAVP
-}
-
-type jDiameterDict struct {
-	Version int
-	Vendors []struct {
-		VendorId   uint32
-		VendorName string
-	}
-	Avps         []jDiameterVendorAVPs
-	Applications []DiameterApplication
 }

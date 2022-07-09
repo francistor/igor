@@ -1,0 +1,466 @@
+{
+	"version": 1001,
+	"vendors":
+    [
+        {"vendorId": 1001, "vendorName": "franciscocardosogil"},
+        {"vendorId": 9, "vendorName": "Cisco"},
+        {"vendorId": 2011, "vendorName": "Huawei"},
+        {"vendorId": 2352, "vendorName": "Redback"}, 
+        {"vendorId": 4874, "vendorName": "Unisphere"},  
+        {"vendorId": 6527, "vendorName": "Alc"},   
+        {"vendorId": 10415, "vendorName": "3GPP"},    
+        {"vendorId": 21100, "vendorName": "PSA"},   
+        {"vendorId": 90001, "vendorName": "Igor"}  
+    ],
+	"avps":
+	[
+        {
+		"vendorId": 0,
+        "attributes":
+            [
+                {
+                    "code": 1,
+                    "name": "User-Name",
+                    "type": "String",
+                    "encrypt": false,
+                    "tagged": false
+
+                },
+                {
+                    "code": 2,
+                    "name": "User-Password",
+                    "type": "Octets",
+                    "encrypt": true
+                },
+                {
+                    "code": 3,
+                    "name": "CHAP-Password",
+                    "type": "Octets"
+                },
+                {
+                    "code": 4,
+                    "name": "NAS-IP-Address",
+                    "type": "Address"
+                },
+                {
+                    "code": 5,
+                    "name": "NAS-Port",
+                    "type": "Integer"
+                },
+                {
+                    "code": 6,
+                    "name": "Service-Type",
+                    "type": "Integer",
+                    "enumValues":
+                    {
+                        "Login": 1,
+                        "Framed": 2,
+                        "Callback-Login": 3,
+                        "Callback-Framed": 4,
+                        "Outbound-User": 5,
+                        "Administrative": 6,
+                        "NAS-Prompt": 7,
+                        "Authenticate-Only": 8,
+                        "Callback-NAS-Prompt": 9,
+                        "Call-Check": 10,
+                        "Callback-Administrative": 11
+                    }
+                },
+                {
+                    "code": 7,
+                    "name": "Framed-Protocol",
+                    "type": "Integer",
+                    "enumValues":
+                    {
+                        "PPP": 1,
+                        "SLIP": 2
+                    }
+                },
+                {
+                    "code": 8,
+                    "name": "Framed-IP-Address",
+                    "type": "Address"
+                },
+                {
+                    "code": 9,
+                    "name": "Framed-IP-Netmask",
+                    "type": "Address"
+                },
+                {
+                    "code": 10,
+                    "name": "Framed-Routing",
+                    "type": "Integer",
+                    "enumValues": 
+                    {
+                        "None": 0,
+                        "Listen": 1,
+                        "Send": 2,
+                        "Listen-Send": 3
+                    }
+                },
+                {
+                    "code": 11,
+                    "name": "Filter-Id",
+                    "type": "String"
+                },
+                {
+                    "code": 18,
+                    "name": "Reply-Message",
+                    "type": "String"
+                },
+                {
+                    "code": 25,
+                    "name": "Class",
+                    "type": "String"
+                },
+                {
+                    "code": 27,
+                    "name": "Session-Timeout",
+                    "type": "Integer"
+                },
+                {
+                    "code": 28,
+                    "name": "Idle-Timeout",
+                    "type": "Integer"
+                },
+                {
+                    "code": 30,
+                    "name": "Called-Station-Id",
+                    "type": "String"
+                },
+                {
+                    "code": 31,
+                    "name": "Calling-Station-Id",
+                    "type": "String"
+                },
+                {
+                    "code": 32,
+                    "name": "NAS-Identifier",
+                    "type": "String"
+                },
+                {
+                    "code": 33,
+                    "name": "Proxy-State",
+                    "type": "Octets"
+                },
+                {
+                    "code": 40,
+                    "name": "Acct-Status-Type",
+                    "type": "Integer",
+                    "enumValues": 
+                    {
+                        "Start": 1,
+                        "Stop": 2,
+                        "Interim-Update": 3,
+                        "Accounting-on": 7,
+                        "Accounting-off": 8
+                    }
+                },
+                {
+                    "code": 41,
+                    "name": "Acct-Delay-Time",
+                    "type": "Integer"
+                },
+                {
+                    "code": 42,
+                    "name": "Acct-Input-Octets",
+                    "type": "Integer"
+                },
+                {
+                    "code": 43,
+                    "name": "Acct-Output-Octets",
+                    "type": "Integer"
+                },
+                {
+                    "code": 44,
+                    "name": "Acct-Session-Id",
+                    "type": "String"
+                },
+                {
+                    "code": 46,
+                    "name": "Acct-Session-Time",
+                    "type": "Integer"
+                },
+                {
+                    "code": 47,
+                    "name": "Acct-Input-Packets",
+                    "type": "Integer"
+                },
+                {
+                    "code": 48,
+                    "name": "Acct-Output-Packets",
+                    "type": "Integer"
+                },
+                {
+                    "code": 49,
+                    "name": "Acct-Terminate-Cause",
+                    "type": "Integer",
+                    "enumValues": {
+                        "User-Request": 1,
+                        "Lost Carrier": 2,
+                        "Lost Service": 3,
+                        "Idle Timeout": 4,
+                        "Session Timeout": 5,
+                        "Admin Reset": 6,
+                        "Admin Reboot": 7,
+                        "Port Error": 8,
+                        "NAS Error": 9,
+                        "NAS Request": 10,
+                        "NAS Reboot": 11,
+                        "Port Unneeded": 12,
+                        "Port Preempted": 13,
+                        "Port Suspended": 14,
+                        "Service Unavailable": 15,
+                        "Callback": 16,
+                        "User Error": 17,
+                        "Host Request": 18
+                    }
+                },
+                {
+                    "code": 60,
+                    "name": "CHAP-Challenge",
+                    "type": "Octets"
+                },
+                {
+                    "code": 95,
+                    "name": "NAS-IPv6-Address",
+                    "type": "IPv6Address"
+                },
+                {
+                    "code": 96,
+                    "name": "Framed-Interface-Id",
+                    "type": "InterfaceId"
+                },
+                {
+                    "code": 97,
+                    "name": "Framed-IPv6-Prefix",
+                    "type": "IPv6Prefix"
+                },
+                {
+                    "code": 123,
+                    "name": "Delegated-IPv6-Prefix",
+                    "type": "IPv6Prefix"
+                }
+            ]
+        },
+        {
+        "vendorId": 9,
+        "attributes":
+            [
+                {
+                    "code": 1,
+                    "name": "AVPair",
+                    "type": "String"
+                }
+            ]
+        },
+        {
+        "vendorId": 2011,
+        "attributes":
+            [
+                {
+                    "code": 1,
+                    "name": "Input-Committed-Burst-Size",
+                    "type": "Integer"
+                },
+                {
+                    "code": 2,
+                    "name": "Input-Committed-Information-Rate",
+                    "type": "Integer"
+                },
+                {
+                    "code": 3,
+                    "name": "Input-Peak-Information-Rate",
+                    "type": "Integer"
+                },
+                {
+                    "code": 4,
+                    "name": "Output-Committed-Burst-Size",
+                    "type": "Integer"
+                },
+                {
+                    "code": 5,
+                    "name": "Output-Committed-Information-Rate",
+                    "type": "Integer"
+                },
+                {
+                    "code": 6,
+                    "name": "Output-Peak-Information-Rate",
+                    "type": "Integer"
+                },
+                {
+                    "code": 15,
+                    "name": "Remanent-Volume",
+                    "type": "Integer"
+                },
+                {
+                    "code": 153,
+                    "name": "User-MAC",
+                    "type": "String"
+                },
+                {
+                    "code": 184,
+                    "name": "Account-Info",
+                    "type": "String"
+                },
+                {
+                    "code": 185,
+                    "name": "Service-Info",
+                    "type": "String"
+                },
+                {
+                    "code": 188,
+                    "name": "AVPair",
+                    "type": "String"
+                }
+            ]
+        },
+        {
+            "vendorId": 2352,
+            "attributes":
+            [
+                {
+                    "code": 190,
+                    "name": "Service-Name",
+                    "type": "String",
+                    "hasTag": true
+                },
+                {
+                    "code": 194,
+                    "name": "Deactivate-Service-Name",
+                    "type": "String",
+                    "hasTag": true
+                }
+            ]
+        },
+        {
+            "vendorId":4874,
+            "attributes":
+            [
+                {
+                    "code": 31,
+                    "name": "Service-Bundle",
+                    "type": "String"
+                },
+                {
+                    "code": 34,
+                    "name": "PPPoE-Description",
+                    "type": "String"
+                },
+                {
+                    "code": 56,
+                    "name": "DHCP-MAC-Address",
+                    "type": "String"
+                }
+            ]
+        },
+        {
+            "vendorId": 6527,
+            "attributes":
+            [
+                {
+                    "code": 27,
+                    "name": "Client-Hardware-Addr",
+                    "type": "String"
+                },
+                {
+                    "code": 151,
+                    "name": "Sub-Serv-Activate",
+                    "type": "String"
+                }
+            ]
+        },
+        {
+            "vendorId": 21100,
+            "attributes":
+            [
+                {
+                    "code": 101,
+                    "name": "ServiceType",
+                    "type": "String"
+                },
+                {
+                    "code": 102,
+                    "name": "ServiceName",
+                    "type": "String"
+                },
+                {
+                    "code": 104,
+                    "name": "AutoactivatedBasicService",
+                    "type": "String"
+                },
+                {
+                    "code": 105,
+                    "name": "AutoActivatedCampaignService",
+                    "type": "String"
+                },
+                {
+                    "code": 106,
+                    "name": "PHONE",
+                    "type": "String"
+                },
+                {
+                    "code": 107,
+                    "name": "CampaignData",
+                    "type": "String"
+                },
+                {
+                    "code": 108,
+                    "name": "Operation",
+                    "type": "String"
+                },
+                {
+                    "code": 109,
+                    "name": "IndexName",
+                    "type": "String"
+                },
+                {
+                    "code": 110,
+                    "name": "IndexValue",
+                    "type": "String"
+                },
+                {
+                    "code": 114,
+                    "name": "BRAS-NAS-IP-Address",
+                    "type": "String"
+                },
+                {
+                    "code": 117,
+                    "name": "MAC-Address",
+                    "type": "String"
+                },
+                {
+                    "code": 119,
+                    "name": "LegacyClientId",
+                    "type": "String"
+                },
+                {
+                    "code": 200,
+                    "name": "myTimeAttribute",
+                    "type": "Time"
+                }
+            ]
+        },
+        {
+            "vendorId": 90001,
+            "attributes":
+            [
+                {
+                    "code": 1,
+                    "name": "ClientId",
+                    "type": "String"
+                },
+                {
+                    "code": 2,
+                    "name": "PlanName",
+                    "type": "String"
+                },
+                {
+                    "code": 3,
+                    "name": "ServiceName",
+                    "type": "String"
+                }
+            ]
+        }
+    ]
+}
