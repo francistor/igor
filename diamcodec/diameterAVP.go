@@ -10,17 +10,17 @@ import (
 	"igor/diamdict"
 	"io"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// Uses the default configuration instance
-
 // Magical reference date is Mon Jan 2 15:04:05 MST 2006
 // Time AVP is the number of seconds since 1/1/1900
 var zeroTime, _ = time.Parse("2006-01-02T15:04:05 UTC", "1900-01-01T00:00:00 UTC")
 var timeFormatString = "2006-01-02T15:04:05 UTC"
+var ipv6PrefixRegex = regexp.MustCompile(`[0-9a-zA-z:\\.]+/[0-9]+`)
 
 type DiameterAVP struct {
 	Code        uint32
@@ -115,7 +115,6 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// OctetString
 	case diamdict.None, diamdict.OctetString:
-		// Treat as octetstring
 		// Read including padding
 		avpBytes = make([]byte, int(dataLen+padLen))
 		_, err := io.ReadAtLeast(reader, avpBytes, int(dataLen+padLen))
@@ -273,7 +272,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		return currentIndex + 20, err
 	}
 
-	return currentIndex, fmt.Errorf("Unknown type: %d", avp.DictItem.DiameterType)
+	return currentIndex, fmt.Errorf("unknown type: %d", avp.DictItem.DiameterType)
 }
 
 // Reads a DiameterAVP from a buffer
@@ -555,10 +554,7 @@ func (avp *DiameterAVP) DataLen() int {
 
 	switch avp.DictItem.DiameterType {
 
-	case diamdict.None:
-		dataSize = len(avp.Value.([]byte))
-
-	case diamdict.OctetString:
+	case diamdict.None, diamdict.OctetString:
 		dataSize = len(avp.Value.([]byte))
 
 	case diamdict.Integer32:
@@ -650,7 +646,7 @@ func (avp *DiameterAVP) GetOctets() []byte {
 
 	var value, ok = avp.Value.([]byte)
 	if !ok {
-		config.GetLogger().Errorf("cannot convert %v to []byte")
+		config.GetLogger().Errorf("cannot convert %T %v to []byte", avp.Value, avp.Value)
 		return nil
 	}
 
@@ -662,12 +658,8 @@ func (avp *DiameterAVP) GetString() string {
 
 	switch avp.DictItem.DiameterType {
 
-	case diamdict.None:
+	case diamdict.None, diamdict.OctetString:
 		// Treat as octetString
-		var octetsValue, _ = avp.Value.([]byte)
-		return fmt.Sprintf("%x", octetsValue)
-
-	case diamdict.OctetString:
 		var octetsValue, _ = avp.Value.([]byte)
 		return fmt.Sprintf("%x", octetsValue)
 
@@ -745,7 +737,7 @@ func (avp *DiameterAVP) GetInt() int64 {
 
 		return avp.Value.(int64)
 	default:
-		config.GetLogger().Errorf("cannot convert value to int64 %T", avp.Value)
+		config.GetLogger().Errorf("cannot convert value to int64 %T %v", avp.Value, avp.Value)
 		return 0
 	}
 }
@@ -757,7 +749,7 @@ func (avp *DiameterAVP) GetFloat() float64 {
 	case diamdict.Float32, diamdict.Float64:
 		return avp.Value.(float64)
 	default:
-		config.GetLogger().Errorf("cannot convert value to float64 %T", avp.Value)
+		config.GetLogger().Errorf("cannot convert value to float64 %T %v", avp.Value, avp.Value)
 		return 0
 	}
 }
@@ -767,7 +759,7 @@ func (avp *DiameterAVP) GetDate() time.Time {
 
 	var value, ok = avp.Value.(time.Time)
 	if !ok {
-		config.GetLogger().Errorf("cannot convert %v to time", avp.Value)
+		config.GetLogger().Errorf("cannot convert %T %v to time", avp.Value, avp.Value)
 		return time.Time{}
 	}
 
@@ -779,7 +771,7 @@ func (avp *DiameterAVP) GetIPAddress() net.IP {
 
 	var value, ok = avp.Value.(net.IP)
 	if !ok {
-		config.GetLogger().Errorf("cannot convert %v to ip address", avp.Value)
+		config.GetLogger().Errorf("cannot convert %T %v to ip address", avp.Value, avp.Value)
 		return net.IP{}
 	}
 
@@ -931,6 +923,9 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 		var stringValue, ok = value.(string)
 		if !ok {
 			return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+		}
+		if !ipv6PrefixRegex.Match([]byte(stringValue)) {
+			return &avp, fmt.Errorf("ipv6 prefix %s does not match expected format", stringValue)
 		}
 		avp.Value = stringValue
 

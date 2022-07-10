@@ -21,13 +21,13 @@ const (
 // VendorId and code of AVP in a single attribute
 type AVPCode struct {
 	VendorId uint32
-	Code     uint32
+	Code     byte
 }
 
 // Diameter Dictionary elements
 type AVPDictItem struct {
 	VendorId   uint32
-	Code       uint32
+	Code       byte
 	Name       string
 	RadiusType int            // One of the constants above
 	EnumValues map[string]int // non nil only in enum type
@@ -115,7 +115,7 @@ The following types are helpers for unserializing the JSON Radius Dictionary
 
 // To Unmarshall Dictionary from Json
 type jRadiusAVP struct {
-	Code       uint32
+	Code       byte
 	Name       string
 	Type       string
 	EnumValues map[string]int
