@@ -51,3 +51,94 @@ func TestOctetsAVP(t *testing.T) {
 		t.Errorf("Octets AVP not properly encoded after unmarshalling. Got %v instead of %v", rebuiltAVP.GetOctets(), []byte(password))
 	}
 }
+
+func TestStringAVP(t *testing.T) {
+
+	var theValue = "this-is the string!"
+
+	// Create avp
+	avp, err := NewAVP("User-Name", theValue)
+	if err != nil {
+		t.Errorf("error string String AVP: %v", err)
+		return
+	}
+	if avp.GetString() != theValue {
+		t.Errorf("String AVP does not match value")
+	}
+
+	// Serialize and unserialize
+	binaryAVP, _ := avp.MarshalBinary()
+	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP)
+	if rebuiltAVP.GetString() != theValue {
+		t.Errorf("String AVP not properly encoded after unmarshalling. Got %s", rebuiltAVP.GetString())
+	}
+}
+
+func TestVendorStringAVP(t *testing.T) {
+
+	var theValue = "this is the string!"
+
+	// Create avp
+	avp, err := NewAVP("Igor-StringAttribute", theValue)
+	if err != nil {
+		t.Errorf("error vendor specific string AVP: %v", err)
+		return
+	}
+	if avp.GetString() != theValue {
+		t.Errorf("String vendor specific AVP does not match value")
+	}
+
+	// Serialize and unserialize
+	binaryAVP, _ := avp.MarshalBinary()
+	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP)
+	if rebuiltAVP.GetString() != theValue {
+		t.Errorf("Vendor specific string AVP not properly encoded after unmarshalling. Got <%s>", rebuiltAVP.GetString())
+	}
+}
+
+func TestVendorIntegerAVP(t *testing.T) {
+
+	var theValue = 2
+
+	// Create avp
+	avp, err := NewAVP("Igor-IntegerAttribute", theValue)
+	if err != nil {
+		t.Errorf("error vendor specific integer AVP: %v", err)
+		return
+	}
+	if int(avp.GetInt()) != theValue {
+		t.Errorf("Integer vendor specific AVP does not match value")
+	}
+
+	// Serialize and unserialize
+	binaryAVP, _ := avp.MarshalBinary()
+	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP)
+	if int(rebuiltAVP.GetInt()) != theValue {
+		t.Errorf("Vendor specific integer AVP not properly encoded after unmarshalling. Got <%d>", rebuiltAVP.GetInt())
+	}
+	if rebuiltAVP.GetString() != "Two" {
+		t.Errorf("Vendor specific integer AVP not properly encoded after unmarshalling. Got <%s>", rebuiltAVP.GetString())
+	}
+}
+
+func TestTaggedAVP(t *testing.T) {
+
+	theValue := "this is a tagged attribute!"
+
+	// Create 0
+	avp, err := NewAVP("Igor-TaggedStringAttribute", theValue+":1")
+	if err != nil {
+		t.Errorf("error creating Tagged AVP: %v", err)
+		return
+	}
+
+	// Serialize and unserialize
+	binaryAVP, _ := avp.MarshalBinary()
+	rebuiltAVP, _, err := RadiusAVPFromBytes(binaryAVP)
+	if err != nil {
+		t.Errorf("Tagged AVP not properly encoded after unmarshalling. Got %s", err.Error())
+	}
+	if rebuiltAVP.GetString() != theValue {
+		t.Errorf("Tagged AVP not properly encoded after unmarshalling. Got %s", rebuiltAVP.GetString())
+	}
+}

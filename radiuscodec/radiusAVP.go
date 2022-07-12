@@ -25,6 +25,7 @@ type RadiusAVP struct {
 	Code     byte
 	VendorId uint32
 	Name     string
+	Tag      byte
 
 	// Type mapping
 	// May be a []byte, string, int64, float64, net.IP, time.Time or []DiameterAVP
@@ -41,8 +42,8 @@ type RadiusAVP struct {
 //    If code == 26
 //      vendorId: 4 bytes
 //      code: 1 byte
-//      length: 1 byte
-//      value
+//      length: 1 byte - the lenght of the vendorId, code, length and value in the contents of the VSA
+//      value - may be prepended by a byte tag
 //    Else
 //      value
 
@@ -50,7 +51,6 @@ type RadiusAVP struct {
 func (avp *RadiusAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	var avpLen byte
-	var vendorId uint32 = 0
 	var vendorCode byte = 0
 	var vendorLen byte = 0
 	var dataLen byte
@@ -59,41 +59,41 @@ func (avp *RadiusAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get Code
 	if err := binary.Read(reader, binary.BigEndian, &avp.Code); err != nil {
-		return 0, fmt.Errorf("could not decode the AVP code field: %w", err)
+		return 0, err
 	}
 	currentIndex += 1
 
 	// Get Length
 	if err := binary.Read(reader, binary.BigEndian, &avpLen); err != nil {
-		return 0, fmt.Errorf("could not decode the AVP length field: %w", err)
+		return currentIndex, err
 	}
 	currentIndex += 1
 
 	// If is vendor specific
 	if avp.Code == 26 {
 		// Get vendorId
-		if err := binary.Read(reader, binary.BigEndian, &vendorId); err != nil {
-			return 0, fmt.Errorf("could not decode the AVP vendorId field: %w", err)
+		if err := binary.Read(reader, binary.BigEndian, &avp.VendorId); err != nil {
+			return currentIndex, err
 		}
 		currentIndex += 4
 
 		// Get vendorCode
 		if err := binary.Read(reader, binary.BigEndian, &vendorCode); err != nil {
-			return 0, fmt.Errorf("could not decode the AVP vendorCode field: %w", err)
+			return currentIndex, err
 		}
 		currentIndex += 1
 
 		// Get vendorLen
 		if err := binary.Read(reader, binary.BigEndian, &vendorLen); err != nil {
-			return 0, fmt.Errorf("could not decode the AVP vendorLen field: %w", err)
+			return currentIndex, err
 		}
 		currentIndex += 1
 
 		avp.Code = vendorCode
 
 		// SanityCheck
-		if !(vendorLen == avpLen-6) {
-			return 0, fmt.Errorf("bad avp coding. Expected length of vendor specific attribute does not match")
+		if !(vendorLen == avpLen-2) {
+			return currentIndex, fmt.Errorf("bad avp coding. Expected length of vendor specific attribute does not match")
 		}
 
 		dataLen = vendorLen - 6 // Substracting 4 bytes for vendorId, 1 byte for vendorCode and 1 byte for vendorLen
@@ -106,6 +106,20 @@ func (avp *RadiusAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	// If not in the dictionary, will get some defaults
 	avp.DictItem, _ = config.GetRDict().GetFromCode(radiusdict.AVPCode{VendorId: avp.VendorId, Code: avp.Code})
 	avp.Name = avp.DictItem.Name
+
+	// Extract tag if necessary
+	if avp.DictItem.Tagged {
+		if err := binary.Read(reader, binary.BigEndian, &avp.Tag); err != nil {
+			return currentIndex, err
+		}
+		currentIndex += 1
+		dataLen = dataLen - 1
+	}
+
+	// Sanity check
+	if dataLen <= 0 {
+		return currentIndex, fmt.Errorf("invalid AVP data length")
+	}
 
 	// Parse according to type
 	switch avp.DictItem.RadiusType {
@@ -162,13 +176,13 @@ func (avp *RadiusAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		var prefixLen byte
 		address := make([]byte, 16)
 		if err := binary.Read(reader, binary.BigEndian, &dummy); err != nil {
-			return currentIndex, fmt.Errorf("could not read the dummy byte in ipv6 prefix: %w", err)
+			return currentIndex, err
 		}
 		if err := binary.Read(reader, binary.BigEndian, &prefixLen); err != nil {
-			return currentIndex + 1, fmt.Errorf("could not read the prefix len byte in ipv6 prefix: %w", err)
+			return currentIndex + 1, err
 		}
 		if err := binary.Read(reader, binary.BigEndian, &address); err != nil {
-			return currentIndex + 2, fmt.Errorf("could not write the address in ipv6 prefi: %w", err)
+			return currentIndex + 2, err
 		}
 
 		avp.Value = net.IP(address).String() + "/" + fmt.Sprintf("%d", prefixLen)
@@ -236,7 +250,7 @@ func (avp *RadiusAVP) WriteTo(buffer io.Writer) (int64, error) {
 	bytesWritten += 1
 
 	// If vendor specific
-	if avp.Code == 26 {
+	if avp.VendorId != 0 {
 		// Write vendorId
 		if err = binary.Write(buffer, binary.BigEndian, avp.VendorId); err != nil {
 			return int64(bytesWritten), err
@@ -249,8 +263,16 @@ func (avp *RadiusAVP) WriteTo(buffer io.Writer) (int64, error) {
 		}
 		bytesWritten += 1
 
-		// Write length
-		if err = binary.Write(buffer, binary.BigEndian, avpLen-6); err != nil {
+		// Write length. This is the length of the embedded AVP
+		if err = binary.Write(buffer, binary.BigEndian, avpLen-2); err != nil {
+			return int64(bytesWritten), err
+		}
+		bytesWritten += 1
+	}
+
+	// Write tag
+	if avp.DictItem.Tagged {
+		if err = binary.Write(buffer, binary.BigEndian, avp.Tag); err != nil {
 			return int64(bytesWritten), err
 		}
 		bytesWritten += 1
@@ -414,6 +436,9 @@ func (avp *RadiusAVP) DataLen() byte {
 	case radiusdict.None, radiusdict.Octets:
 		dataSize = len(avp.Value.([]byte))
 
+	case radiusdict.String:
+		dataSize = len(avp.Value.(string))
+
 	case radiusdict.Integer:
 		dataSize = 4
 
@@ -426,12 +451,18 @@ func (avp *RadiusAVP) DataLen() byte {
 	case radiusdict.IPv6Address:
 		dataSize = 16
 
+	case radiusdict.IPv6Prefix:
+		dataSize = 18
+
 	case radiusdict.InterfaceId:
 		dataSize = 8
 
 	case radiusdict.Integer64:
 		dataSize = 8
+	}
 
+	if avp.DictItem.Tagged {
+		dataSize += 1
 	}
 
 	if avp.VendorId == 0 {
@@ -470,7 +501,11 @@ func (avp *RadiusAVP) GetString() string {
 
 	case radiusdict.Integer, radiusdict.Integer64:
 		var intValue, _ = avp.Value.(int64)
-		return fmt.Sprintf("%d", intValue)
+		if stringValue, ok := avp.DictItem.EnumCodes[int(intValue)]; ok {
+			return stringValue
+		} else {
+			return fmt.Sprintf("%d", intValue)
+		}
 
 	case radiusdict.String, radiusdict.IPv6Prefix:
 		var stringValue, _ = avp.Value.(string)
@@ -483,7 +518,6 @@ func (avp *RadiusAVP) GetString() string {
 	case radiusdict.Time:
 		var timeValue, _ = avp.Value.(time.Time)
 		return timeValue.Format(timeFormatString)
-
 	}
 
 	return ""
@@ -526,9 +560,20 @@ func (avp *RadiusAVP) GetIPAddress() net.IP {
 	return value
 }
 
+// Sets tag on attribute, making sure it is of the appropriate type in the dictionary
+func (avp *RadiusAVP) SetTag(tag byte) *RadiusAVP {
+	if avp.DictItem.Tagged {
+		avp.Tag = tag
+	} else {
+		config.GetLogger().Errorf("tried to set tag to %s attribute", avp.DictItem.Name)
+	}
+
+	return avp
+}
+
 // Creates a new AVP
 // If the type of value is not compatible with the Diameter type in the dictionary, an error is returned
-func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
+func NewAVPOld(name string, value interface{}) (*RadiusAVP, error) {
 	var avp = RadiusAVP{}
 
 	avp.DictItem = config.GetRDict().AVPByName[name]
@@ -616,6 +661,120 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 			return &avp, fmt.Errorf("ipv6 prefix %s does not match expected format", stringValue)
 		}
 		avp.Value = stringValue
+
+	default:
+		return &avp, fmt.Errorf("%d radius type not known", avp.DictItem.RadiusType)
+	}
+
+	return &avp, nil
+}
+
+func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
+	var avp = RadiusAVP{}
+
+	avp.DictItem = config.GetRDict().AVPByName[name]
+	if avp.DictItem.RadiusType == radiusdict.None {
+		return &avp, fmt.Errorf("%s not found in dictionary", name)
+	}
+
+	avp.Name = name
+	avp.Code = avp.DictItem.Code
+	avp.VendorId = avp.DictItem.VendorId
+
+	var stringValue, isString = value.(string)
+	if avp.DictItem.Tagged {
+		if !isString {
+			return &avp, fmt.Errorf("tried to create a tagged AVP from a non string value")
+		}
+		stringComponents := strings.Split(stringValue, ":")
+		if len(stringComponents) == 2 {
+			tag, err := strconv.ParseUint(stringComponents[1], 10, 8)
+			if err != nil {
+				return &avp, fmt.Errorf("could not decode tag %s", stringComponents[1])
+			}
+			avp.Tag = byte(tag)
+			stringValue = stringComponents[0]
+		} else {
+			return &avp, fmt.Errorf("%s is tagged but no tag found", name)
+		}
+	}
+
+	var err error
+	switch avp.DictItem.RadiusType {
+	case radiusdict.Octets, radiusdict.InterfaceId:
+		if isString {
+			avp.Value, err = hex.DecodeString(stringValue)
+			if err != nil {
+				return &avp, fmt.Errorf("could not decode %s as hex string", value)
+			}
+		} else {
+			var octetsValue, ok = value.([]byte)
+			if !ok {
+				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+			}
+			avp.Value = octetsValue
+		}
+
+	case radiusdict.Integer, radiusdict.Integer64:
+
+		if isString {
+			avp.Value, err = strconv.ParseInt(stringValue, 10, 8)
+			if err != nil {
+				return &avp, fmt.Errorf("could not parse %s as integer", stringValue)
+			}
+		} else {
+			avp.Value, err = toInt64(value)
+			if err != nil {
+				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+			}
+		}
+
+	case radiusdict.String:
+		if isString {
+			avp.Value = stringValue
+		} else {
+			return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+		}
+
+	case radiusdict.Address, radiusdict.IPv6Address:
+
+		if isString {
+			avp.Value = net.ParseIP(stringValue)
+			if avp.Value == nil {
+				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+			}
+		} else {
+			addressValue, ok := value.(net.IP)
+			if !ok {
+				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+			} else {
+				avp.Value = addressValue
+			}
+		}
+
+	case radiusdict.Time:
+		if isString {
+			avp.Value, err = time.Parse(timeFormatString, stringValue)
+			if err != nil {
+				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T %s: %s", avp.DictItem.RadiusType, value, value, err)
+			}
+		} else {
+			timeValue, ok := value.(time.Time)
+			if !ok {
+				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+			}
+			avp.Value = timeValue
+		}
+
+	case radiusdict.IPv6Prefix:
+		if isString {
+			if !ipv6PrefixRegex.Match([]byte(stringValue)) {
+				return &avp, fmt.Errorf("ipv6 prefix %s does not match expected format", stringValue)
+			}
+			avp.Value = stringValue
+		} else {
+			return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+		}
 
 	default:
 		return &avp, fmt.Errorf("%d radius type not known", avp.DictItem.RadiusType)

@@ -22,7 +22,7 @@
                     "code": 1,
                     "name": "User-Name",
                     "type": "String",
-                    "encrypt": false,
+                    "encrypted": false,
                     "tagged": false
 
                 },
@@ -30,7 +30,7 @@
                     "code": 2,
                     "name": "User-Password",
                     "type": "Octets",
-                    "encrypt": true
+                    "encrypted": true
                 },
                 {
                     "code": 3,
@@ -433,11 +433,6 @@
                     "code": 119,
                     "name": "LegacyClientId",
                     "type": "String"
-                },
-                {
-                    "code": 200,
-                    "name": "myTimeAttribute",
-                    "type": "Time"
                 }
             ]
         },
@@ -447,18 +442,62 @@
             [
                 {
                     "code": 1,
-                    "name": "ClientId",
-                    "type": "String"
+                    "name": "OctetsAttribute",
+                    "type": "Octets"
                 },
                 {
                     "code": 2,
-                    "name": "PlanName",
+                    "name": "StringAttribute",
                     "type": "String"
                 },
                 {
                     "code": 3,
-                    "name": "ServiceName",
-                    "type": "String"
+                    "name": "IntegerAttribute",
+                    "type": "Integer",
+                    "enumValues": 
+                    {
+                        "Zero": 0,
+                        "One": 1,
+                        "Two": 2,
+                        "three": 3
+                    }
+                },
+                {
+                    "code": 4,
+                    "name": "AddressAttribute",
+                    "type": "Address",
+                    "tagged": true
+                },
+                {
+                    "code": 5,
+                    "name": "TimeAttribute",
+                    "type": "Time"
+                },
+                {
+                    "code": 6,
+                    "name": "IPv6Attribute",
+                    "type": "IPv6Address"
+                },
+                {
+                    "code": 6,
+                    "name": "IPv6PrefixAttribute",
+                    "type": "IPv6Prefix"
+                },
+                {
+                    "code": 7,
+                    "name": "InterfaceIdAttribute",
+                    "type": "InterfaceId"
+                },
+                {
+                    "code": 8,
+                    "name": "Integer64Attribute",
+                    "type": "Integer64"
+                },
+                {
+                    "code": 8,
+                    "name": "TaggedStringAttribute",
+                    "type": "String",
+                    "tagged": true
                 }
             ]
         }

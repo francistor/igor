@@ -25,6 +25,21 @@ func TestRadiusDict(t *testing.T) {
 	if avp.EnumCodes != nil {
 		t.Errorf("Code {0, 1} codes was not nil")
 	}
+	if avp.Tagged == true {
+		t.Errorf("Code {0, 1} codes was tagged")
+	}
+	if avp.Encrypted == true {
+		t.Errorf("Code {0, 1} codes was encrypted")
+	}
+
+	// Encrypted type
+	avp = radiusDict.AVPByCode[AVPCode{0, 2}]
+	if avp.Name != "User-Password" {
+		t.Errorf("Code {0, 2} Name was not User-Password")
+	}
+	if avp.Encrypted != true {
+		t.Errorf("Code {0, 2} Name was not Encrypted")
+	}
 
 	// Enum values
 	avp = radiusDict.AVPByName["Service-Type"]
@@ -61,14 +76,20 @@ func TestRadiusDict(t *testing.T) {
 		if avp.Code != 1 {
 			t.Errorf("Igor-Client id code is not 1")
 		}
+		if avp.VendorId != 90001 {
+			t.Errorf("Igor-Client has not vendorId code 90001")
+		}
 	}
 
-	avp, err = radiusDict.GetFromCode(AVPCode{90001, 3})
+	avp, err = radiusDict.GetFromCode(AVPCode{90001, 4})
 	if err != nil {
-		t.Errorf("Igor code 3 not found")
+		t.Errorf("Igor code 4 not found")
 	} else {
-		if avp.Name != "Igor-ServiceName" {
-			t.Errorf("Igor code 3 is not Igor-ServiceName but %s", avp.Name)
+		if avp.Name != "Igor-TaggedId" {
+			t.Errorf("Igor code 4 is not Igor-TaggedId but %s", avp.Name)
+		}
+		if avp.Tagged != true {
+			t.Error("Igor code 4 is not Tagged", avp.Name)
 		}
 	}
 }

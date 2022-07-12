@@ -60,13 +60,13 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get Header
 	if err := binary.Read(reader, binary.BigEndian, &avp.Code); err != nil {
-		return 0, fmt.Errorf("could not decode the AVP code field: %w", err)
+		return 0, err
 	}
 	currentIndex += 4
 
 	// Get Flags
 	if err := binary.Read(reader, binary.BigEndian, &flags); err != nil {
-		return currentIndex, fmt.Errorf("could not decode the AVP flags field: %w", err)
+		return currentIndex, err
 	}
 	isVendorSpecific = flags&0x80 != 0
 	avp.IsMandatory = flags&0x40 != 0
@@ -74,11 +74,11 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get Len
 	if err := binary.Read(reader, binary.BigEndian, &lenHigh); err != nil {
-		return currentIndex, fmt.Errorf("could not decode the AVP len (high) field: %w", err)
+		return currentIndex, err
 	}
 	currentIndex += 1
 	if err := binary.Read(reader, binary.BigEndian, &lenLow); err != nil {
-		return currentIndex, fmt.Errorf("could not decode the len (low) code field: %w", err)
+		return currentIndex, err
 	}
 	currentIndex += 2
 
@@ -97,7 +97,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	if isVendorSpecific {
 		if err := binary.Read(reader, binary.BigEndian, &avp.VendorId); err != nil {
-			return currentIndex, fmt.Errorf("could not decode the vendor id code field: %w", err)
+			return currentIndex, err
 		}
 		currentIndex += 4
 		dataLen = avpLen - 12
@@ -190,13 +190,13 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		var addrType uint16
 		var padding uint16
 		if err := binary.Read(reader, binary.BigEndian, &addrType); err != nil {
-			return currentIndex, fmt.Errorf("bad address value (decoding type): %w", err)
+			return currentIndex, err
 		}
 		if addrType == 1 {
 			var ipv4Addr [4]byte
 			// IPv4
 			if err := binary.Read(reader, binary.BigEndian, &ipv4Addr); err != nil {
-				return currentIndex + 2, fmt.Errorf("bad address value (decoding ipv4 value): %w", err)
+				return currentIndex + 2, err
 			}
 			avp.Value = net.IP(ipv4Addr[:])
 			// Drain 2 bytes
@@ -207,7 +207,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 			// IPv6
 			var ipv6Addr [16]byte
 			if err := binary.Read(reader, binary.BigEndian, &ipv6Addr); err != nil {
-				return currentIndex + 2, fmt.Errorf("bad address value (decoding ipv6 value): %w", err)
+				return currentIndex + 2, err
 			}
 			avp.Value = net.IP(ipv6Addr[:])
 			// Drain 2 bytes
@@ -255,13 +255,13 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		var padding uint16
 		address := make([]byte, 16)
 		if err := binary.Read(reader, binary.BigEndian, &dummy); err != nil {
-			return currentIndex, fmt.Errorf("could not read the dummy byte in ipv6 prefix: %w", err)
+			return currentIndex, err
 		}
 		if err := binary.Read(reader, binary.BigEndian, &prefixLen); err != nil {
-			return currentIndex + 1, fmt.Errorf("could not read the prefix len byte in ipv6 prefix: %w", err)
+			return currentIndex + 1, err
 		}
 		if err := binary.Read(reader, binary.BigEndian, &address); err != nil {
-			return currentIndex + 2, fmt.Errorf("could not write the address in ipv6 prefi: %w", err)
+			return currentIndex + 2, err
 		}
 
 		// Drain 2 bytes

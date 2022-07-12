@@ -32,6 +32,8 @@ type AVPDictItem struct {
 	RadiusType int            // One of the constants above
 	EnumValues map[string]int // non nil only in enum type
 	EnumCodes  map[int]string // non  nil only in enum type
+	Encrypted  bool
+	Tagged     bool
 }
 
 // Represents the full Radius Dictionary
@@ -119,7 +121,7 @@ type jRadiusAVP struct {
 	Name       string
 	Type       string
 	EnumValues map[string]int
-	Encrypt    bool
+	Encrypted  bool
 	Tagged     bool
 }
 
@@ -186,5 +188,7 @@ func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
 		RadiusType: radiusType,
 		EnumValues: javp.EnumValues,
 		EnumCodes:  codes,
+		Encrypted:  javp.Encrypted,
+		Tagged:     javp.Tagged,
 	}
 }
