@@ -2,6 +2,7 @@ package radiuscodec
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -550,7 +551,6 @@ func (avp *RadiusAVP) GetDate() time.Time {
 
 // Returns the value of the AVP as IP address
 func (avp *RadiusAVP) GetIPAddress() net.IP {
-
 	var value, ok = avp.Value.(net.IP)
 	if !ok {
 		config.GetLogger().Errorf("cannot convert %T %v to ip address", avp.Value, avp.Value)
@@ -569,104 +569,6 @@ func (avp *RadiusAVP) SetTag(tag byte) *RadiusAVP {
 	}
 
 	return avp
-}
-
-// Creates a new AVP
-// If the type of value is not compatible with the Diameter type in the dictionary, an error is returned
-func NewAVPOld(name string, value interface{}) (*RadiusAVP, error) {
-	var avp = RadiusAVP{}
-
-	avp.DictItem = config.GetRDict().AVPByName[name]
-	if avp.DictItem.RadiusType == radiusdict.None {
-		return &avp, fmt.Errorf("%s not found in dictionary", name)
-	}
-
-	avp.Name = name
-	avp.Code = avp.DictItem.Code
-	avp.VendorId = avp.DictItem.VendorId
-
-	switch avp.DictItem.RadiusType {
-	case radiusdict.Octets, radiusdict.InterfaceId:
-		var octetsValue, ok = value.([]byte)
-		if !ok {
-			var stringValue, ok = value.(string)
-			if !ok {
-				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
-			}
-			var err error
-			avp.Value, err = hex.DecodeString(stringValue)
-			if err != nil {
-				return &avp, fmt.Errorf("could not decode %s as hex string", value)
-			}
-		} else {
-			avp.Value = octetsValue
-		}
-
-	case radiusdict.Integer, radiusdict.Integer64:
-		var value, error = toInt64(value)
-
-		if error != nil {
-			return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
-		}
-		avp.Value = value
-
-	case radiusdict.String:
-		var stringValue, ok = value.(string)
-		if !ok {
-			return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
-		}
-		avp.Value = stringValue
-
-	case radiusdict.Address, radiusdict.IPv6Address:
-		// Address and string are allowed
-		var addressValue, ok = value.(net.IP)
-		if !ok {
-			// Try with string
-			var stringValue, ok = value.(string)
-			if !ok {
-				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
-			}
-			avp.Value = net.ParseIP(stringValue)
-			if avp.Value == nil {
-				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
-			}
-		} else {
-			// Type address
-			avp.Value = addressValue
-		}
-
-	case radiusdict.Time:
-		// Time and string are allowed
-		var timeValue, ok = value.(time.Time)
-		if !ok {
-			var stringValue, ok = value.(string)
-			if !ok {
-				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
-			}
-			var err error
-			avp.Value, err = time.Parse(timeFormatString, stringValue)
-			if err != nil {
-				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T %s: %s", avp.DictItem.RadiusType, value, value, err)
-			}
-		} else {
-			avp.Value = timeValue
-		}
-
-	case radiusdict.IPv6Prefix:
-		var stringValue, ok = value.(string)
-		if !ok {
-			return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
-		}
-		if !ipv6PrefixRegex.Match([]byte(stringValue)) {
-			return &avp, fmt.Errorf("ipv6 prefix %s does not match expected format", stringValue)
-		}
-		avp.Value = stringValue
-
-	default:
-		return &avp, fmt.Errorf("%d radius type not known", avp.DictItem.RadiusType)
-	}
-
-	return &avp, nil
 }
 
 func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
@@ -815,4 +717,132 @@ func toInt64(value interface{}) (int64, error) {
 	default:
 		return 0, fmt.Errorf("cannot convert %T to int64", value)
 	}
+}
+
+/*
+	  On transmission, the password is hidden.  The password is first
+      padded at the end with nulls to a multiple of 16 octets.  A one-
+      way MD5 hash is calculated over a stream of octets consisting of
+      the shared secret followed by the Request Authenticator.  This
+      value is XORed with the first 16 octet segment of the password and
+      placed in the first 16 octets of the String field of the User-
+      Password Attribute.
+
+      If the password is longer than 16 characters, a second one-way MD5
+      hash is calculated over a stream of octets consisting of the
+      shared secret followed by the result of the first xor.  That hash
+      is XORed with the second 16 octet segment of the password and
+      placed in the second 16 octets of the String field of the User-
+      Password Attribute.
+
+      If necessary, this operation is repeated, with each xor result
+      being used along with the shared secret to generate the next hash
+      to xor the next segment of the password, to no more than 128
+      characters.
+
+      The method is taken from the book "Network Security" by Kaufman,
+      Perlman and Speciner [9] pages 109-110.  A more precise
+      explanation of the method follows:
+
+      Call the shared secret S and the pseudo-random 128-bit Request
+      Authenticator RA.  Break the password into 16-octet chunks p1, p2,
+      etc.  with the last one padded at the end with nulls to a 16-octet
+      boundary.  Call the ciphertext blocks c(1), c(2), etc.  We'll need
+      intermediate values b1, b2, etc.
+
+         b1 = MD5(S + RA)       c(1) = p1 xor b1
+         b2 = MD5(S + c(1))     c(2) = p2 xor b2
+                .                       .
+                .                       .
+                .                       .
+         bi = MD5(S + c(i-1))   c(i) = pi xor bi
+
+      The String will contain c(1)+c(2)+...+c(i) where + denotes
+      concatenation.
+
+      On receipt, the process is reversed to yield the original
+      password
+*/
+
+func Encrypt1(secret string, authenticator []byte, payload []byte) []byte {
+
+	// Calculate padded length
+	var upLen = len(payload)
+	var pLen int
+	if upLen%16 == 0 {
+		pLen = upLen
+	} else {
+		pLen = upLen + (16 - upLen%16)
+	}
+
+	var encryptedPayload []byte
+	var b, c []byte
+	for i := 0; i < pLen; i += 16 {
+		// Get the b
+		hasher := md5.New()
+		hasher.Write([]byte(secret))
+		if b == nil {
+			hasher.Write(authenticator)
+		} else {
+			hasher.Write(c)
+			fmt.Println("<-", c)
+		}
+		b = hasher.Sum(nil)
+
+		// Encrypt with the calculated c, which is the xor of the payload with the b
+		c = make([]byte, 16)
+		for j := 0; j < 16; j++ {
+			if i+j < upLen {
+				c[j] = b[j] ^ payload[i+j]
+			} else {
+				c[j] = b[j]
+			}
+		}
+		encryptedPayload = append(encryptedPayload, c...)
+	}
+
+	return encryptedPayload
+}
+
+// The inverse of decrypt1
+func Decrypt1(secret string, authenticator []byte, payload []byte) []byte {
+
+	// Calculate padded length
+	var upLen = len(payload)
+	var pLen int
+	if upLen%16 == 0 {
+		pLen = upLen
+	} else {
+		pLen = upLen + (16 - upLen%16)
+	}
+
+	var decryptedPayload []byte
+	var b []byte
+
+	// Proceed backwards
+	for i := pLen - 16; i >= 0; i -= 16 {
+		// Get the b
+		hasher := md5.New()
+		hasher.Write([]byte(secret))
+		if i == 0 {
+			// This is the last chunk
+			hasher.Write(authenticator)
+		} else {
+			hasher.Write(payload[i-16 : i])
+		}
+		b = hasher.Sum(nil)
+
+		// Decrypt with the calculated c, which is the xor of the payload with the b
+		c := make([]byte, 16)
+		for j := 0; j < 16; j++ {
+			if i+j < upLen {
+				c[j] = b[j] ^ payload[i+j]
+			} else {
+				c[j] = b[j]
+			}
+		}
+		decryptedPayload = append(c, decryptedPayload...)
+	}
+
+	return decryptedPayload
 }

@@ -69,27 +69,27 @@ func TestRadiusDict(t *testing.T) {
 	}
 
 	// Vendor Specific
-	avp, err := radiusDict.GetFromName("Igor-ClientId")
+	avp, err := radiusDict.GetFromName("Igor-OctetsAttribute")
 	if err != nil {
-		t.Errorf("Igor-ClientId not found")
+		t.Errorf("Igor-OctetsAttribute not found")
 	} else {
 		if avp.Code != 1 {
-			t.Errorf("Igor-Client id code is not 1")
+			t.Errorf("Igor-OctetsAttribute id code is not 1")
 		}
 		if avp.VendorId != 90001 {
-			t.Errorf("Igor-Client has not vendorId code 90001")
+			t.Errorf("Igor-OctetsAttribute has not vendorId code 90001")
 		}
 	}
 
-	avp, err = radiusDict.GetFromCode(AVPCode{90001, 4})
+	avp, err = radiusDict.GetFromCode(AVPCode{90001, 10})
 	if err != nil {
-		t.Errorf("Igor code 4 not found")
+		t.Errorf("Igor code 10 not found")
 	} else {
-		if avp.Name != "Igor-TaggedId" {
-			t.Errorf("Igor code 4 is not Igor-TaggedId but %s", avp.Name)
+		if avp.Name != "Igor-TaggedStringAttribute" {
+			t.Errorf("Igor code 10 is not Igor-TaggedStringAttribute but %s", avp.Name)
 		}
 		if avp.Tagged != true {
-			t.Error("Igor code 4 is not Tagged", avp.Name)
+			t.Error("Igor code 10 is not TaggedStringAttribute", avp.Name)
 		}
 	}
 }

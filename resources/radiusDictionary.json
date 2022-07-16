@@ -475,26 +475,26 @@
                 },
                 {
                     "code": 6,
-                    "name": "IPv6Attribute",
+                    "name": "IPv6AddressAttribute",
                     "type": "IPv6Address"
                 },
                 {
-                    "code": 6,
+                    "code": 7,
                     "name": "IPv6PrefixAttribute",
                     "type": "IPv6Prefix"
                 },
                 {
-                    "code": 7,
+                    "code": 8,
                     "name": "InterfaceIdAttribute",
                     "type": "InterfaceId"
                 },
                 {
-                    "code": 8,
+                    "code": 9,
                     "name": "Integer64Attribute",
                     "type": "Integer64"
                 },
                 {
-                    "code": 8,
+                    "code": 10,
                     "name": "TaggedStringAttribute",
                     "type": "String",
                     "tagged": true
