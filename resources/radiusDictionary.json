@@ -498,6 +498,12 @@
                     "name": "TaggedStringAttribute",
                     "type": "String",
                     "tagged": true
+                },
+                {
+                    "code": 11,
+                    "name": "SaltedOctetsAttribute",
+                    "type": "Octets",
+                    "salted": true
                 }
             ]
         }

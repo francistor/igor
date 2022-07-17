@@ -43,18 +43,22 @@ type RadiusAVP struct {
 //    If code == 26
 //      vendorId: 4 bytes
 //      code: 1 byte
-//      length: 1 byte - the lenght of the vendorId, code, length and value in the contents of the VSA
+//      length: 1 byte - the length of the vendorId, code, length and value in the contents of the VSA
 //      value - may be prepended by a byte tag
 //    Else
 //      value
 
+// Encrypted attributes are padded with null when written, and those bytes are not removed when read from the Reader
+// That means the contents will not match
+
 // Returns the number of bytes read
-func (avp *RadiusAVP) ReadFrom(reader io.Reader) (n int64, err error) {
+func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secret string) (n int64, err error) {
 
 	var avpLen byte
 	var vendorCode byte = 0
 	var vendorLen byte = 0
 	var dataLen byte
+	var salt [2]byte
 
 	currentIndex := int64(0)
 
@@ -117,6 +121,15 @@ func (avp *RadiusAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		dataLen = dataLen - 1
 	}
 
+	// Extract salt if necessary
+	if avp.DictItem.Salted {
+		if err := binary.Read(reader, binary.BigEndian, &salt); err != nil {
+			return currentIndex, err
+		}
+		currentIndex += 2
+		dataLen = dataLen - 2
+	}
+
 	// Sanity check
 	if dataLen <= 0 {
 		return currentIndex, fmt.Errorf("invalid AVP data length")
@@ -127,15 +140,23 @@ func (avp *RadiusAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	case radiusdict.None, radiusdict.Octets:
 
 		avpBytes := make([]byte, int(dataLen))
-		_, err := io.ReadAtLeast(reader, avpBytes, int(dataLen))
+		if n, err := io.ReadAtLeast(reader, avpBytes, int(dataLen)); err != nil {
+			return currentIndex + int64(n), err
+		}
 
-		avp.Value = avpBytes
+		if avp.DictItem.Encrypted || avp.DictItem.Salted {
+			avp.Value = decrypt1(avpBytes, authenticator, secret, salt[:])
+		} else {
+			avp.Value = avpBytes
+		}
 
-		return currentIndex + int64(dataLen), err
+		return currentIndex + int64(dataLen), nil
 
 	case radiusdict.String:
 		avpBytes := make([]byte, int(dataLen))
-		_, err := io.ReadAtLeast(reader, avpBytes, int(dataLen))
+		if n, err := io.ReadAtLeast(reader, avpBytes, int(dataLen)); err != nil {
+			return currentIndex + int64(n), err
+		}
 
 		avp.Value = string(avpBytes)
 
@@ -143,7 +164,10 @@ func (avp *RadiusAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	case radiusdict.Integer:
 		var value int32
-		err := binary.Read(reader, binary.BigEndian, &value)
+		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
+			return currentIndex + 4, err
+		}
+
 		avp.Value = int64(value)
 		return currentIndex + 4, err
 
@@ -152,24 +176,31 @@ func (avp *RadiusAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 			return currentIndex, fmt.Errorf("address type is not 4 bytes long")
 		}
 		avpBytes := make([]byte, 4)
-		_, err := io.ReadAtLeast(reader, avpBytes, 4)
+		if n, err := io.ReadAtLeast(reader, avpBytes, 4); err != nil {
+			return currentIndex + int64(n), err
+		}
+
 		avp.Value = net.IP(avpBytes)
-		return currentIndex + 4, err
+		return currentIndex + 4, nil
 
 	case radiusdict.IPv6Address:
 		if dataLen != 16 {
 			return currentIndex, fmt.Errorf("ipv6address type is not 16 bytes long")
 		}
 		avpBytes := make([]byte, 16)
-		_, err := io.ReadAtLeast(reader, avpBytes, 16)
+		if n, err := io.ReadAtLeast(reader, avpBytes, 16); err != nil {
+			return currentIndex + int64(n), err
+		}
 		avp.Value = net.IP(avpBytes)
-		return currentIndex + 16, err
+		return currentIndex + 16, nil
 
 	case radiusdict.Time:
 		var value uint32
-		err := binary.Read(reader, binary.BigEndian, &value)
+		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
+			return currentIndex, err
+		}
 		avp.Value = zeroTime.Add(time.Second * time.Duration(value))
-		return currentIndex + 4, err
+		return currentIndex + 4, nil
 
 	case radiusdict.IPv6Prefix:
 		// Radius Type IPv6 prefix. Encoded as 1 byte padding, 1 byte prefix length, and 16 bytes with prefix.
@@ -197,7 +228,9 @@ func (avp *RadiusAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		}
 		// Read
 		avpBytes := make([]byte, int(dataLen))
-		_, err := io.ReadAtLeast(reader, avpBytes, int(dataLen))
+		if n, err := io.ReadAtLeast(reader, avpBytes, int(dataLen)); err != nil {
+			return currentIndex + int64(n), err
+		}
 
 		// Use only dataLen bytes. The rest is padding
 		avp.Value = avpBytes
@@ -206,7 +239,9 @@ func (avp *RadiusAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	case radiusdict.Integer64:
 		var value int64
-		err := binary.Read(reader, binary.BigEndian, &value)
+		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
+			return currentIndex, err
+		}
 		avp.Value = int64(value)
 		return currentIndex + 8, err
 
@@ -216,20 +251,21 @@ func (avp *RadiusAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 }
 
 // Reads a DiameterAVP from a buffer
-func RadiusAVPFromBytes(inputBytes []byte) (RadiusAVP, uint32, error) {
+func RadiusAVPFromBytes(inputBytes []byte, authenticator [16]byte, secret string) (RadiusAVP, uint32, error) {
 	r := bytes.NewReader(inputBytes)
 
 	avp := RadiusAVP{}
-	n, err := avp.ReadFrom(r)
+	n, err := avp.FromReader(r, authenticator, secret)
 	return avp, uint32(n), err
 }
 
 // Writes the AVP to the specified writer
 // Returns the number of bytes written including padding
-func (avp *RadiusAVP) WriteTo(buffer io.Writer) (int64, error) {
+func (avp *RadiusAVP) ToWriter(buffer io.Writer, authenticator [16]byte, secret string) (int64, error) {
 
 	var bytesWritten = 0
 	var err error
+	var salt [2]byte
 
 	// Write Code
 	var code byte
@@ -244,7 +280,7 @@ func (avp *RadiusAVP) WriteTo(buffer io.Writer) (int64, error) {
 	bytesWritten += 1
 
 	// Write Length
-	avpLen := avp.DataLen()
+	avpLen := avp.Len()
 	if err = binary.Write(buffer, binary.BigEndian, avpLen); err != nil {
 		return int64(bytesWritten), err
 	}
@@ -279,6 +315,14 @@ func (avp *RadiusAVP) WriteTo(buffer io.Writer) (int64, error) {
 		bytesWritten += 1
 	}
 
+	// Write salt
+	if avp.DictItem.Salted {
+		if err = binary.Write(buffer, binary.BigEndian, salt); err != nil {
+			return int64(bytesWritten), err
+		}
+		bytesWritten += 2
+	}
+
 	// Write data
 	switch avp.DictItem.RadiusType {
 
@@ -287,6 +331,12 @@ func (avp *RadiusAVP) WriteTo(buffer io.Writer) (int64, error) {
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling radius type %d and value %T %v", avp.DictItem.RadiusType, avp.Value, avp.Value)
 		}
+
+		// Replace value if encrypted
+		if avp.DictItem.Encrypted || avp.DictItem.Salted {
+			octetsValue = encrypt1(octetsValue, authenticator, secret, salt[:])
+		}
+
 		if err = binary.Write(buffer, binary.BigEndian, octetsValue); err != nil {
 			return int64(bytesWritten), err
 		}
@@ -417,25 +467,35 @@ func (avp *RadiusAVP) WriteTo(buffer io.Writer) (int64, error) {
 }
 
 // Returns a byte slice with the contents of the AVP
-func (avp *RadiusAVP) MarshalBinary() (data []byte, err error) {
+func (avp *RadiusAVP) ToBytes(authenticator [16]byte, secret string) (data []byte, err error) {
 
 	// Will write the output here
 	var buffer = new(bytes.Buffer)
-	if _, err := avp.WriteTo(buffer); err != nil {
+	if _, err := avp.ToWriter(buffer, authenticator, secret); err != nil {
 		return buffer.Bytes(), err
 	}
 
 	return buffer.Bytes(), nil
 }
 
-// Returns the size of the AVP without padding
-func (avp *RadiusAVP) DataLen() byte {
+// Returns the size of the AVP
+func (avp *RadiusAVP) Len() byte {
 	var dataSize = 0
 
 	switch avp.DictItem.RadiusType {
 
 	case radiusdict.None, radiusdict.Octets:
 		dataSize = len(avp.Value.([]byte))
+
+		// Add the padding that will be introduced by the Encrypt function
+		if (avp.DictItem.Encrypted || avp.DictItem.Salted) && dataSize%16 != 0 {
+			dataSize = dataSize + (16 - dataSize%16)
+		}
+
+		// Add the salt bytes
+		if avp.DictItem.Salted {
+			dataSize += 2
+		}
 
 	case radiusdict.String:
 		dataSize = len(avp.Value.(string))
@@ -524,6 +584,16 @@ func (avp *RadiusAVP) GetString() string {
 	return ""
 }
 
+// Helper to trim bytes from a password attribute
+func (avp *RadiusAVP) GetPasswordString() (string, error) {
+
+	var octetsValue, ok = avp.Value.([]byte)
+	if !ok {
+		return "", fmt.Errorf("attribut is not of type octets")
+	}
+	return string(bytes.Trim(octetsValue, "\x00")), nil
+}
+
 // Returns the value of the AVP as a number
 func (avp *RadiusAVP) GetInt() int64 {
 
@@ -571,6 +641,8 @@ func (avp *RadiusAVP) SetTag(tag byte) *RadiusAVP {
 	return avp
 }
 
+// Creates a new AVP with the specified name and value
+// Will return an error if the name is not found in the dictionary
 func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 	var avp = RadiusAVP{}
 
@@ -763,8 +835,11 @@ func toInt64(value interface{}) (int64, error) {
       On receipt, the process is reversed to yield the original
       password
 */
+/*
+	For salted, see https://www.ietf.org/archive/id/draft-ietf-radius-saltencrypt-00.txt
+*/
 
-func Encrypt1(secret string, authenticator []byte, payload []byte) []byte {
+func encrypt1(payload []byte, authenticator [16]byte, secret string, salt []byte) []byte {
 
 	// Calculate padded length
 	var upLen = len(payload)
@@ -782,10 +857,10 @@ func Encrypt1(secret string, authenticator []byte, payload []byte) []byte {
 		hasher := md5.New()
 		hasher.Write([]byte(secret))
 		if b == nil {
-			hasher.Write(authenticator)
+			hasher.Write(authenticator[:])
+			hasher.Write(salt)
 		} else {
 			hasher.Write(c)
-			fmt.Println("<-", c)
 		}
 		b = hasher.Sum(nil)
 
@@ -805,7 +880,7 @@ func Encrypt1(secret string, authenticator []byte, payload []byte) []byte {
 }
 
 // The inverse of decrypt1
-func Decrypt1(secret string, authenticator []byte, payload []byte) []byte {
+func decrypt1(payload []byte, authenticator [16]byte, secret string, salt []byte) []byte {
 
 	// Calculate padded length
 	var upLen = len(payload)
@@ -826,7 +901,8 @@ func Decrypt1(secret string, authenticator []byte, payload []byte) []byte {
 		hasher.Write([]byte(secret))
 		if i == 0 {
 			// This is the last chunk
-			hasher.Write(authenticator)
+			hasher.Write(authenticator[:])
+			hasher.Write(salt)
 		} else {
 			hasher.Write(payload[i-16 : i])
 		}

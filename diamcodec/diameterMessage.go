@@ -454,19 +454,19 @@ func (dm *DiameterMessage) AddOriginAVPs(ci *config.PolicyConfigurationManager) 
 ///////////////////////////////////////////////////////////////
 // Message constructors
 ///////////////////////////////////////////////////////////////
-func NewDiameterRequest(appName string, commandName string) (DiameterMessage, error) {
+func NewDiameterRequest(appName string, commandName string) (*DiameterMessage, error) {
 
 	diameterMessage := DiameterMessage{IsRequest: true}
 
 	// Find element in dictionary
 	appDict, ok := config.GetDDict().AppByName[appName]
 	if !ok {
-		return diameterMessage, fmt.Errorf("application %s not found", appName)
+		return &diameterMessage, fmt.Errorf("application %s not found", appName)
 	}
 
 	commandDict, ok := appDict.CommandByName[commandName]
 	if !ok {
-		return diameterMessage, fmt.Errorf("command %s not found in application %s", commandName, appName)
+		return &diameterMessage, fmt.Errorf("command %s not found in application %s", commandName, appName)
 	}
 
 	diameterMessage.ApplicationName = appName
@@ -478,11 +478,10 @@ func NewDiameterRequest(appName string, commandName string) (DiameterMessage, er
 	diameterMessage.E2EId = getE2EId()
 
 	// E2EId and HopByHopId are filled out later
-	return diameterMessage, nil
-
+	return &diameterMessage, nil
 }
 
-func NewDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage {
+func NewDiameterAnswer(diameterRequest *DiameterMessage) *DiameterMessage {
 
 	diameterMessage := DiameterMessage{}
 
@@ -494,54 +493,8 @@ func NewDiameterAnswer(diameterRequest *DiameterMessage) DiameterMessage {
 	diameterMessage.E2EId = diameterRequest.E2EId
 	diameterMessage.HopByHopId = diameterRequest.HopByHopId
 
-	return diameterMessage
+	return &diameterMessage
 }
-
-/*
-// New Diameter Request including default Origin Host and Realm
-func NewDefaultDiameterRequest2(appName string, commandName string) (DiameterMessage, error) {
-	dm, err := newDiameterRequest(appName, commandName)
-	if err == nil {
-		// Add mandatory parameters
-		dm.Add("Origin-Host", config.GetPolicyConfig().DiameterServerConf().DiameterHost)
-		dm.Add("Origin-Realm", config.GetPolicyConfig().DiameterServerConf().DiameterRealm)
-	}
-	return dm, err
-}
-
-// New Diameter Answer including default Origin Host and Realm
-func NewDefaultDiameterAnswer2(diameterRequest *DiameterMessage) DiameterMessage {
-	dm := newDiameterAnswer(diameterRequest)
-
-	// Add mandatory parameters
-	dm.Add("Origin-Host", config.GetPolicyConfig().DiameterServerConf().DiameterHost)
-	dm.Add("Origin-Realm", config.GetPolicyConfig().DiameterServerConf().DiameterRealm)
-
-	return dm
-}
-
-// New Diameter Request including instance specific Origin Host and Realm
-func NewInstanceDiameterRequest2(ci *config.PolicyConfigurationManager, appName string, commandName string) (DiameterMessage, error) {
-	dm, err := newDiameterRequest(appName, commandName)
-	if err == nil {
-		// Add mandatory parameters
-		dm.Add("Origin-Host", ci.DiameterServerConf().DiameterHost)
-		dm.Add("Origin-Realm", ci.DiameterServerConf().DiameterRealm)
-	}
-	return dm, err
-}
-
-// New Diameter Answer including instance specific Origin Host and Realm
-func NewInstanceDiameterAnswer2(ci *config.PolicyConfigurationManager, diameterRequest *DiameterMessage) DiameterMessage {
-	dm := newDiameterAnswer(diameterRequest)
-
-	// Add mandatory parameters
-	dm.Add("Origin-Host", ci.DiameterServerConf().DiameterHost)
-	dm.Add("Origin-Realm", ci.DiameterServerConf().DiameterRealm)
-
-	return dm
-}
-*/
 
 // TODO:
 func CopyDiameterMessage(diameterMessage *DiameterMessage) DiameterMessage {

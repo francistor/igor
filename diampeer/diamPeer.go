@@ -353,10 +353,10 @@ func (dp *DiameterPeer) eventLoop() {
 					panic("could not create a CER")
 				}
 				// Finish building the CER message
-				dp.pushCEAttributes(&cer)
+				dp.pushCEAttributes(cer)
 
 				// Send the message to the peer
-				dp.eventLoopChannel <- EgressDiameterMsg{Message: &cer}
+				dp.eventLoopChannel <- EgressDiameterMsg{Message: cer}
 
 			// Connect goroutine reports connection could not be established
 			// the DiameterPeer will terminate the event loop, send the Down event
@@ -562,12 +562,12 @@ func (dp *DiameterPeer) eventLoop() {
 							dwa := diamcodec.NewDiameterAnswer(v.Message)
 							dwa.AddOriginAVPs(dp.ci)
 							dwa.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
-							dp.eventLoopChannel <- EgressDiameterMsg{Message: &dwa}
+							dp.eventLoopChannel <- EgressDiameterMsg{Message: dwa}
 
 						case "Disconnect-Peer":
 							dpa := diamcodec.NewDiameterAnswer(v.Message)
 							dpa.AddOriginAVPs(dp.ci)
-							dp.eventLoopChannel <- EgressDiameterMsg{Message: &dpa}
+							dp.eventLoopChannel <- EgressDiameterMsg{Message: dpa}
 							dp.eventLoopChannel <- PeerCloseCommandMsg{}
 							dp.status = StatusTerminating
 
@@ -588,7 +588,7 @@ func (dp *DiameterPeer) eventLoop() {
 								errorResp := diamcodec.NewDiameterAnswer(v.Message)
 								errorResp.AddOriginAVPs(dp.ci)
 								errorResp.Add("Result-Code", diamcodec.DIAMETER_UNABLE_TO_COMPLY)
-								dp.eventLoopChannel <- EgressDiameterMsg{Message: &errorResp}
+								dp.eventLoopChannel <- EgressDiameterMsg{Message: errorResp}
 							} else {
 								dp.eventLoopChannel <- EgressDiameterMsg{Message: resp}
 							}
@@ -689,7 +689,7 @@ func (dp *DiameterPeer) eventLoop() {
 				if err != nil {
 					panic("could not create a DWR")
 				}
-				dp.eventLoopChannel <- EgressDiameterMsg{Message: &dwr}
+				dp.eventLoopChannel <- EgressDiameterMsg{Message: dwr}
 				dp.outstandingDWA++
 			}
 		}
@@ -838,8 +838,8 @@ func (dp *DiameterPeer) handleCER(request *diamcodec.DiameterMessage) (string, e
 				cea := diamcodec.NewDiameterAnswer(request)
 				cea.AddOriginAVPs(dp.ci)
 				cea.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
-				dp.pushCEAttributes(&cea)
-				dp.eventLoopChannel <- EgressDiameterMsg{Message: &cea}
+				dp.pushCEAttributes(cea)
+				dp.eventLoopChannel <- EgressDiameterMsg{Message: cea}
 
 				// All good returns here
 				return originHost, nil
@@ -860,7 +860,7 @@ func (dp *DiameterPeer) handleCER(request *diamcodec.DiameterMessage) (string, e
 		cea := diamcodec.NewDiameterAnswer(request)
 		cea.AddOriginAVPs(dp.ci)
 		cea.Add("Result-Code", diamcodec.DIAMETER_UNKNOWN_PEER)
-		dp.eventLoopChannel <- EgressDiameterMsg{Message: &cea}
+		dp.eventLoopChannel <- EgressDiameterMsg{Message: cea}
 	}
 
 	return "", fmt.Errorf("bad CEA")

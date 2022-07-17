@@ -27,19 +27,19 @@ func TestDiameterMetrics(t *testing.T) {
 
 	diameterRequest, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
 	diameterRequest.AddOriginAVPs(config.GetPolicyConfig())
-	diameterAnswer := diamcodec.NewDiameterAnswer(&diameterRequest)
+	diameterAnswer := diamcodec.NewDiameterAnswer(diameterRequest)
 	diameterAnswer.AddOriginAVPs(config.GetPolicyConfig())
 
 	// Generate some metrics
-	PushPeerDiameterRequestReceived("testPeer", &diameterRequest)
-	PushPeerDiameterRequestSent("testPeer", &diameterRequest)
-	PushPeerDiameterRequestTimeout("testPeer", PeerDiameterMetricFromMessage("testPeer", &diameterRequest))
-	PushPeerDiameterAnswerReceived("testPeer", &diameterAnswer)
-	PushPeerDiameterAnswerSent("testPeer", &diameterAnswer)
-	PushPeerDiameterAnswerStalled("testPeer", &diameterAnswer)
-	PushRouterRouteNotFound("testPeer", &diameterRequest)
-	PushRouterHandlerError("testPeer", &diameterRequest)
-	PushRouterNoAvailablePeer("testPeer", &diameterRequest)
+	PushPeerDiameterRequestReceived("testPeer", diameterRequest)
+	PushPeerDiameterRequestSent("testPeer", diameterRequest)
+	PushPeerDiameterRequestTimeout("testPeer", PeerDiameterMetricFromMessage("testPeer", diameterRequest))
+	PushPeerDiameterAnswerReceived("testPeer", diameterAnswer)
+	PushPeerDiameterAnswerSent("testPeer", diameterAnswer)
+	PushPeerDiameterAnswerStalled("testPeer", diameterAnswer)
+	PushRouterRouteNotFound("testPeer", diameterRequest)
+	PushRouterHandlerError("testPeer", diameterRequest)
+	PushRouterNoAvailablePeer("testPeer", diameterRequest)
 
 	time.Sleep(100 * time.Millisecond)
 

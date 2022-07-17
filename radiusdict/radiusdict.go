@@ -34,6 +34,7 @@ type AVPDictItem struct {
 	EnumCodes  map[int]string // non  nil only in enum type
 	Encrypted  bool
 	Tagged     bool
+	Salted     bool
 }
 
 // Represents the full Radius Dictionary
@@ -123,6 +124,7 @@ type jRadiusAVP struct {
 	EnumValues map[string]int
 	Encrypted  bool
 	Tagged     bool
+	Salted     bool
 }
 
 type jRadiusVendorAVPs struct {
@@ -141,6 +143,8 @@ type jRadiusDict struct {
 
 // Builds a cooked AVPDictItem from the raw Json representation
 func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
+
+	// Sanity check
 	var radiusType int
 	switch javp.Type {
 	case "None":
@@ -168,6 +172,10 @@ func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
 		panic(javp.Type + " is not a valid RadiusType")
 	}
 
+	if (javp.Encrypted || javp.Salted) && radiusType != Octets {
+		panic("encrypted not octets found in dictionary")
+	}
+
 	var codes map[int]string
 	if javp.EnumValues != nil {
 		codes = make(map[int]string)
@@ -190,5 +198,6 @@ func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
 		EnumCodes:  codes,
 		Encrypted:  javp.Encrypted,
 		Tagged:     javp.Tagged,
+		Salted:     javp.Salted,
 	}
 }

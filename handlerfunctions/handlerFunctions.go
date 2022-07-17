@@ -9,5 +9,5 @@ func EmptyHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessag
 	resp := diamcodec.NewDiameterAnswer(request)
 	resp.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
 
-	return &resp, nil
+	return resp, nil
 }

@@ -28,7 +28,7 @@ func MyMessageHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMe
 		time.Sleep(5000 * time.Millisecond)
 	}
 
-	return &answer, nil
+	return answer, nil
 }
 
 func TestMain(m *testing.M) {
@@ -94,7 +94,7 @@ func TestDiameterPeerOK(t *testing.T) {
 	request, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
 	request.AddOriginAVPs(config.GetPolicyConfig())
 	request.Add("User-Name", "TestUserNameRequest")
-	response, error := activePeer.DiameterExhangeWithAnswer(&request, 2*time.Second)
+	response, error := activePeer.DiameterExhangeWithAnswer(request, 2*time.Second)
 
 	if error != nil {
 		t.Fatal("bad response", err)
@@ -109,7 +109,7 @@ func TestDiameterPeerOK(t *testing.T) {
 
 	// Simulate a timeout. The handler takes more time than this
 	request.Add("franciscocardosogil-Command", "Slow")
-	_, eTimeout := activePeer.DiameterExhangeWithAnswer(&request, 10*time.Millisecond)
+	_, eTimeout := activePeer.DiameterExhangeWithAnswer(request, 10*time.Millisecond)
 
 	if eTimeout == nil {
 		t.Fatal("should have got an error")
@@ -397,8 +397,8 @@ func TestRequestsCancellation(t *testing.T) {
 
 	rc1 := make(chan interface{}, 1)
 	rc2 := make(chan interface{}, 1)
-	activePeer.DiameterExchangeWithChannel(&request1, 300*time.Second, rc1)
-	activePeer.DiameterExchangeWithChannel(&request2, 300*time.Second, rc2)
+	activePeer.DiameterExchangeWithChannel(request1, 300*time.Second, rc1)
+	activePeer.DiameterExchangeWithChannel(request2, 300*time.Second, rc2)
 
 	// Disengage Peer
 	activePeer.SetDown()

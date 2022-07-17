@@ -634,6 +634,8 @@ func TestJSON(t *testing.T) {
 	*/
 }
 
+/////////////////////////////////////////////////////////////////////////////////////
+
 func TestDiameterMessage(t *testing.T) {
 
 	var ci = config.GetPolicyConfig()
