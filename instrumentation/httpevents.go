@@ -1,7 +1,5 @@
 package instrumentation
 
-// TODO: Integrate with metrics server
-
 type HttpClientMetricKey struct {
 	Endpoint  string
 	ErrorCode string

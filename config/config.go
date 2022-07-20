@@ -148,7 +148,7 @@ func (c *ConfigurationManager) GetConfigObject(objectName string, refresh bool) 
 			c.objectCache.Store(objectName, obj)
 		} else {
 			if logger := GetLogger(); logger != nil {
-				GetLogger().Errorf("error retrieving %s: %v", err)
+				GetLogger().Errorf("error retrieving %s: %v", objectName, err)
 			}
 		}
 		c.inFlight.Delete(objectName)

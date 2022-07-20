@@ -58,17 +58,17 @@ func TestDiamConfig(t *testing.T) {
 	// Diameter Server Configuration
 	dsc := GetPolicyConfig().DiameterServerConf()
 	if dsc.BindAddress != "127.0.0.1" {
-		t.Fatalf("Could not get BindAddress or was not %s", "127.0.0.1")
+		t.Fatalf("BindAddress retreived is <%s>", dsc.BindAddress)
 	}
 
 	// Diameter Peers configuration
 	dp := GetPolicyConfig().PeersConf()
 	if dp["superserver.igorsuperserver"].WatchdogIntervalMillis != 300000 {
-		t.Fatalf("WatchdogIntervalMillis was not 300000 but %d", dp["superserver.igorsuperserver"].WatchdogIntervalMillis)
+		t.Fatalf("WatchdogIntervalMillis was %d", dp["superserver.igorsuperserver"].WatchdogIntervalMillis)
 	}
 	peer, err := dp.FindPeer("client.igorclient")
 	if err != nil {
-		t.Fatalf("Peer not found for and origin-host %s", "client.igorclient")
+		t.Fatalf("Peer not found for and origin-host client.igorclient")
 	}
 	if peer.DiameterHost != "client.igorclient" || peer.ConnectionPolicy != "passive" {
 		t.Fatal("Found peer is not conforming to expected attributes", peer)
@@ -97,19 +97,27 @@ func TestDiamConfig(t *testing.T) {
 	}
 }
 
+func TestRadiusConfig(t *testing.T) {
+	// Radius Server Configuration
+	dsc := GetPolicyConfig().RadiusServerConf()
+	if dsc.BindAddress != "0.0.0.0" {
+		t.Fatalf("Bind address was <%s>", dsc.BindAddress)
+	}
+}
+
 func TestHandlerConfig(t *testing.T) {
 	hc := GetHandlerConfig().HandlerConf()
 	if hc.BindAddress != "0.0.0.0" {
-		t.Fatalf("Could not get BindAddress or was not %s", "0.0.0.0")
+		t.Fatalf("BindAddress was <%s>", hc.BindAddress)
 	}
 	if hc.BindPort != 8080 {
-		t.Fatalf("Could not get BindPort or was not %d", 8080)
+		t.Fatalf("BindPort was %d", hc.BindPort)
 	}
 	if hc.RouterIPAddress != "127.0.0.1" {
-		t.Fatalf("Could not get RouterIPAddress or was not %s", "127.0.0.1")
+		t.Fatalf("RouterIPAddress was <%s>", hc.RouterIPAddress)
 	}
 	if hc.RouterPort != 23868 {
-		t.Fatalf("Could not get RouterPort or was not %d", 23868)
+		t.Fatalf("RouterPort was %d", hc.RouterPort)
 	}
 }
 

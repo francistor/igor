@@ -12,6 +12,8 @@ type PolicyConfigurationManager struct {
 	currentDiameterServerConfig DiameterServerConfig
 	currentRoutingRules         DiameterRoutingRules
 	currentDiameterPeers        DiameterPeers
+
+	currentRadiusServerConfig RadiusServerConfig
 }
 
 // Slice of configuration managers
@@ -43,6 +45,9 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefau
 	policyConfig.UpdateDiameterPeers()
 	policyConfig.UpdateDiameterRoutingRules()
 
+	// Load radius configuration
+	policyConfig.UpdateRadiusServerConfig()
+
 	return &policyConfig
 }
 
@@ -73,7 +78,7 @@ type DiameterServerConfig struct {
 	VendorId             int
 	ProductName          string
 	FirmwareRevision     int
-	PeerCheckTimeSeconds string
+	PeerCheckTimeSeconds int
 	HttpBindAddress      string
 	HttpBindPort         int
 }
@@ -85,7 +90,10 @@ func (c *PolicyConfigurationManager) getDiameterServerConfig() (DiameterServerCo
 	if err != nil {
 		return dsc, err
 	}
-	json.Unmarshal(dc.RawBytes, &dsc)
+	if err := json.Unmarshal(dc.RawBytes, &dsc); err != nil {
+		fmt.Println(err)
+		return dsc, err
+	}
 	return dsc, nil
 }
 
@@ -100,6 +108,42 @@ func (c *PolicyConfigurationManager) UpdateDiameterServerConfig() error {
 
 func (c *PolicyConfigurationManager) DiameterServerConf() DiameterServerConfig {
 	return c.currentDiameterServerConfig
+}
+
+///////////////////////////////////////////////////////////////////////////////
+type RadiusServerConfig struct {
+	BindAddress             string
+	AuthPort                int
+	AcctPort                int
+	CoAPort                 int
+	ClientAnonymousBasePort int
+	NumAnonymousClientPorts int
+}
+
+// Retrieves the radius server configuration
+func (c *PolicyConfigurationManager) getRadiusServerConfig() (RadiusServerConfig, error) {
+	rsc := RadiusServerConfig{}
+	rc, err := c.CM.GetConfigObject("radiusServer.json", true)
+	if err != nil {
+		return rsc, err
+	}
+	if err := json.Unmarshal(rc.RawBytes, &rsc); err != nil {
+		return rsc, err
+	}
+	return rsc, nil
+}
+
+func (c *PolicyConfigurationManager) UpdateRadiusServerConfig() error {
+	rsc, error := c.getRadiusServerConfig()
+	if error != nil {
+		return fmt.Errorf("could not retrieve the Radius Server configuration: %w", error)
+	}
+	c.currentRadiusServerConfig = rsc
+	return nil
+}
+
+func (c *PolicyConfigurationManager) RadiusServerConf() RadiusServerConfig {
+	return c.currentRadiusServerConfig
 }
 
 ///////////////////////////////////////////////////////////////////////////////

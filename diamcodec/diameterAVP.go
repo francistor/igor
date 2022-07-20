@@ -1132,10 +1132,14 @@ func FromMap(avpMap map[string]interface{}) (DiameterAVP, error) {
 
 // Get a DiameterAVP from JSON
 func (avp *DiameterAVP) UnmarshalJSON(b []byte) error {
-	theMap := make(map[string]interface{})
-	json.Unmarshal(b, &theMap)
 
 	var err error
+
+	theMap := make(map[string]interface{})
+	if err = json.Unmarshal(b, &theMap); err != nil {
+		return err
+	}
+
 	*avp, err = FromMap(theMap)
 	return err
 }

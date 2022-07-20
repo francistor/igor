@@ -2,6 +2,7 @@ package radiuscodec
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"igor/config"
 	"net"
@@ -14,7 +15,7 @@ import (
 
 // Initialization
 var bootstrapFile = "resources/searchRules.json"
-var instanceName = "testClient"
+var instanceName = "testServer"
 
 var authenticator = [16]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0F}
 var secret = "mysecret"
@@ -372,4 +373,33 @@ func TestRadiusPacket(t *testing.T) {
 	if !ValidateResponseAuthenticator(responseBytes, request.Authenticator, secret) {
 		t.Errorf("response has invalid authenticator")
 	}
+}
+
+func TestJSONAVP(t *testing.T) {
+
+	var javp = `{
+		"Igor-TaggedStringAttribute": "TaggedAttribute:1"
+	}`
+
+	// Unserialize
+	avp := RadiusAVP{}
+	if err := json.Unmarshal([]byte(javp), &avp); err != nil {
+		t.Fatalf("could not unmarshal avp: %s", err)
+	}
+	if avp.GetString() != "TaggedAttribute" {
+		t.Errorf("attribute does not match expected value. Got <%s>", avp.GetString())
+	}
+	if avp.Tag != 1 {
+		t.Errorf("tag does not match expected value. got %d", avp.Tag)
+	}
+
+	// Serialize
+	if jsonBytes, err := json.Marshal(&avp); err != nil {
+		t.Fatalf("could not marshal avp: %s", err)
+	} else {
+		if string(jsonBytes) != "{\"Igor-TaggedStringAttribute\":\"TaggedAttribute:1\"}" {
+			t.Errorf("serialized avp not as expected. got <%s>", string(jsonBytes))
+		}
+	}
+
 }

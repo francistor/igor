@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"igor/config"
 	"igor/radiusdict"
@@ -584,6 +585,16 @@ func (avp *RadiusAVP) GetString() string {
 	return ""
 }
 
+// Helper to get also the tag
+func (avp *RadiusAVP) GetTaggedString() string {
+	str := avp.GetString()
+	if avp.DictItem.Tagged {
+		return fmt.Sprintf("%s:%d", str, avp.Tag)
+	} else {
+		return str
+	}
+}
+
 // Helper to trim bytes from a password attribute
 func (avp *RadiusAVP) GetPasswordString() (string, error) {
 
@@ -921,4 +932,56 @@ func decrypt1(payload []byte, authenticator [16]byte, secret string, salt []byte
 	}
 
 	return decryptedPayload
+}
+
+///////////////////////////////////////////////////////////////
+// JSON Encoding
+///////////////////////////////////////////////////////////////
+
+// Generate a map for JSON encoding
+func (avp *RadiusAVP) ToMap() map[string]interface{} {
+	theMap := map[string]interface{}{}
+
+	switch avp.DictItem.RadiusType {
+	case radiusdict.None, radiusdict.Octets, radiusdict.String, radiusdict.InterfaceId, radiusdict.Address, radiusdict.IPv6Address, radiusdict.IPv6Prefix, radiusdict.Time:
+		theMap[avp.Name] = avp.GetTaggedString()
+	case radiusdict.Integer:
+		theMap[avp.Name] = avp.GetInt()
+	}
+	return theMap
+}
+
+// Encode as JSON using the map representation
+func (avp *RadiusAVP) MarshalJSON() ([]byte, error) {
+	return json.Marshal(avp.ToMap())
+}
+
+// Generates a RadiusAVP from its JSON representation
+func FromMap(avpMap map[string]interface{}) (RadiusAVP, error) {
+
+	if len(avpMap) != 1 {
+		return RadiusAVP{}, fmt.Errorf("map contains more than one key in JSON representation of Diameter AVP")
+	}
+
+	// There will be only one entry
+	for name := range avpMap {
+		avp, err := NewAVP(name, avpMap[name])
+		return *avp, err
+	}
+
+	// Unreachable code
+	return RadiusAVP{}, fmt.Errorf("ureachable code")
+}
+
+// Get a RadiusAVP from JSON
+func (avp *RadiusAVP) UnmarshalJSON(b []byte) error {
+	var err error
+
+	theMap := make(map[string]interface{})
+	if err = json.Unmarshal(b, &theMap); err != nil {
+		return err
+	}
+
+	*avp, err = FromMap(theMap)
+	return err
 }

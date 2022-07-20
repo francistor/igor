@@ -14,6 +14,7 @@ var MS *MetricsServer = NewMetricsServer()
 type PeerDiameterMetrics map[PeerDiameterMetricKey]uint64
 type HttpClientMetrics map[HttpClientMetricKey]uint64
 type HttpHandlerMetrics map[HttpHandlerMetricKey]uint64
+type RadiusMetrics map[RadiusMetricKey]uint64
 
 type Query struct {
 
@@ -34,15 +35,25 @@ type MetricsServer struct {
 	InputChan chan interface{}
 	QueryChan chan Query
 
-	// Server
+	// Diameter Server
 	diameterRequestsReceived PeerDiameterMetrics
 	diameterAnswersSent      PeerDiameterMetrics
 
-	// Client
+	// Diameter Client
 	diameterRequestsSent    PeerDiameterMetrics
 	diameterAnswersReceived PeerDiameterMetrics
 	diameterRequestsTimeout PeerDiameterMetrics
 	diameterAnswersStalled  PeerDiameterMetrics
+
+	// RadiusServer
+	radiusServerRequests  RadiusMetrics
+	radiusServerResponses RadiusMetrics
+	radiusServerDrops     RadiusMetrics
+
+	// RadiusClient
+	radiusClientRequests  RadiusMetrics
+	radiusClientResponses RadiusMetrics
+	radiusClientTimeouts  RadiusMetrics
 
 	// Router
 	diameterRouteNotFound   PeerDiameterMetrics
@@ -169,6 +180,78 @@ func GetFilteredPeerDiameterMetrics(peerDiameterMetrics PeerDiameterMetrics, fil
 // Gets filtered and aggregated metrics
 func GetPeerDiameterMetrics(peerDiameterMetrics PeerDiameterMetrics, filter map[string]string, aggLabels []string) PeerDiameterMetrics {
 	return GetAggPeerDiameterMetrics(GetFilteredPeerDiameterMetrics(peerDiameterMetrics, filter), aggLabels)
+}
+
+////////////////////////////////////////////////////////////
+// Radius Metrics
+////////////////////////////////////////////////////////////
+
+func GetAggRadiusMetrics(radiusMetrics RadiusMetrics, aggLabels []string) RadiusMetrics {
+	outMetrics := make(RadiusMetrics)
+
+	// Iterate through the items in the metrics map, group & add by the value of the labels
+	for metricKey, v := range radiusMetrics {
+		// metricKey will contain the values of the labels that we are aggregating by, the others are zeroed (not initialized)
+		mk := RadiusMetricKey{}
+		for _, key := range aggLabels {
+			switch key {
+			case "Code":
+				mk.Code = metricKey.Code
+			case "Endpoint":
+				mk.Endpoint = metricKey.Endpoint
+			}
+		}
+		if m, found := outMetrics[mk]; found {
+			outMetrics[mk] = m + v
+		} else {
+			outMetrics[mk] = v
+		}
+	}
+
+	return outMetrics
+}
+
+func GetFilteredRadiusMetrics(radiusMetrics RadiusMetrics, filter map[string]string) RadiusMetrics {
+
+	// If no filter specified, do nothing
+	if filter == nil {
+		return radiusMetrics
+	}
+
+	// We'll put the output here
+	outMetrics := make(RadiusMetrics)
+
+	for metricKey := range radiusMetrics {
+
+		// Check all the items in the filter. If mismatch, get out of the loop
+		match := true
+	outer:
+		for key := range filter {
+			switch key {
+			case "Code":
+				if metricKey.Code != filter["Code"] {
+					match = false
+					break outer
+				}
+			case "Endpoint":
+				if metricKey.Endpoint != filter["Endpoint"] {
+					match = false
+					break outer
+				}
+			}
+		}
+
+		// Filter match
+		if match {
+			outMetrics[metricKey] = radiusMetrics[metricKey]
+		}
+	}
+
+	return outMetrics
+}
+
+func GetRadiusMetrics(radiusMetrics RadiusMetrics, filter map[string]string, aggLabels []string) RadiusMetrics {
+	return GetAggRadiusMetrics(GetFilteredRadiusMetrics(radiusMetrics, filter), aggLabels)
 }
 
 ////////////////////////////////////////////////////////////
@@ -337,6 +420,14 @@ func (ms *MetricsServer) resetMetrics() {
 	ms.diameterNoAvailablePeer = make(PeerDiameterMetrics)
 	ms.diameterHandlerError = make(PeerDiameterMetrics)
 
+	ms.radiusServerRequests = make(RadiusMetrics)
+	ms.radiusServerResponses = make(RadiusMetrics)
+	ms.radiusServerDrops = make(RadiusMetrics)
+
+	ms.radiusClientRequests = make(RadiusMetrics)
+	ms.radiusClientResponses = make(RadiusMetrics)
+	ms.radiusClientTimeouts = make(RadiusMetrics)
+
 	ms.httpClientExchanges = make(HttpClientMetrics)
 
 	ms.httpHandlerExchanges = make(HttpHandlerMetrics)
@@ -356,6 +447,18 @@ func (ms *MetricsServer) DiameterQuery(name string, filter map[string]string, ag
 		return v
 	} else {
 		return PeerDiameterMetrics{}
+	}
+}
+
+// Wrapper to get Radius Metrics
+func (ms *MetricsServer) RadiusQuery(name string, filter map[string]string, aggLabels []string) RadiusMetrics {
+	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
+	ms.QueryChan <- query
+	v, ok := (<-query.RChan).(RadiusMetrics)
+	if ok {
+		return v
+	} else {
+		return RadiusMetrics{}
 	}
 }
 
@@ -419,6 +522,20 @@ func (ms *MetricsServer) metricServerLoop() {
 			case "DiameterHandlerError":
 				query.RChan <- GetPeerDiameterMetrics(ms.diameterHandlerError, query.Filter, query.AggLabels)
 
+			case "RadiusServerRequests":
+				query.RChan <- GetRadiusMetrics(ms.radiusServerRequests, query.Filter, query.AggLabels)
+			case "RadiusServerResponses":
+				query.RChan <- GetRadiusMetrics(ms.radiusServerResponses, query.Filter, query.AggLabels)
+			case "RadiusServerDrops":
+				query.RChan <- GetRadiusMetrics(ms.radiusServerDrops, query.Filter, query.AggLabels)
+
+			case "RadiusClientRequests":
+				query.RChan <- GetRadiusMetrics(ms.radiusClientRequests, query.Filter, query.AggLabels)
+			case "RadiusClientResponses":
+				query.RChan <- GetRadiusMetrics(ms.radiusClientResponses, query.Filter, query.AggLabels)
+			case "RadiusClientTimeouts":
+				query.RChan <- GetRadiusMetrics(ms.radiusClientTimeouts, query.Filter, query.AggLabels)
+
 			case "HttpClientExchanges":
 				query.RChan <- GetHttpClientMetrics(ms.httpClientExchanges, query.Filter, query.AggLabels)
 
@@ -477,12 +594,57 @@ func (ms *MetricsServer) metricServerLoop() {
 					ms.diameterRequestsTimeout[e.Key] = curr + 1
 				}
 
+			// Radius Events
 			case PeerDiameterAnswerStalledEvent:
 				if curr, ok := ms.diameterAnswersStalled[e.Key]; !ok {
 					ms.diameterAnswersStalled[e.Key] = 1
 				} else {
 					ms.diameterAnswersStalled[e.Key] = curr + 1
 				}
+
+			case RadiusServerRequestEvent:
+				if curr, ok := ms.radiusServerRequests[e.Key]; !ok {
+					ms.radiusServerRequests[e.Key] = 1
+				} else {
+					ms.radiusServerRequests[e.Key] = curr + 1
+				}
+
+			case RadiusServerResponseEvent:
+				if curr, ok := ms.radiusServerResponses[e.Key]; !ok {
+					ms.radiusServerResponses[e.Key] = 1
+				} else {
+					ms.radiusServerResponses[e.Key] = curr + 1
+				}
+
+			case RadiusServerDropEvent:
+				if curr, ok := ms.radiusServerDrops[e.Key]; !ok {
+					ms.radiusServerDrops[e.Key] = 1
+				} else {
+					ms.radiusServerDrops[e.Key] = curr + 1
+				}
+
+			case RadiusClientRequestEvent:
+				if curr, ok := ms.radiusClientRequests[e.Key]; !ok {
+					ms.radiusClientRequests[e.Key] = 1
+				} else {
+					ms.radiusClientRequests[e.Key] = curr + 1
+				}
+
+			case RadiusClientResponseEvent:
+				if curr, ok := ms.radiusClientResponses[e.Key]; !ok {
+					ms.radiusClientResponses[e.Key] = 1
+				} else {
+					ms.radiusClientResponses[e.Key] = curr + 1
+				}
+
+			case RadiusClientTimeoutEvent:
+				if curr, ok := ms.radiusClientTimeouts[e.Key]; !ok {
+					ms.radiusClientTimeouts[e.Key] = 1
+				} else {
+					ms.radiusClientTimeouts[e.Key] = curr + 1
+				}
+
+			// Router Events
 
 			case RouterRouteNotFoundEvent:
 				if curr, ok := ms.diameterRouteNotFound[e.Key]; !ok {
@@ -503,7 +665,7 @@ func (ms *MetricsServer) metricServerLoop() {
 					ms.diameterHandlerError[e.Key] = curr + 1
 				}
 
-				// Client Metrics
+			// HttpClient Events
 			case HttpClientExchangeEvent:
 				if curr, ok := ms.httpClientExchanges[e.Key]; !ok {
 					ms.httpClientExchanges[e.Key] = 1
@@ -511,7 +673,7 @@ func (ms *MetricsServer) metricServerLoop() {
 					ms.httpClientExchanges[e.Key] = curr + 1
 				}
 
-				// HandlerMetrics
+			// HttpHandler Events
 			case HttpHandlerExchangeEvent:
 				if curr, ok := ms.httpHandlerExchanges[e.Key]; !ok {
 					ms.httpHandlerExchanges[e.Key] = 1

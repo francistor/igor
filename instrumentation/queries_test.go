@@ -116,3 +116,28 @@ func TestHttpHandlerAggregations(t *testing.T) {
 		t.Errorf("aggregation should be 2 but got %d", outMetrics[HttpHandlerMetricKey{ErrorCode: "200"}])
 	}
 }
+
+func TestRadiusAggregations(t *testing.T) {
+
+	key1 := RadiusMetricKey{
+		Endpoint: "127.0.0.1:1812",
+		Code:     "1",
+	}
+
+	key2 := RadiusMetricKey{
+		Endpoint: "127.0.0.1:1812",
+		Code:     "2",
+	}
+
+	myMetrics := RadiusMetrics{key1: 1, key2: 1}
+
+	outMetrics := GetRadiusMetrics(myMetrics, map[string]string{"Endpoint": "127.0.0.1:1812"}, []string{"Code"})
+	if outMetrics[RadiusMetricKey{Code: "1"}] != 1 {
+		t.Errorf("aggregation should be 1 but got %d", outMetrics[RadiusMetricKey{Code: "1"}])
+	}
+
+	outMetrics = GetRadiusMetrics(myMetrics, map[string]string{"Endpoint": "127.0.0.1:1812"}, []string{})
+	if outMetrics[RadiusMetricKey{}] != 2 {
+		t.Errorf("aggregation should be 2 but got %d", outMetrics[RadiusMetricKey{}])
+	}
+}

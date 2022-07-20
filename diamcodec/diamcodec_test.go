@@ -574,7 +574,7 @@ func TestSerializationError(t *testing.T) {
 
 }
 
-func TestJSON(t *testing.T) {
+func TestJSONAVP(t *testing.T) {
 
 	var javp = `{
 		"franciscocardosogil-myTestAllGrouped": [

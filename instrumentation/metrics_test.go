@@ -140,3 +140,55 @@ func TestHttpClientMetrics(t *testing.T) {
 		t.Fatalf("HttpHandlerExchanges is not 3")
 	}
 }
+
+func TestRadiusMetrics(t *testing.T) {
+	MS.ResetMetrics()
+	time.Sleep(100 * time.Millisecond)
+
+	PushRadiusServerRequest("127.0.0.1:1812", "1")
+	PushRadiusServerResponse("127.0.0.1:1812", "2")
+	PushRadiusServerDrop("127.0.0.1:1812", "1")
+	PushRadiusClientRequest("127.0.0.1:1812", "1")
+	PushRadiusClientResponse("127.0.0.1:1812", "2")
+	PushRadiusClientTimeout("127.0.0.1:1812", "1")
+
+	time.Sleep(100 * time.Millisecond)
+	rm := MS.RadiusQuery("RadiusServerRequests", nil, []string{"Endpoint"})
+	if v, ok := rm[RadiusMetricKey{Endpoint: "127.0.0.1:1812"}]; !ok {
+		t.Fatalf("RadiusServerRequests not found")
+	} else if v != 1 {
+		t.Fatalf("RadiusServerRequests is not 1")
+	}
+	rm = MS.RadiusQuery("RadiusServerResponses", nil, []string{"Endpoint"})
+	if v, ok := rm[RadiusMetricKey{Endpoint: "127.0.0.1:1812"}]; !ok {
+		t.Fatalf("RadiusServerResponses not found")
+	} else if v != 1 {
+		t.Fatalf("RadiusServerResponses is not 1")
+	}
+	rm = MS.RadiusQuery("RadiusServerDrops", nil, []string{"Endpoint"})
+	if v, ok := rm[RadiusMetricKey{Endpoint: "127.0.0.1:1812"}]; !ok {
+		t.Fatalf("RadiusServerDrops not found")
+	} else if v != 1 {
+		t.Fatalf("RadiusServerDrops is not 1")
+	}
+
+	rm = MS.RadiusQuery("RadiusClientRequests", nil, []string{"Endpoint"})
+	if v, ok := rm[RadiusMetricKey{Endpoint: "127.0.0.1:1812"}]; !ok {
+		t.Fatalf("RadiusClientsRequests not found")
+	} else if v != 1 {
+		t.Fatalf("RadiusClientsRequests is not 1")
+	}
+	rm = MS.RadiusQuery("RadiusClientResponses", nil, []string{"Endpoint"})
+	if v, ok := rm[RadiusMetricKey{Endpoint: "127.0.0.1:1812"}]; !ok {
+		t.Fatalf("RadiusClientResponses not found")
+	} else if v != 1 {
+		t.Fatalf("RadiusClientResponses is not 1")
+	}
+	rm = MS.RadiusQuery("RadiusClientTimeouts", nil, []string{"Endpoint"})
+	if v, ok := rm[RadiusMetricKey{Endpoint: "127.0.0.1:1812"}]; !ok {
+		t.Fatalf("RadiusClientTimeouts not found")
+	} else if v != 1 {
+		t.Fatalf("RadiusClientTimeouts is not 1")
+	}
+
+}

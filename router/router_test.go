@@ -144,7 +144,7 @@ func TestRouteMessage(t *testing.T) {
 	request.AddOriginAVPs(config.GetPolicyConfig())
 	request.Add("Destination-Realm", "igorsuperserver")
 	request.Add("User-Name", "TestUserNameRequest")
-	response, err := client.RouteDiameterRequest(&request, time.Duration(1000*time.Millisecond))
+	response, err := client.RouteDiameterRequest(request, time.Duration(1000*time.Millisecond))
 	if err != nil {
 		t.Fatalf("route message returned error %s", err)
 	} else if response.GetIntAVP("Result-Code") != diamcodec.DIAMETER_SUCCESS {
