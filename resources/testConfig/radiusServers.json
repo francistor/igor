@@ -1,0 +1,39 @@
+{
+	"servers" : 
+	[
+		{
+        "name": "igor-superserver",
+        "IPAddress": "localhost",
+        "secret": "secret",
+        "authPort": 11812,
+        "acctPort": 11813,
+        "coaPort": 13799,
+        "originPorts": [8000, 8001],
+        "errorLimit": 3,
+        "quarantineTimeSeconds": 60
+      },
+      {
+        "name": "non-existing-server",
+        "IPAddress": "192.168.250.1",
+        "secret": "secret",
+        "authPort": 11812,
+        "acctPort": 11813,
+        "coaPort": 13799,
+        "errorLimit": 3,
+        "quarantineTimeSeconds": 60
+      }
+	],
+	"serverGroups" :
+	[
+	  {
+        "name": "igor-server-ne-group",
+        "servers": ["non-existing-server", "yaas-superserver"],
+        "policy": "fixed"
+      },
+      {
+      	"name": "igor-superserver-group",
+      	"servers": ["igor-superserver"],
+      	"policy": "random"
+      }
+	]
+}

@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
 	bootFile := "resources/searchRules.json"
-	instanceName := "testServer"
+	instanceName := "testConfig"
 
 	InitPolicyConfigInstance(bootFile, instanceName, true)
 	InitHandlerConfigInstance(bootFile, instanceName, false)
@@ -102,6 +102,30 @@ func TestRadiusConfig(t *testing.T) {
 	dsc := GetPolicyConfig().RadiusServerConf()
 	if dsc.BindAddress != "0.0.0.0" {
 		t.Fatalf("Bind address was <%s>", dsc.BindAddress)
+	}
+
+	// Radius Clients configuration
+	rc := GetPolicyConfig().RadiusClientsConf()
+	if rc["127.0.0.1"].Secret != "secret" {
+		t.Errorf("secret for 127.0.0.1 is not as expeted")
+	}
+
+	// Get Radius Servers configuration
+	rs := GetPolicyConfig().RadiusServersConf()
+	if rs.Servers["non-existing-server"].IPAddress != "192.168.250.1" {
+		t.Errorf("address of non-existing-server is not 192.168.250.1")
+	}
+	if rs.Servers["igor-superserver"].OriginPorts[0] != 8000 {
+		t.Errorf("igor-superserver has unexpected origin port")
+	}
+	if rs.ServerGroups["igor-superserver-group"].Policy != "random" {
+		t.Errorf("igor-supserserver server group has not policy random")
+	}
+
+	// Get Radius handlers configuration
+	rh := GetPolicyConfig().RadiusHandlersConf()
+	if rh.AuthHandlers[0] != "https://localhost:8080/radiusRequest" {
+		t.Errorf("first radius handler for auth not as expected")
 	}
 }
 

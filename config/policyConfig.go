@@ -14,6 +14,9 @@ type PolicyConfigurationManager struct {
 	currentDiameterPeers        DiameterPeers
 
 	currentRadiusServerConfig RadiusServerConfig
+	currentRadiusClients      RadiusClients
+	currentRadiusServers      RadiusServers
+	currentRadiusHandlers     RadiusHandlers
 }
 
 // Slice of configuration managers
@@ -41,12 +44,30 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefau
 	}
 
 	// Load diameter configuraton
-	policyConfig.UpdateDiameterServerConfig()
-	policyConfig.UpdateDiameterPeers()
-	policyConfig.UpdateDiameterRoutingRules()
+	var cerr error
+	if cerr = policyConfig.UpdateDiameterServerConfig(); cerr != nil {
+		panic(cerr)
+	}
+	if cerr = policyConfig.UpdateDiameterPeers(); cerr != nil {
+		panic(cerr)
+	}
+	if cerr = policyConfig.UpdateDiameterRoutingRules(); cerr != nil {
+		panic(cerr)
+	}
 
 	// Load radius configuration
-	policyConfig.UpdateRadiusServerConfig()
+	if cerr = policyConfig.UpdateRadiusServerConfig(); cerr != nil {
+		panic(cerr)
+	}
+	if cerr = policyConfig.UpdateRadiusClients(); cerr != nil {
+		panic(cerr)
+	}
+	if cerr = policyConfig.UpdateRadiusServers(); cerr != nil {
+		panic(cerr)
+	}
+	if cerr = policyConfig.UpdateRadiusHandlers(); cerr != nil {
+		panic(cerr)
+	}
 
 	return &policyConfig
 }
@@ -144,6 +165,154 @@ func (c *PolicyConfigurationManager) UpdateRadiusServerConfig() error {
 
 func (c *PolicyConfigurationManager) RadiusServerConf() RadiusServerConfig {
 	return c.currentRadiusServerConfig
+}
+
+type RadiusClient struct {
+	Name      string
+	IPAddress string
+	Secret    string
+}
+
+// type RadiusClients []RadiusClient
+type RadiusClients map[string]RadiusClient
+
+// Retrieves the radius clients configuration
+func (c *PolicyConfigurationManager) getRadiusClientsConfig() (RadiusClients, error) {
+
+	var clientsArray []RadiusClient
+
+	radiusClients := make(RadiusClients)
+	rc, err := c.CM.GetConfigObject("radiusClients.json", true)
+	if err != nil {
+		return radiusClients, err
+	}
+	if err := json.Unmarshal(rc.RawBytes, &clientsArray); err != nil {
+		return radiusClients, err
+	}
+
+	// Fill the map
+	for _, c := range clientsArray {
+		radiusClients[c.IPAddress] = c
+	}
+
+	return radiusClients, nil
+}
+
+func (c *PolicyConfigurationManager) UpdateRadiusClients() error {
+	radiusClients, error := c.getRadiusClientsConfig()
+	if error != nil {
+		return fmt.Errorf("could not retrieve the Radius Clients configuration: %w", error)
+	}
+	c.currentRadiusClients = radiusClients
+	return nil
+}
+
+func (c *PolicyConfigurationManager) RadiusClientsConf() RadiusClients {
+	return c.currentRadiusClients
+}
+
+type RadiusServer struct {
+	Name                  string
+	IPAddress             string
+	Secret                string
+	AuthPort              int
+	AcctPort              int
+	COAPort               int
+	OriginPorts           []int
+	ErrorLimit            int
+	QuarantineTimeSeconds int
+}
+
+type RadiusServerGroup struct {
+	Name    string
+	Servers []string
+
+	// policy may be "fixed", "random", "fixed-withclear", "random-withclear"
+	Policy string
+}
+
+type RadiusServers struct {
+	Servers      map[string]RadiusServer
+	ServerGroups map[string]RadiusServerGroup
+}
+
+// Retrieves the radius servers configuration
+func (c *PolicyConfigurationManager) getRadiusServersConfig() (RadiusServers, error) {
+
+	// To unmarshal from JSON
+	var radiusServersArray struct {
+		Servers      []RadiusServer
+		ServerGroups []RadiusServerGroup
+	}
+
+	// Returned value
+	radiusServers := RadiusServers{
+		Servers:      make(map[string]RadiusServer),
+		ServerGroups: make(map[string]RadiusServerGroup),
+	}
+
+	rc, err := c.CM.GetConfigObject("radiusServers.json", true)
+	if err != nil {
+		return radiusServers, err
+	}
+	if err := json.Unmarshal(rc.RawBytes, &radiusServersArray); err != nil {
+		return radiusServers, err
+	}
+
+	// Format
+	for _, rs := range radiusServersArray.Servers {
+		radiusServers.Servers[rs.Name] = rs
+	}
+	for _, rg := range radiusServersArray.ServerGroups {
+		radiusServers.ServerGroups[rg.Name] = rg
+	}
+
+	return radiusServers, nil
+}
+
+func (c *PolicyConfigurationManager) UpdateRadiusServers() error {
+	radiusServers, error := c.getRadiusServersConfig()
+	if error != nil {
+		return fmt.Errorf("could not retrieve the Radius Servers configuration: %w", error)
+	}
+	c.currentRadiusServers = radiusServers
+	return nil
+}
+
+func (c *PolicyConfigurationManager) RadiusServersConf() RadiusServers {
+	return c.currentRadiusServers
+}
+
+type RadiusHandlers struct {
+	AuthHandlers []string
+	AcctHandlers []string
+	COAHandlers  []string
+}
+
+// Retrieves the radius routes configuration
+func (c *PolicyConfigurationManager) getRadiusHandlersConfig() (RadiusHandlers, error) {
+	var radiusHandlers RadiusHandlers
+	rc, err := c.CM.GetConfigObject("radiusHandlers.json", true)
+	if err != nil {
+		return radiusHandlers, err
+	}
+	if err := json.Unmarshal(rc.RawBytes, &radiusHandlers); err != nil {
+		return radiusHandlers, err
+	}
+	return radiusHandlers, nil
+}
+
+func (c *PolicyConfigurationManager) UpdateRadiusHandlers() error {
+	radiusHandlers, error := c.getRadiusHandlersConfig()
+	if error != nil {
+		return fmt.Errorf("could not retrieve the Radius Handlers configuration: %w", error)
+	}
+	c.currentRadiusHandlers = radiusHandlers
+	return nil
+}
+
+func (c *PolicyConfigurationManager) RadiusHandlersConf() RadiusHandlers {
+	return c.currentRadiusHandlers
 }
 
 ///////////////////////////////////////////////////////////////////////////////

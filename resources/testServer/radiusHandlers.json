@@ -1,0 +1,5 @@
+{
+    "authHandlers": ["https://localhost:8080/radiusRequest", "https://localhost:8080/radiusRequest"],
+    "acctHandlers": ["https://localhost:8080/radiusRequest", "https://localhost:8080/radiusRequest"],
+    "coaHandlers": ["https://localhost:8080/radiusRequest", "https://localhost:8080/radiusRequest"]
+}

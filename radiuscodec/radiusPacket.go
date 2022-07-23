@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"igor/config"
 	"io"
@@ -419,4 +420,17 @@ func ValidateResponseAuthenticator(packetBytes []byte, requestAuthenticator [16]
 	}
 
 	return true
+}
+
+///////////////////////////////////////////////////////////////
+// Serialization
+///////////////////////////////////////////////////////////////
+
+func (rp RadiusPacket) String() string {
+	b, error := json.Marshal(rp)
+	if error != nil {
+		return "<error>"
+	} else {
+		return string(b)
+	}
 }
