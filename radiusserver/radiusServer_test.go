@@ -2,10 +2,8 @@ package radiusserver
 
 import (
 	"context"
-	"fmt"
 	"igor/config"
 	"igor/radiuscodec"
-	"igor/router"
 	"net"
 	"os"
 	"testing"
@@ -23,16 +21,13 @@ func TestMain(m *testing.M) {
 
 func TestRadiusServer(t *testing.T) {
 
-	// Emulated router channel
-	routerChan := make(chan router.RoutableRadiusRequest)
-
 	// Get the configuration
 	pci := config.GetPolicyConfigInstance("testServer")
 	serverConf := pci.RadiusServerConf()
 
 	// Instantiate a radius server
 	ctx, terminateServerSocket := context.WithCancel(context.Background())
-	NewRadiusServer(ctx, config.GetPolicyConfigInstance("testServer"), serverConf.BindAddress, serverConf.AuthPort, routerChan)
+	NewRadiusServer(ctx, config.GetPolicyConfigInstance("testServer"), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
 
 	// Wait fo the socket to be created
 	time.Sleep(100 * time.Millisecond)
@@ -56,14 +51,6 @@ func TestRadiusServer(t *testing.T) {
 	}
 	clientSocket.WriteTo(requestBytes, addr)
 
-	// Process the request
-	rreq := <-routerChan
-	t.Log(fmt.Println(rreq.RadiusPacket))
-	// Generate answer
-	resPacket := radiuscodec.NewRadiusResponse(rreq.RadiusPacket, true)
-	resPacket.Add("Class", "this is the response")
-	rreq.RChan <- resPacket
-
 	// Get response
 	responseBuffer := make([]byte, 4096)
 	_, _, err = clientSocket.ReadFrom(responseBuffer)
@@ -74,12 +61,24 @@ func TestRadiusServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if receivedPacket.GetStringAVP("Class") != "this is the response" {
-		t.Errorf("unexpected class attribute in response <%s>", receivedPacket.GetStringAVP("Class"))
+	if receivedPacket.GetStringAVP("User-Name") != "myUserName" {
+		t.Errorf("unexpected class attribute in response <%s>", receivedPacket.GetStringAVP("User-Name"))
 	}
 
 	terminateServerSocket()
 
 	// Wait fo the socket to be created
 	time.Sleep(1000 * time.Millisecond)
+}
+
+// Simple handler that generates a success response with the same attributes as in the request
+func echoHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+
+	response := radiuscodec.NewRadiusResponse(request, true)
+	for i := range request.AVPs {
+		response.AddAVP(&request.AVPs[i])
+	}
+
+	return response, nil
+
 }

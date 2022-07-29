@@ -6,9 +6,11 @@ import (
 	"igor/config"
 	"igor/instrumentation"
 	"igor/radiuscodec"
-	"igor/router"
 	"net"
 )
+
+// Type for functions that handle the radius requests received
+type RadiusPacketHandler func(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error)
 
 // Implements a radius server socket
 // Validates incoming messages, sends them to the router for processing and sends the responses
@@ -17,19 +19,19 @@ type RadiusServer struct {
 	// Configuration instance object
 	ci *config.PolicyConfigurationManager
 
-	// The channel to send the messages to
-	routerChannel chan router.RoutableRadiusRequest
+	// Handler function
+	handler RadiusPacketHandler
 
 	// Context for cancellation
 	context context.Context
 }
 
-func NewRadiusServer(ctx context.Context, ci *config.PolicyConfigurationManager, bindIPAddress string, bindPort int, ch chan router.RoutableRadiusRequest) *RadiusServer {
+func NewRadiusServer(ctx context.Context, ci *config.PolicyConfigurationManager, bindIPAddress string, bindPort int, handler RadiusPacketHandler) *RadiusServer {
 
 	radiusServer := RadiusServer{
-		ci:            ci,
-		routerChannel: ch,
-		context:       ctx,
+		ci:      ci,
+		handler: handler,
+		context: ctx,
 	}
 
 	socket, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", bindIPAddress, bindPort))
@@ -49,7 +51,7 @@ func (rs *RadiusServer) eventLoop(socket net.PacketConn) {
 	go func() {
 		<-rs.context.Done()
 
-		// Will generate an error in the loop, and the eventLoop will return
+		// Will generate an error in the loop, and the readerLoop will return
 		socket.Close()
 	}()
 
@@ -77,7 +79,7 @@ func (rs *RadiusServer) eventLoop(socket net.PacketConn) {
 
 		if !found {
 			config.GetLogger().Debugf("message from unknown client %s", clientIPAddr)
-			break
+			continue
 		}
 
 		// Decode the packet
@@ -86,47 +88,37 @@ func (rs *RadiusServer) eventLoop(socket net.PacketConn) {
 			config.GetLogger().Errorf("error decoding packet %s", err)
 		}
 
-		// Channel for answer
-		rChan := make(chan interface{})
-
-		// Send the request to the router
-		routableReq := router.RoutableRadiusRequest{
-			Secret:       radiusClient.Secret,
-			RadiusPacket: radiusPacket,
-			RChan:        rChan,
-		}
-		rs.routerChannel <- routableReq
 		instrumentation.PushRadiusServerRequest(clientIPAddr, string(radiusPacket.Code))
 		config.GetLogger().Debugf("<- Server received RadiusPacket %s\n", radiusPacket)
 
 		// Wait for response
-		go func(secret string, addr net.Addr, code byte) {
-			clientIPAddr := clientAddr.(*net.UDPAddr).IP.String()
-			r := <-rChan
+		go func(radiusPacket *radiuscodec.RadiusPacket, secret string, addr net.Addr) {
 
-			switch v := r.(type) {
-			case error:
-				config.GetLogger().Errorf("discarding packet for %s with code %d: %s", addr.String(), code, err)
-				instrumentation.PushRadiusServerDrop(clientIPAddr, string(code))
+			code := radiusPacket.Code
 
-			case *radiuscodec.RadiusPacket:
+			response, err := rs.handler(radiusPacket)
 
-				respBuf, err := v.ToBytes(secret, v.Identifier)
-				if err != nil {
-					config.GetLogger().Errorf("error serializing packet for %s with code %d: %s", addr.String(), code, err)
-					instrumentation.PushRadiusServerDrop(clientIPAddr, string(code))
-					return
-				}
-				if _, err = socket.WriteTo(respBuf, addr); err != nil {
-					config.GetLogger().Errorf("error sending packet to %s with code %d: %s", addr.String(), code, err)
-					instrumentation.PushRadiusServerDrop(clientIPAddr, string(code))
-					return
-				}
-
-				instrumentation.PushRadiusServerResponse(clientIPAddr, string(code))
-				config.GetLogger().Debugf("-> Server sent RadiusPacket %s\n", v)
-
+			if err != nil {
+				config.GetLogger().Errorf("discarding packet for %s with code %d: %s", addr.String(), radiusPacket.Code, err)
+				instrumentation.PushRadiusServerDrop(clientIPAddr, string(radiusPacket.Code))
+				return
 			}
-		}(radiusClient.Secret, clientAddr, radiusPacket.Code)
+
+			respBuf, err := response.ToBytes(secret, radiusPacket.Identifier)
+			if err != nil {
+				config.GetLogger().Errorf("error serializing packet for %s with code %d: %s", addr.String(), code, err)
+				instrumentation.PushRadiusServerDrop(clientIPAddr, string(code))
+				return
+			}
+			if _, err = socket.WriteTo(respBuf, addr); err != nil {
+				config.GetLogger().Errorf("error sending packet to %s with code %d: %s", addr.String(), code, err)
+				instrumentation.PushRadiusServerDrop(clientIPAddr, string(code))
+				return
+			}
+
+			instrumentation.PushRadiusServerResponse(clientIPAddr, string(code))
+			config.GetLogger().Debugf("-> Server sent RadiusPacket %s\n", radiusPacket)
+
+		}(radiusPacket, radiusClient.Secret, clientAddr)
 	}
 }

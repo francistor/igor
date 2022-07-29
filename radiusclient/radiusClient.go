@@ -8,3 +8,7 @@ package radiusClient
 //
 // If the origin endpoint does not yet exist, creates a RadiusClientSocket. If the origin endpoint is not specified,
 // uses one of the default RadiusClientSockets created initially
+
+const (
+	StatusClosing = 1
+)
