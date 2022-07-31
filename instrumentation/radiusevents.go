@@ -60,3 +60,11 @@ type RadiusClientTimeoutEvent struct {
 func PushRadiusClientTimeout(endpoint string, Code string) {
 	MS.InputChan <- RadiusClientTimeoutEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
+
+type RadiusClientResponseStalledEvent struct {
+	Key RadiusMetricKey
+}
+
+func PushRadiusClientResponseStalled(endpoint string, Code string) {
+	MS.InputChan <- RadiusClientResponseStalledEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
+}

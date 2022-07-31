@@ -94,27 +94,33 @@ func TestDiameterPeerOK(t *testing.T) {
 	request, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
 	request.AddOriginAVPs(config.GetPolicyConfig())
 	request.Add("User-Name", "TestUserNameRequest")
-	response, error := activePeer.DiameterExhangeWithAnswer(request, 2*time.Second)
+	var rc1 = make(chan interface{}, 1)
+	activePeer.DiameterExchange(request, 2*time.Second, rc1)
 
-	if error != nil {
+	a1 := <-rc1
+	switch v := a1.(type) {
+	case error:
 		t.Fatal("bad response", err)
-	}
-	userNameAVP, error := response.GetAVP("User-Name")
-	if error != nil {
-		t.Fatal("bad AVP", err)
-	}
-	if userNameAVP.GetString() != "TestUserNameEcho" {
-		t.Fatal("bad AVP content", userNameAVP.GetString())
+	case *diamcodec.DiameterMessage:
+		userNameAVP, error := v.GetAVP("User-Name")
+		if error != nil {
+			t.Fatal("bad AVP", err)
+		}
+		if userNameAVP.GetString() != "TestUserNameEcho" {
+			t.Fatal("bad AVP content", userNameAVP.GetString())
+		}
 	}
 
 	// Simulate a timeout. The handler takes more time than this
 	request.Add("franciscocardosogil-Command", "Slow")
-	_, eTimeout := activePeer.DiameterExhangeWithAnswer(request, 10*time.Millisecond)
+	var rc2 = make(chan interface{}, 1)
+	activePeer.DiameterExchange(request, 10*time.Millisecond, rc2)
 
-	if eTimeout == nil {
-		t.Fatal("should have got an error")
-	} else if eTimeout.Error() != "Timeout" {
-		t.Fatal("should have got a timeout")
+	a2 := <-rc2
+	switch v := a2.(type) {
+	case error:
+	default:
+		t.Fatalf("should have got a timeout and got %v", v)
 	}
 
 	// Check metrics
@@ -397,8 +403,8 @@ func TestRequestsCancellation(t *testing.T) {
 
 	rc1 := make(chan interface{}, 1)
 	rc2 := make(chan interface{}, 1)
-	activePeer.DiameterExchangeWithChannel(request1, 300*time.Second, rc1)
-	activePeer.DiameterExchangeWithChannel(request2, 300*time.Second, rc2)
+	activePeer.DiameterExchange(request1, 300*time.Second, rc1)
+	activePeer.DiameterExchange(request2, 300*time.Second, rc2)
 
 	// Disengage Peer
 	activePeer.SetDown()

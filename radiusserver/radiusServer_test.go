@@ -80,5 +80,4 @@ func echoHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, 
 	}
 
 	return response, nil
-
 }

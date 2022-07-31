@@ -40,6 +40,7 @@ Diameter Client
 	PeerRequestSent
 	PeerAnswerReceived
 	PeerRequestTimeout
+	PeerAnswerStalled
 
 Router
 	RouterRouteNotFound

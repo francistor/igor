@@ -68,7 +68,7 @@ type DiameterRouter struct {
 	// the PeerDown event
 	diameterPeersTable map[string]DiameterPeerWithStatus
 
-	// Time to check the peer status. Reload configuration and check if new connections
+	// Timer to check the peer status. Reload configuration and check if new connections
 	// need to be established or closed
 	peerTableTicker *time.Ticker
 
@@ -334,7 +334,7 @@ routerEventLoop:
 					targetPeer := router.diameterPeersTable[destinationHost]
 					if targetPeer.IsEngaged {
 						// Route found. Send request asyncronously
-						go targetPeer.Peer.DiameterExchangeWithChannel(rdr.Message, rdr.Timeout, rdr.RChan)
+						go targetPeer.Peer.DiameterExchange(rdr.Message, rdr.Timeout, rdr.RChan)
 						break messageHandler
 					}
 				}
@@ -380,8 +380,7 @@ routerEventLoop:
 	logger.Infof("finished Peer manager %s ", router.instanceName)
 }
 
-// Sends a DiameterMessage and returns a channel for the response or error
-// TODO: Make sure that the response channel is closed
+// Sends a DiameterMessage and returns the answer
 func (router *DiameterRouter) RouteDiameterRequest(request *diamcodec.DiameterMessage, timeout time.Duration) (*diamcodec.DiameterMessage, error) {
 	responseChannel := make(chan interface{}, 1)
 

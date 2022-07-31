@@ -117,7 +117,7 @@ func (rs *RadiusServer) eventLoop(socket net.PacketConn) {
 			}
 
 			instrumentation.PushRadiusServerResponse(clientIPAddr, string(code))
-			config.GetLogger().Debugf("-> Server sent RadiusPacket %s\n", radiusPacket)
+			config.GetLogger().Debugf("-> Server sent RadiusPacket %s\n", response)
 
 		}(radiusPacket, radiusClient.Secret, clientAddr)
 	}

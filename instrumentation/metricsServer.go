@@ -51,9 +51,10 @@ type MetricsServer struct {
 	radiusServerDrops     RadiusMetrics
 
 	// RadiusClient
-	radiusClientRequests  RadiusMetrics
-	radiusClientResponses RadiusMetrics
-	radiusClientTimeouts  RadiusMetrics
+	radiusClientRequests         RadiusMetrics
+	radiusClientResponses        RadiusMetrics
+	radiusClientTimeouts         RadiusMetrics
+	radiusClientResponsesStalled RadiusMetrics
 
 	// Router
 	diameterRouteNotFound   PeerDiameterMetrics
@@ -427,6 +428,7 @@ func (ms *MetricsServer) resetMetrics() {
 	ms.radiusClientRequests = make(RadiusMetrics)
 	ms.radiusClientResponses = make(RadiusMetrics)
 	ms.radiusClientTimeouts = make(RadiusMetrics)
+	ms.radiusClientResponsesStalled = make(RadiusMetrics)
 
 	ms.httpClientExchanges = make(HttpClientMetrics)
 
@@ -535,6 +537,8 @@ func (ms *MetricsServer) metricServerLoop() {
 				query.RChan <- GetRadiusMetrics(ms.radiusClientResponses, query.Filter, query.AggLabels)
 			case "RadiusClientTimeouts":
 				query.RChan <- GetRadiusMetrics(ms.radiusClientTimeouts, query.Filter, query.AggLabels)
+			case "RadiusClientResponsesStalled":
+				query.RChan <- GetRadiusMetrics(ms.radiusClientResponsesStalled, query.Filter, query.AggLabels)
 
 			case "HttpClientExchanges":
 				query.RChan <- GetHttpClientMetrics(ms.httpClientExchanges, query.Filter, query.AggLabels)
@@ -642,6 +646,13 @@ func (ms *MetricsServer) metricServerLoop() {
 					ms.radiusClientTimeouts[e.Key] = 1
 				} else {
 					ms.radiusClientTimeouts[e.Key] = curr + 1
+				}
+
+			case RadiusClientResponseStalledEvent:
+				if curr, ok := ms.radiusClientResponsesStalled[e.Key]; !ok {
+					ms.radiusClientResponsesStalled[e.Key] = 1
+				} else {
+					ms.radiusClientResponsesStalled[e.Key] = curr + 1
 				}
 
 			// Router Events

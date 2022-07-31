@@ -218,7 +218,6 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 			return int64(n1), err
 		}
 		// Write authenticator
-		fmt.Println("writing authenticator", auth)
 		n2, err := outWriter.Write(auth)
 		if err != nil {
 			return int64(n1 + n2), err
@@ -386,10 +385,14 @@ func (rp *RadiusPacket) GetDateAVP(avpName string) time.Time {
 ///////////////////////////////////////////////////////////////
 // Packet creation
 ///////////////////////////////////////////////////////////////
+
+// Creates a new radius request with the specified code
 func NewRadiusRequest(code byte) *RadiusPacket {
 	return &RadiusPacket{Code: code}
 }
 
+// Creates a radius answer for the specified packet
+// id is the same as for the request
 func NewRadiusResponse(request *RadiusPacket, isSuccess bool) *RadiusPacket {
 	var code byte
 	if isSuccess {
@@ -403,6 +406,8 @@ func NewRadiusResponse(request *RadiusPacket, isSuccess bool) *RadiusPacket {
 ///////////////////////////////////////////////////////////////
 // Packet Validation
 ///////////////////////////////////////////////////////////////
+
+// Checks the response authenticator
 func ValidateResponseAuthenticator(packetBytes []byte, requestAuthenticator [16]byte, secret string) bool {
 
 	hasher := md5.New()
@@ -412,7 +417,7 @@ func ValidateResponseAuthenticator(packetBytes []byte, requestAuthenticator [16]
 	hasher.Write([]byte(secret))
 	auth := hasher.Sum(nil)
 
-	// Compara by brute force, better than reflect
+	// Compare by brute force, better than reflect
 	for i, b := range packetBytes[4:20] {
 		if auth[i] != b {
 			return false
