@@ -133,12 +133,11 @@ func (c *PolicyConfigurationManager) DiameterServerConf() DiameterServerConfig {
 
 ///////////////////////////////////////////////////////////////////////////////
 type RadiusServerConfig struct {
-	BindAddress             string
-	AuthPort                int
-	AcctPort                int
-	CoAPort                 int
-	ClientAnonymousBasePort int
-	NumAnonymousClientPorts int
+	BindAddress string
+	AuthPort    int
+	AcctPort    int
+	CoAPort     int
+	OriginPorts []int
 }
 
 // Retrieves the radius server configuration

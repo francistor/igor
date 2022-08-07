@@ -32,6 +32,7 @@ const (
 // that the Peer object is down and should be recycled
 // If the reason is an error (e.g. bad response from the other, communication problem),
 // etc. the Error field will be not null
+// It must be waranteed that the TCP port (the connection has been closed) is reusable after sending this event
 type PeerDownEvent struct {
 	// Myself
 	Sender *DiameterPeer
@@ -130,6 +131,7 @@ type WatchdogMsg struct {
 
 // Type for functions that handle the diameter requests received
 // If an error is returned, no diameter answer is sent. Implementers should always generate a diameter answer instead
+// with error code
 type MessageHandler func(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error)
 
 // Context data for an in flight request
@@ -309,11 +311,7 @@ func (dp *DiameterPeer) eventLoop() {
 			dp.watchdogTicker.Stop()
 		}
 
-		// Close the connection (another time, should not make harm)
-		if dp.connection != nil {
-			dp.connection.Close()
-		}
-
+		// Connection is closed in the event loop
 	}()
 
 	// Initialize to something, in order to be able to select below.
@@ -453,13 +451,11 @@ func (dp *DiameterPeer) eventLoop() {
 				if dp.cancel != nil {
 					dp.cancel()
 				}
+				*/
 
-				// Close the connection. Any reads will return with error in the read loop, which will terminate
-				// and send control message through the readloopChannel
 				if dp.connection != nil {
 					dp.connection.Close()
 				}
-				*/
 
 				// Cancellation of all outstanding requests
 				for hopId := range dp.requestsMap {

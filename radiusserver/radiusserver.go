@@ -1,12 +1,16 @@
 package radiusserver
 
 import (
-	"context"
 	"fmt"
 	"igor/config"
 	"igor/instrumentation"
 	"igor/radiuscodec"
 	"net"
+	"sync/atomic"
+)
+
+const (
+	StatusClosing = 1
 )
 
 // Type for functions that handle the radius requests received
@@ -22,38 +26,42 @@ type RadiusServer struct {
 	// Handler function
 	handler RadiusPacketHandler
 
-	// Context for cancellation
-	context context.Context
+	// The UDP socket
+	socket net.PacketConn
+
+	// Status
+	status int32
 }
 
-func NewRadiusServer(ctx context.Context, ci *config.PolicyConfigurationManager, bindIPAddress string, bindPort int, handler RadiusPacketHandler) *RadiusServer {
-
-	radiusServer := RadiusServer{
-		ci:      ci,
-		handler: handler,
-		context: ctx,
-	}
+// Creates a Radius Server
+func NewRadiusServer(ci *config.PolicyConfigurationManager, bindIPAddress string, bindPort int, handler RadiusPacketHandler) *RadiusServer {
 
 	socket, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", bindIPAddress, bindPort))
 	if err != nil {
 		panic(fmt.Sprintf("could not create listen socket in %s:%d : %s", bindIPAddress, bindPort, err))
 	}
 
+	radiusServer := RadiusServer{
+		ci:      ci,
+		handler: handler,
+		socket:  socket,
+	}
+
 	// Start receiving packets
-	go radiusServer.eventLoop(socket)
+	go radiusServer.readLoop(socket)
 
 	return &radiusServer
 }
 
-func (rs *RadiusServer) eventLoop(socket net.PacketConn) {
+func (rs *RadiusServer) Close() {
+	// Set the status
+	atomic.StoreInt32(&rs.status, StatusClosing)
 
-	// Close socket and exit whent the context is done
-	go func() {
-		<-rs.context.Done()
+	// Will generate an error in the loop, and the readerLoop will return
+	rs.socket.Close()
+}
 
-		// Will generate an error in the loop, and the readerLoop will return
-		socket.Close()
-	}()
+func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 
 	// Single buffer where all incoming packets are read
 	// According to RFC 2865, the maximum packet size is 4096
@@ -63,8 +71,8 @@ func (rs *RadiusServer) eventLoop(socket net.PacketConn) {
 		packetSize, clientAddr, err := socket.ReadFrom(reqBuf)
 		if err != nil {
 			// Check here if the error is due to the socket being closed
-			if rs.context.Err() != nil {
-				// The context was cancelled
+			if atomic.LoadInt32(&rs.status) == StatusClosing {
+				// The socket was closed gracefully
 				config.GetLogger().Infof("finished radius server socket %s", socket.LocalAddr().String())
 				return
 			} else {

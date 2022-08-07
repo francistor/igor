@@ -1,7 +1,6 @@
 package radiusserver
 
 import (
-	"context"
 	"igor/config"
 	"igor/radiuscodec"
 	"net"
@@ -26,8 +25,7 @@ func TestRadiusServer(t *testing.T) {
 	serverConf := pci.RadiusServerConf()
 
 	// Instantiate a radius server
-	ctx, terminateServerSocket := context.WithCancel(context.Background())
-	NewRadiusServer(ctx, config.GetPolicyConfigInstance("testServer"), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
+	rs := NewRadiusServer(config.GetPolicyConfigInstance("testServer"), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
 
 	// Wait fo the socket to be created
 	time.Sleep(100 * time.Millisecond)
@@ -65,7 +63,7 @@ func TestRadiusServer(t *testing.T) {
 		t.Errorf("unexpected class attribute in response <%s>", receivedPacket.GetStringAVP("User-Name"))
 	}
 
-	terminateServerSocket()
+	rs.Close()
 
 	// Wait fo the socket to be created
 	time.Sleep(1000 * time.Millisecond)

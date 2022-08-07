@@ -1,5 +1,9 @@
 package instrumentation
 
+import (
+	"time"
+)
+
 // Used as key for radius metrics, both in storage and as a way to specify queries,
 // where the fields with non zero values will be used for aggregation
 type RadiusMetricKey struct {
@@ -67,4 +71,22 @@ type RadiusClientResponseStalledEvent struct {
 
 func PushRadiusClientResponseStalled(endpoint string, Code string) {
 	MS.InputChan <- RadiusClientResponseStalledEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
+}
+
+// Instrumentation of Diameter Peers table
+type RadiusServerTableEntry struct {
+	ServerName       string
+	IsAvailable      bool
+	UnavailableUntil time.Time
+}
+
+type RadiusServersTable []RadiusServerTableEntry
+
+type RadiusServersTableUpdatedEvent struct {
+	InstanceName string
+	Table        RadiusServersTable
+}
+
+func PushRadiusServersTable(instanceName string, table RadiusServersTable) {
+	MS.InputChan <- RadiusServersTableUpdatedEvent{InstanceName: instanceName, Table: table}
 }

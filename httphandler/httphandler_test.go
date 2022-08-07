@@ -67,7 +67,7 @@ func TestMain(m *testing.M) {
 
 func TestBasicHandler(t *testing.T) {
 
-	handler := NewHttpHandler("testServer", handlerfunctions.EmptyHandler)
+	handler := NewHttpHandler("testServer", handlerfunctions.EmptyDiameterHandler, handlerfunctions.EmptyRadiusHandler)
 	go handler.Run()
 
 	time.Sleep(200 * time.Millisecond)
@@ -78,6 +78,8 @@ func TestBasicHandler(t *testing.T) {
 
 	// Create an http client with timeout and http2 transport
 	client := http.Client{Timeout: 2 * time.Second, Transport: transCfg}
+
+	// TODO: Replace this by the helper function
 
 	// resp, err := client.Get("https://127.0.0.1:8080/diameterRequest")
 	httpResp, err := client.Post("https://127.0.0.1:8080/diameterRequest", "application/json", strings.NewReader(jDiameterMessage))

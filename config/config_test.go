@@ -101,7 +101,10 @@ func TestRadiusConfig(t *testing.T) {
 	// Radius Server Configuration
 	dsc := GetPolicyConfig().RadiusServerConf()
 	if dsc.BindAddress != "0.0.0.0" {
-		t.Fatalf("Bind address was <%s>", dsc.BindAddress)
+		t.Errorf("Bind address was <%s>", dsc.BindAddress)
+	}
+	if dsc.OriginPorts[1] != 9001 {
+		t.Errorf("Origin port 9001 not found")
 	}
 
 	// Radius Clients configuration

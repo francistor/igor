@@ -3,11 +3,13 @@ package router
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"igor/config"
 	"igor/diamcodec"
 	"igor/handlerfunctions"
 	"igor/httphandler"
 	"igor/instrumentation"
+	"igor/radiuscodec"
 	"os"
 	"testing"
 	"time"
@@ -27,7 +29,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestBasicSetup(t *testing.T) {
+func TestDiameterBasicSetup(t *testing.T) {
 	superServerRouter := NewRouter("testSuperServer")
 	time.Sleep(150 * time.Millisecond)
 	serverRouter := NewRouter("testServer")
@@ -106,26 +108,26 @@ func TestBasicSetup(t *testing.T) {
 	}
 
 	// Close Routers
+	serverRouter.SetDown()
 	serverRouter.Close()
-	<-serverRouter.RouterDoneChannel
 	t.Log("Server Router terminated")
 
+	superServerRouter.SetDown()
 	superServerRouter.Close()
-	<-superServerRouter.RouterDoneChannel
 	t.Log("SuperServer Router terminated")
 
+	clientRouter.SetDown()
 	clientRouter.Close()
-	<-clientRouter.RouterDoneChannel
 	t.Log("Client Router terminated")
 
 }
 
 // Client will send message to Server, which will handle locally
 // The two types of routes are tested here
-func TestRouteMessage(t *testing.T) {
+func TestDiameterRouteMessage(t *testing.T) {
 
 	// Start handler
-	httphandler.NewHttpHandler("testServer", handlerfunctions.EmptyHandler)
+	httphandler.NewHttpHandler("testServer", handlerfunctions.EmptyDiameterHandler, handlerfunctions.EmptyRadiusHandler)
 	time.Sleep(150 * time.Millisecond)
 
 	// Start Routers
@@ -162,6 +164,27 @@ func TestRouteMessage(t *testing.T) {
 	}
 }
 
+func TestRouteRadiusPacket(t *testing.T) {
+	rrouter := NewRadiusRouter("testServer", echoHandler)
+
+	rrouter.updateRadiusServersTable()
+
+	rchan := make(chan interface{}, 1)
+	req := RoutableRadiusRequest{
+		destination: "igor-server-ne-group",
+		packet:      radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST),
+		rchan:       rchan,
+		timeout:     1 * time.Second,
+		retries:     2,
+	}
+	reqParams := rrouter.getRouteParams(req)
+	if reqParams[2].endpoint != "192.168.250.1:11812" {
+		t.Errorf("third try has wrong endpoint")
+	}
+	fmt.Println(reqParams)
+
+}
+
 // Helper to navigate through peers
 func findPeer(diameterHost string, table instrumentation.DiameterPeersTable) instrumentation.DiameterPeersTableEntry {
 	for _, tableEntry := range table {
@@ -182,4 +205,15 @@ func PrettyPrintJSON(j []byte) string {
 	}
 
 	return jBytes.String()
+}
+
+// Simple handler that generates a success response with the same attributes as in the request
+func echoHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+
+	response := radiuscodec.NewRadiusResponse(request, true)
+	for i := range request.AVPs {
+		response.AddAVP(&request.AVPs[i])
+	}
+
+	return response, nil
 }

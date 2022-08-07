@@ -3,6 +3,5 @@
 	"authPort": 0,
 	"acctPort": 0,
 	"coaPort": 0,
-	"clientAnonymousBasePort": 0,
-	"numAnonymousClientPorts": 0
+	"originPorts": [9000, 9001]
 }

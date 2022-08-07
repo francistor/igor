@@ -1,4 +1,4 @@
-package radiusClient
+package radiusclient
 
 import (
 	"fmt"
@@ -39,24 +39,6 @@ type RadiusResponseMsg struct {
 	packetBytes []byte
 }
 
-// Sent to the eventLoop in order to send the specified packet
-type RadiusRequestMsg struct {
-	// Where to send the message to
-	endpoint string
-
-	// The packet to send
-	packet *radiuscodec.RadiusPacket
-
-	// The response channel
-	rchan chan interface{}
-
-	// Timeout
-	timeout time.Duration
-
-	// The secret shared with the endpoint
-	secret string
-}
-
 // Sent to the eventLoop by the timeout handler function
 type CancelRequestMsg struct {
 	// To identify the resquest
@@ -70,7 +52,7 @@ type CancelRequestMsg struct {
 }
 
 // Send to the event loop to finalize the object
-type CloseCommandMsg struct {
+type SetDownCommandMsg struct {
 }
 
 // Sent when the packet listener reports that the socket has
@@ -87,6 +69,9 @@ type ReadErrorMsg struct {
 
 // Context data for an in flight request
 type RequestContext struct {
+
+	// The server name. Zero if server not declared in configuration
+	serverName string
 
 	// Metric key. Need it because the message will not be available in a timeout
 	key instrumentation.RadiusMetricKey
@@ -115,6 +100,9 @@ type RadiusClientSocket struct {
 	// Configuration instance
 	ci *config.PolicyConfigurationManager
 
+	// The port used
+	port int
+
 	// Outstanding requests
 	// Nested map. First keyed by destination endpoint (ipaddress:port) and then by radius identifier
 	requestsMap map[string]map[byte]RequestContext
@@ -135,8 +123,8 @@ type RadiusClientSocket struct {
 	// can be closed as far as the ReadLoop is concerned
 	readLoopDoneChannel chan bool
 
-	// Passed as parameter. To report events back to the Router
-	routerControlChannel chan interface{}
+	// Passed as parameter. To report events back to the RadiusClient
+	controlChannel chan interface{}
 
 	// Wait group to be used on each goroutine launched, to make sure that
 	// the eventloop channel is not used after being closed
@@ -153,13 +141,14 @@ func NewRadiusClientSocket(controlChannel chan interface{}, ci *config.PolicyCon
 	}
 
 	rcs := RadiusClientSocket{
-		ci:                   ci,
-		requestsMap:          make(map[string]map[byte]RequestContext),
-		lastRadiusIdMap:      make(map[string]byte),
-		eventLoopChannel:     make(chan interface{}, EVENTLOOP_CAPACITY),
-		readLoopDoneChannel:  make(chan bool),
-		routerControlChannel: controlChannel,
-		socket:               socket,
+		ci:                  ci,
+		port:                originPort,
+		requestsMap:         make(map[string]map[byte]RequestContext),
+		lastRadiusIdMap:     make(map[string]byte),
+		eventLoopChannel:    make(chan interface{}, EVENTLOOP_CAPACITY),
+		readLoopDoneChannel: make(chan bool),
+		controlChannel:      controlChannel,
+		socket:              socket,
 	}
 
 	go rcs.eventLoop()
@@ -170,9 +159,9 @@ func NewRadiusClientSocket(controlChannel chan interface{}, ci *config.PolicyCon
 
 // Starts the closing process
 func (rcs *RadiusClientSocket) SetDown() {
-	config.GetLogger().Debugf("client socket for %d terminating", rcs.socket.LocalAddr().String())
+	config.GetLogger().Debugf("client socket for %s terminating", rcs.socket.LocalAddr().String())
 
-	rcs.eventLoopChannel <- CloseCommandMsg{}
+	rcs.eventLoopChannel <- SetDownCommandMsg{}
 }
 
 // Closes the event loop channel
@@ -210,29 +199,37 @@ func (rcs *RadiusClientSocket) eventLoop() {
 
 		case ReadEOFMsg:
 
+			rcs.socket.Close()
+
+			// Terminate the outsanding requests
 			rcs.cancelAll()
 
-			// Tell the router we are down
-			rcs.routerControlChannel <- SocketDownEvent{Sender: rcs}
+			// Tell the radiusclient we are down
+			rcs.controlChannel <- SocketDownEvent{Sender: rcs}
 
 			return
 
 		case ReadErrorMsg:
 
-			rcs.cancelAll()
-
-			// Tell the router we are down
-			rcs.routerControlChannel <- SocketDownEvent{Sender: rcs, Error: v.Error}
-
-			return
-
-		case CloseCommandMsg:
+			rcs.socket.Close()
 
 			// Terminate the outsanding requests
 			rcs.cancelAll()
 
-			// Tell the router we are down
-			rcs.routerControlChannel <- SocketDownEvent{Sender: rcs}
+			// Tell the radiusclient we are down
+			rcs.controlChannel <- SocketDownEvent{Sender: rcs, Error: v.Error}
+
+			return
+
+		case SetDownCommandMsg:
+
+			rcs.socket.Close()
+
+			// Terminate the outsanding requests
+			rcs.cancelAll()
+
+			// Tell the radiusclient we are down
+			rcs.controlChannel <- SocketDownEvent{Sender: rcs}
 
 			return
 
@@ -290,31 +287,32 @@ func (rcs *RadiusClientSocket) eventLoop() {
 
 		case RadiusRequestMsg:
 
-			radiusId, error := rcs.getNextRadiusId(v.endpoint)
-			if error != nil {
-				config.GetLogger().Errorf("could not get an id: %s", error)
-				v.rchan <- error
+			radiusId, err := rcs.getNextRadiusId(v.endpoint)
+			if err != nil {
+				config.GetLogger().Errorf("could not get an id: %s", err)
+				v.rchan <- err
 				close(v.rchan)
 				continue
 			}
 
-			packetBytes, error := v.packet.ToBytes(v.secret, radiusId)
-			if error != nil {
-				config.GetLogger().Errorf("error marshaling packet: %s", error)
-				v.rchan <- error
+			packetBytes, err := v.packet.ToBytes(v.secret, radiusId)
+			if err != nil {
+				config.GetLogger().Errorf("error marshaling packet: %s", err)
+				v.rchan <- err
 				close(v.rchan)
 				continue
 			}
 
 			remoteAddr, _ := net.ResolveUDPAddr("udp", v.endpoint)
-			_, err := rcs.socket.WriteTo(packetBytes, remoteAddr)
+			_, err = rcs.socket.WriteTo(packetBytes, remoteAddr)
 			if err != nil {
-				config.GetLogger().Errorf("error writing packet: %s", error)
-				v.rchan <- error
+				config.GetLogger().Errorf("error writing packet: %v", err)
+				v.rchan <- err
 				close(v.rchan)
 
 				// Finalize
-				rcs.eventLoopChannel <- CloseCommandMsg{}
+				rcs.eventLoopChannel <- SetDownCommandMsg{}
+				continue
 			}
 
 			// For the timer to be created below
@@ -334,6 +332,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				}),
 				secret:        v.secret,
 				authenticator: v.packet.Authenticator,
+				serverName:    v.serverName,
 			}
 
 			instrumentation.PushRadiusClientRequest(v.endpoint, string(v.packet.Code))
@@ -394,8 +393,8 @@ func (rcs *RadiusClientSocket) readLoop(ch chan bool) {
 
 // Sends a Radius request and gets the answer or error as a message to the specified channel.
 // The response channel is closed just after sending the reponse or error
-func (rcs *RadiusClientSocket) RadiusExchange(endpoint string, rp *radiuscodec.RadiusPacket, timeout time.Duration, secret string, rc chan interface{}) {
-	if cap(rc) < 1 {
+func (rcs *RadiusClientSocket) SendRadiusRequest(request RadiusRequestMsg) {
+	if cap(request.rchan) < 1 {
 		panic("using an unbuffered response channel")
 	}
 
@@ -403,19 +402,15 @@ func (rcs *RadiusClientSocket) RadiusExchange(endpoint string, rp *radiuscodec.R
 	rcs.wg.Add(1)
 	defer rcs.wg.Done()
 
-	code := rp.Code
+	code := request.packet.Code
 	if code != radiuscodec.ACCESS_REQUEST && code != radiuscodec.ACCOUNTING_REQUEST && code != radiuscodec.COA_REQUEST && code != radiuscodec.DISCONNECT_REQUEST {
-		rc <- fmt.Errorf("code is not for request, but %d", code)
+		request.rchan <- fmt.Errorf("code is not for request, but %d", code)
+		close(request.rchan)
 		return
 	}
 
 	// Send myself the message
-	rcs.eventLoopChannel <- RadiusRequestMsg{
-		endpoint: endpoint,
-		packet:   rp,
-		timeout:  timeout,
-		secret:   secret,
-		rchan:    rc}
+	rcs.eventLoopChannel <- request
 }
 
 // Gets the next radiusid to use, or error if all are busy

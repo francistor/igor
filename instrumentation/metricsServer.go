@@ -69,6 +69,7 @@ type MetricsServer struct {
 
 	// One PeerTable per instance
 	diameterPeersTables map[string]DiameterPeersTable
+	radiusServersTables map[string]RadiusServersTable
 }
 
 ////////////////////////////////////////////////////////////
@@ -400,6 +401,7 @@ func NewMetricsServer() *MetricsServer {
 	// Initialize Metrics
 	server.resetMetrics()
 	server.diameterPeersTables = make(map[string]DiameterPeersTable, 1)
+	server.radiusServersTables = make(map[string]RadiusServersTable, 1)
 
 	// Start receive loop
 	go server.metricServerLoop()
@@ -495,6 +497,13 @@ func (ms *MetricsServer) PeersTableQuery() map[string]DiameterPeersTable {
 	return (<-query.RChan).(map[string]DiameterPeersTable)
 }
 
+// Wrapper to get RadiusServersTable
+func (ms *MetricsServer) RadiusServerQuery() map[string]RadiusServersTable {
+	query := Query{Name: "RadiusServersTables", RChan: make(chan interface{})}
+	ms.QueryChan <- query
+	return (<-query.RChan).(map[string]RadiusServersTable)
+}
+
 func (ms *MetricsServer) metricServerLoop() {
 
 	for {
@@ -548,6 +557,9 @@ func (ms *MetricsServer) metricServerLoop() {
 
 			case "DiameterPeersTables":
 				query.RChan <- ms.diameterPeersTables
+
+			case "RadiusServersTables":
+				query.RChan <- ms.radiusServersTables
 			}
 
 			close(query.RChan)
@@ -695,6 +707,10 @@ func (ms *MetricsServer) metricServerLoop() {
 			// PeersTable
 			case DiameterPeersTableUpdatedEvent:
 				ms.diameterPeersTables[e.InstanceName] = e.Table
+
+			// RadiusTable
+			case RadiusServersTableUpdatedEvent:
+				ms.radiusServersTables[e.InstanceName] = e.Table
 			}
 		}
 	}

@@ -3,6 +3,5 @@
 	"authPort": 1812,
 	"acctPort": 1813,
 	"coaPort": 3799,
-	"clientAnonymousBasePort": 42000,
-	"numAnonymousClientPorts": 10
+	"originPorts": [9000, 9001]
 }

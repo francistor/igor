@@ -54,7 +54,7 @@ type ConfigurationManager struct {
 	// The contents of the bootstrapFile are parsed here
 	sRules searchRules
 
-	// Cache of the configuration files already red
+	// Cache of the configuration files already read
 	objectCache sync.Map
 
 	// inFlight contains a map of object names to Once objects that will retrieve the object

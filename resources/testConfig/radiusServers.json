@@ -27,7 +27,7 @@
 	[
 	  {
         "name": "igor-server-ne-group",
-        "servers": ["non-existing-server", "yaas-superserver"],
+        "servers": ["non-existing-server", "igor-superserver"],
         "policy": "fixed"
       },
       {
