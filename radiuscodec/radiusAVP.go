@@ -585,7 +585,8 @@ func (avp *RadiusAVP) GetString() string {
 	return ""
 }
 
-// Helper to get also the tag
+// Helper to get also the tag. Will not include the tag if
+// the attribute is not tagged
 func (avp *RadiusAVP) GetTaggedString() string {
 	str := avp.GetString()
 	if avp.DictItem.Tagged {
@@ -652,6 +653,11 @@ func (avp *RadiusAVP) SetTag(tag byte) *RadiusAVP {
 	return avp
 }
 
+// Simple helper to get the tag
+func (avp *RadiusAVP) GetTag() byte {
+	return avp.Tag
+}
+
 // Creates a new AVP with the specified name and value
 // Will return an error if the name is not found in the dictionary
 func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
@@ -669,18 +675,18 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 	var stringValue, isString = value.(string)
 	if avp.DictItem.Tagged {
 		if !isString {
-			return &avp, fmt.Errorf("tried to create a tagged AVP from a non string value")
+			return &RadiusAVP{}, fmt.Errorf("tried to create a tagged AVP from a non string value")
 		}
 		stringComponents := strings.Split(stringValue, ":")
 		if len(stringComponents) == 2 {
 			tag, err := strconv.ParseUint(stringComponents[1], 10, 8)
 			if err != nil {
-				return &avp, fmt.Errorf("could not decode tag %s", stringComponents[1])
+				return &RadiusAVP{}, fmt.Errorf("could not decode tag %s", stringComponents[1])
 			}
 			avp.Tag = byte(tag)
 			stringValue = stringComponents[0]
 		} else {
-			return &avp, fmt.Errorf("%s is tagged but no tag found", name)
+			return &RadiusAVP{}, fmt.Errorf("%s is tagged but no tag found", name)
 		}
 	}
 
@@ -690,12 +696,12 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 		if isString {
 			avp.Value, err = hex.DecodeString(stringValue)
 			if err != nil {
-				return &avp, fmt.Errorf("could not decode %s as hex string", value)
+				return &RadiusAVP{}, fmt.Errorf("could not decode %s as hex string", value)
 			}
 		} else {
 			var octetsValue, ok = value.([]byte)
 			if !ok {
-				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
 			}
 			avp.Value = octetsValue
 		}
@@ -703,14 +709,20 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 	case radiusdict.Integer, radiusdict.Integer64:
 
 		if isString {
-			avp.Value, err = strconv.ParseInt(stringValue, 10, 8)
-			if err != nil {
-				return &avp, fmt.Errorf("could not parse %s as integer", stringValue)
+			// Try dictionary
+			if intValue, found := avp.DictItem.EnumValues[stringValue]; !found {
+				// Try parse as number
+				avp.Value, err = strconv.ParseInt(stringValue, 10, 64)
+				if err != nil {
+					return &RadiusAVP{}, fmt.Errorf("could not parse %s as integer", stringValue)
+				}
+			} else {
+				avp.Value = int64(intValue)
 			}
 		} else {
 			avp.Value, err = toInt64(value)
 			if err != nil {
-				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
 			}
 		}
 
@@ -718,20 +730,22 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 		if isString {
 			avp.Value = stringValue
 		} else {
-			return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+			return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
 		}
 
 	case radiusdict.Address, radiusdict.IPv6Address:
 
 		if isString {
-			avp.Value = net.ParseIP(stringValue)
-			if avp.Value == nil {
-				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+			addressValue := net.ParseIP(stringValue)
+			if addressValue == nil {
+				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+			} else {
+				avp.Value = addressValue
 			}
 		} else {
 			addressValue, ok := value.(net.IP)
 			if !ok {
-				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
 			} else {
 				avp.Value = addressValue
 			}
@@ -741,12 +755,12 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 		if isString {
 			avp.Value, err = time.Parse(timeFormatString, stringValue)
 			if err != nil {
-				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T %s: %s", avp.DictItem.RadiusType, value, value, err)
+				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T %s: %s", avp.DictItem.RadiusType, value, value, err)
 			}
 		} else {
 			timeValue, ok := value.(time.Time)
 			if !ok {
-				return &avp, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
 			}
 			avp.Value = timeValue
 		}
@@ -754,15 +768,15 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 	case radiusdict.IPv6Prefix:
 		if isString {
 			if !ipv6PrefixRegex.Match([]byte(stringValue)) {
-				return &avp, fmt.Errorf("ipv6 prefix %s does not match expected format", stringValue)
+				return &RadiusAVP{}, fmt.Errorf("ipv6 prefix %s does not match expected format", stringValue)
 			}
 			avp.Value = stringValue
 		} else {
-			return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+			return &RadiusAVP{}, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
 		}
 
 	default:
-		return &avp, fmt.Errorf("%d radius type not known", avp.DictItem.RadiusType)
+		return &RadiusAVP{}, fmt.Errorf("%d radius type not known", avp.DictItem.RadiusType)
 	}
 
 	return &avp, nil
@@ -938,26 +952,47 @@ func decrypt1(payload []byte, authenticator [16]byte, secret string, salt []byte
 // JSON Encoding
 ///////////////////////////////////////////////////////////////
 
-// Generate a map for JSON encoding
-func (avp *RadiusAVP) ToMap() map[string]interface{} {
-	theMap := map[string]interface{}{}
-
-	switch avp.DictItem.RadiusType {
-	case radiusdict.None, radiusdict.Octets, radiusdict.String, radiusdict.InterfaceId, radiusdict.Address, radiusdict.IPv6Address, radiusdict.IPv6Prefix, radiusdict.Time:
-		theMap[avp.Name] = avp.GetTaggedString()
-	case radiusdict.Integer:
-		theMap[avp.Name] = avp.GetInt()
-	}
-	return theMap
-}
-
 // Encode as JSON using the map representation
 func (avp *RadiusAVP) MarshalJSON() ([]byte, error) {
 	return json.Marshal(avp.ToMap())
 }
 
+// Get a RadiusAVP from JSON
+func (avp *RadiusAVP) UnmarshalJSON(b []byte) error {
+
+	theMap := make(map[string]interface{})
+
+	if err := json.Unmarshal(b, &theMap); err != nil {
+		return err
+	} else {
+		*avp, err = AVPFromMap(theMap)
+		return err
+	}
+}
+
+// Generate a map for JSON encoding
+func (avp *RadiusAVP) ToMap() map[string]interface{} {
+	theMap := map[string]interface{}{}
+
+	switch avp.DictItem.RadiusType {
+
+	case radiusdict.None, radiusdict.Octets, radiusdict.String, radiusdict.InterfaceId, radiusdict.Address, radiusdict.IPv6Address, radiusdict.IPv6Prefix, radiusdict.Time:
+		theMap[avp.Name] = avp.GetTaggedString()
+
+	case radiusdict.Integer:
+		// Try dictionary, if not found use integer value
+		var intValue, _ = avp.Value.(int64)
+		if stringValue, ok := avp.DictItem.EnumCodes[int(intValue)]; ok {
+			theMap[avp.Name] = stringValue
+		} else {
+			theMap[avp.Name] = avp.GetInt()
+		}
+	}
+	return theMap
+}
+
 // Generates a RadiusAVP from its JSON representation
-func FromMap(avpMap map[string]interface{}) (RadiusAVP, error) {
+func AVPFromMap(avpMap map[string]interface{}) (RadiusAVP, error) {
 
 	if len(avpMap) != 1 {
 		return RadiusAVP{}, fmt.Errorf("map contains more than one key in JSON representation of Diameter AVP")
@@ -971,17 +1006,4 @@ func FromMap(avpMap map[string]interface{}) (RadiusAVP, error) {
 
 	// Unreachable code
 	return RadiusAVP{}, fmt.Errorf("ureachable code")
-}
-
-// Get a RadiusAVP from JSON
-func (avp *RadiusAVP) UnmarshalJSON(b []byte) error {
-	var err error
-
-	theMap := make(map[string]interface{})
-	if err = json.Unmarshal(b, &theMap); err != nil {
-		return err
-	}
-
-	*avp, err = FromMap(theMap)
-	return err
 }

@@ -1,4 +1,3 @@
 [
-	{"realm": "igorserver", "applicationId": "Gx", "handler": "GxHandler"},
-	{"realm": "*", "applicationId": "NASREQ", "handler": "NASReqHandler"}
+	{"realm": "*", "applicationId": "*"}
 ]

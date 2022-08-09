@@ -454,6 +454,8 @@ func (dm *DiameterMessage) AddOriginAVPs(ci *config.PolicyConfigurationManager) 
 ///////////////////////////////////////////////////////////////
 // Message constructors
 ///////////////////////////////////////////////////////////////
+
+// Builds a DiameterRequest with the specified application and command names
 func NewDiameterRequest(appName string, commandName string) (*DiameterMessage, error) {
 
 	diameterMessage := DiameterMessage{IsRequest: true}

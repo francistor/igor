@@ -3,6 +3,7 @@ package config
 import (
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -11,8 +12,7 @@ func httpServer() {
 	// Serve configuration
 	var fileHandler = http.FileServer(http.Dir("resources"))
 	http.Handle("/", fileHandler)
-	err := http.ListenAndServe(":8100", nil)
-	if err != nil {
+	if err := http.ListenAndServe(":8100", nil); err != nil {
 		panic("could not start http server")
 	}
 }
@@ -37,12 +37,14 @@ func TestObjectRetrieval(t *testing.T) {
 
 	var wg sync.WaitGroup
 
+	var co ConfigObject
+	var err error
 	var objectName = "testFile.json"
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := GetPolicyConfig().CM.GetConfigObject(objectName, true)
+			co, err = GetPolicyConfig().cm.GetConfigObject(objectName, true)
 			t.Log("Got configuration object")
 			if err != nil {
 				panic(err)
@@ -50,6 +52,17 @@ func TestObjectRetrieval(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+
+	// Parse Raw
+	if !strings.Contains(string(co.RawBytes), "correctly") {
+		t.Fatal("raw testFile.json not retrieved correctly")
+	}
+
+	// Parse as JSON
+	var jsonMap = co.Json.(map[string]interface{})
+	if jsonMap["test"].(string) != "file retreived correctly" {
+		t.Fatal("json testFile.json not retrieved correctly")
+	}
 }
 
 // Diameter Configuration
@@ -66,21 +79,18 @@ func TestDiamConfig(t *testing.T) {
 	if dp["superserver.igorsuperserver"].WatchdogIntervalMillis != 300000 {
 		t.Fatalf("WatchdogIntervalMillis was %d", dp["superserver.igorsuperserver"].WatchdogIntervalMillis)
 	}
-	peer, err := dp.FindPeer("client.igorclient")
-	if err != nil {
-		t.Fatalf("Peer not found for and origin-host client.igorclient")
+	peer, found := dp["client.igorclient"]
+	if !found {
+		t.Fatalf("Peer not found for client.igorclient")
 	}
 	if peer.DiameterHost != "client.igorclient" || peer.ConnectionPolicy != "passive" {
 		t.Fatal("Found peer is not conforming to expected attributes", peer)
 	}
 
 	// Routing rules configuration
-	rr := GetPolicyConfig().RoutingRulesConf()
-	if err != nil {
-		t.Fatal("Could not get Routing Rules", err)
-	}
 	// Find the rule {"realm": "igorsuperserver", "applicationId": "*", "peers": ["superserver.igorsuperserver"], "policy": "fixed"}
-	found := false
+	rr := GetPolicyConfig().RoutingRulesConf()
+	found = false
 	for _, rule := range rr {
 		if rule.Realm == "igorsuperserver" && rule.ApplicationId == "*" && rule.Peers[0] == "superserver.igorsuperserver" && rule.Policy == "fixed" {
 			found = true
@@ -101,34 +111,34 @@ func TestRadiusConfig(t *testing.T) {
 	// Radius Server Configuration
 	dsc := GetPolicyConfig().RadiusServerConf()
 	if dsc.BindAddress != "0.0.0.0" {
-		t.Errorf("Bind address was <%s>", dsc.BindAddress)
+		t.Fatalf("Bind address was <%s>", dsc.BindAddress)
 	}
 	if dsc.OriginPorts[1] != 9001 {
-		t.Errorf("Origin port 9001 not found")
+		t.Fatalf("Origin port 9001 not found")
 	}
 
 	// Radius Clients configuration
 	rc := GetPolicyConfig().RadiusClientsConf()
 	if rc["127.0.0.1"].Secret != "secret" {
-		t.Errorf("secret for 127.0.0.1 is not as expeted")
+		t.Fatalf("secret for 127.0.0.1 is not as expeted")
 	}
 
 	// Get Radius Servers configuration
 	rs := GetPolicyConfig().RadiusServersConf()
 	if rs.Servers["non-existing-server"].IPAddress != "192.168.250.1" {
-		t.Errorf("address of non-existing-server is not 192.168.250.1")
+		t.Fatalf("address of non-existing-server is not 192.168.250.1")
 	}
 	if rs.Servers["igor-superserver"].OriginPorts[0] != 8000 {
-		t.Errorf("igor-superserver has unexpected origin port")
+		t.Fatalf("igor-superserver has unexpected origin port")
 	}
 	if rs.ServerGroups["igor-superserver-group"].Policy != "random" {
-		t.Errorf("igor-supserserver server group has not policy random")
+		t.Fatalf("igor-supserserver server group has not policy random")
 	}
 
 	// Get Radius handlers configuration
 	rh := GetPolicyConfig().RadiusHandlersConf()
 	if rh.AuthHandlers[0] != "https://localhost:8080/radiusRequest" {
-		t.Errorf("first radius handler for auth not as expected")
+		t.Fatalf("first radius handler for auth not as expected")
 	}
 }
 
@@ -145,18 +155,5 @@ func TestHandlerConfig(t *testing.T) {
 	}
 	if hc.RouterPort != 23868 {
 		t.Fatalf("RouterPort was %d", hc.RouterPort)
-	}
-}
-
-// Retrieval of some JSON configuration file
-func TestConfigFile(t *testing.T) {
-
-	json, err := GetPolicyConfig().CM.GetConfigObjectAsJson("testFile.json", true)
-	if err != nil {
-		t.Fatal("Could not get configuration file testFile.json in \"testInstance\" folder", err)
-	}
-	var jsonMap = json.(map[string]interface{})
-	if jsonMap["test"].(string) != "content" {
-		t.Fatal("\"test\" property was not set to \"content\"")
 	}
 }

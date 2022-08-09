@@ -405,12 +405,13 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
 		}
-		for i, _ := range groupedValue {
-			n, err := groupedValue[i].WriteTo(buffer)
-			if err != nil {
+		for i := range groupedValue {
+			if n, err := groupedValue[i].WriteTo(buffer); err != nil {
 				return int64(bytesWritten) + n, err
+			} else {
+				bytesWritten += int(n)
 			}
-			bytesWritten += int(n)
+
 		}
 
 	case diamdict.Address:

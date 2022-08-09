@@ -33,7 +33,7 @@ func TestDiameterMetrics(t *testing.T) {
 	// Generate some metrics
 	PushPeerDiameterRequestReceived("testPeer", diameterRequest)
 	PushPeerDiameterRequestSent("testPeer", diameterRequest)
-	PushPeerDiameterRequestTimeout("testPeer", PeerDiameterMetricFromMessage("testPeer", diameterRequest))
+	PushPeerDiameterRequestTimeout(PeerDiameterMetricFromMessage("testPeer", diameterRequest))
 	PushPeerDiameterAnswerReceived("testPeer", diameterAnswer)
 	PushPeerDiameterAnswerSent("testPeer", diameterAnswer)
 	PushPeerDiameterAnswerStalled("testPeer", diameterAnswer)

@@ -6,8 +6,9 @@ import (
 	"net"
 )
 
+// Manages the configuration items for policy
 type PolicyConfigurationManager struct {
-	CM ConfigurationManager
+	cm ConfigurationManager
 
 	currentDiameterServerConfig DiameterServerConfig
 	currentRoutingRules         DiameterRoutingRules
@@ -20,27 +21,29 @@ type PolicyConfigurationManager struct {
 }
 
 // Slice of configuration managers
-// Except during testing, there will be only one instance, which will be retrieved by GetConfig()
+// Except during testing, there will be only one instance, which will be retrieved by GetPolicyConfig().
+// To retrieve a specific instance, use GetPolicyConfigInstance(<instance-name>)
 var policyConfigs []*PolicyConfigurationManager = make([]*PolicyConfigurationManager, 0)
 
-// Adds a Policy (Radius and Diameter) configuration object with the specified name
+// Adds a Policy (Radius and Diameter) configuration object with the specified name to the list of policyConfigs
+// if isDefault is true, also initializes the logger and the dictionaries, which are shared among all instances
 func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefault bool) *PolicyConfigurationManager {
 
 	// Check not already instantiated
 	for i := range policyConfigs {
-		if policyConfigs[i].CM.instanceName == instanceName {
+		if policyConfigs[i].cm.instanceName == instanceName {
 			panic(instanceName + " already initalized")
 		}
 	}
 
 	// Better to create asap
-	policyConfig := PolicyConfigurationManager{CM: NewConfigurationManager(bootstrapFile, instanceName)}
+	policyConfig := PolicyConfigurationManager{cm: NewConfigurationManager(bootstrapFile, instanceName)}
 	policyConfigs = append(policyConfigs, &policyConfig)
 
 	// Initialize logger and dictionary, if default
 	if isDefault {
-		initLogger(&policyConfig.CM)
-		initDictionaries(&policyConfig.CM)
+		initLogger(&policyConfig.cm)
+		initDictionaries(&policyConfig.cm)
 	}
 
 	// Load diameter configuraton
@@ -76,7 +79,7 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefau
 func GetPolicyConfigInstance(instanceName string) *PolicyConfigurationManager {
 
 	for i := range policyConfigs {
-		if policyConfigs[i].CM.instanceName == instanceName {
+		if policyConfigs[i].cm.instanceName == instanceName {
 			return policyConfigs[i]
 		}
 	}
@@ -84,7 +87,7 @@ func GetPolicyConfigInstance(instanceName string) *PolicyConfigurationManager {
 	panic("configuraton instance <" + instanceName + "> not configured")
 }
 
-// Retrieves the default configuration instance
+// Retrieves the default configuration instance, which is the first one in the list
 func GetPolicyConfig() *PolicyConfigurationManager {
 	return policyConfigs[0]
 }
@@ -104,20 +107,20 @@ type DiameterServerConfig struct {
 	HttpBindPort         int
 }
 
-// Retrieves the diameter server configuration
+// Retrieves the diameter server configuration, forcing a refresh
 func (c *PolicyConfigurationManager) getDiameterServerConfig() (DiameterServerConfig, error) {
 	dsc := DiameterServerConfig{}
-	dc, err := c.CM.GetConfigObject("diameterServer.json", true)
+	dc, err := c.cm.GetConfigObject("diameterServer.json", true)
 	if err != nil {
 		return dsc, err
 	}
 	if err := json.Unmarshal(dc.RawBytes, &dsc); err != nil {
-		fmt.Println(err)
 		return dsc, err
 	}
 	return dsc, nil
 }
 
+// Updates the diameter server configuration in the global variable
 func (c *PolicyConfigurationManager) UpdateDiameterServerConfig() error {
 	dsc, error := c.getDiameterServerConfig()
 	if error != nil {
@@ -127,6 +130,7 @@ func (c *PolicyConfigurationManager) UpdateDiameterServerConfig() error {
 	return nil
 }
 
+// Retrieves the contents of the global variable containing the diameter server configuration
 func (c *PolicyConfigurationManager) DiameterServerConf() DiameterServerConfig {
 	return c.currentDiameterServerConfig
 }
@@ -140,10 +144,10 @@ type RadiusServerConfig struct {
 	OriginPorts []int
 }
 
-// Retrieves the radius server configuration
+// Retrieves the radius server configuration, corcing a refresh
 func (c *PolicyConfigurationManager) getRadiusServerConfig() (RadiusServerConfig, error) {
 	rsc := RadiusServerConfig{}
-	rc, err := c.CM.GetConfigObject("radiusServer.json", true)
+	rc, err := c.cm.GetConfigObject("radiusServer.json", true)
 	if err != nil {
 		return rsc, err
 	}
@@ -153,6 +157,7 @@ func (c *PolicyConfigurationManager) getRadiusServerConfig() (RadiusServerConfig
 	return rsc, nil
 }
 
+// Updates the radius server configuration in the global variable
 func (c *PolicyConfigurationManager) UpdateRadiusServerConfig() error {
 	rsc, error := c.getRadiusServerConfig()
 	if error != nil {
@@ -162,26 +167,30 @@ func (c *PolicyConfigurationManager) UpdateRadiusServerConfig() error {
 	return nil
 }
 
+// Retrieves the contents of the global variable containing the radius server configuration
 func (c *PolicyConfigurationManager) RadiusServerConf() RadiusServerConfig {
 	return c.currentRadiusServerConfig
 }
 
+// Holds the configuration of a Radius Client
 type RadiusClient struct {
 	Name      string
 	IPAddress string
 	Secret    string
 }
 
-// type RadiusClients []RadiusClient
+// Holds the configuration of all Radius Clients, indexed by IP address
 type RadiusClients map[string]RadiusClient
 
-// Retrieves the radius clients configuration
+// Retrieves the radius clients configuration, forcing a refresh
 func (c *PolicyConfigurationManager) getRadiusClientsConfig() (RadiusClients, error) {
 
+	// To store the parsed JSON
 	var clientsArray []RadiusClient
 
+	// To be returned
 	radiusClients := make(RadiusClients)
-	rc, err := c.CM.GetConfigObject("radiusClients.json", true)
+	rc, err := c.cm.GetConfigObject("radiusClients.json", true)
 	if err != nil {
 		return radiusClients, err
 	}
@@ -197,6 +206,7 @@ func (c *PolicyConfigurationManager) getRadiusClientsConfig() (RadiusClients, er
 	return radiusClients, nil
 }
 
+// Updates the radius clients configuration in the global variable
 func (c *PolicyConfigurationManager) UpdateRadiusClients() error {
 	radiusClients, error := c.getRadiusClientsConfig()
 	if error != nil {
@@ -206,10 +216,12 @@ func (c *PolicyConfigurationManager) UpdateRadiusClients() error {
 	return nil
 }
 
+// Retrieves the contents of the global variable containing the radius clients configuration
 func (c *PolicyConfigurationManager) RadiusClientsConf() RadiusClients {
 	return c.currentRadiusClients
 }
 
+// Holds the configuration for an upstream Radius Server
 type RadiusServer struct {
 	Name                  string
 	IPAddress             string
@@ -222,20 +234,22 @@ type RadiusServer struct {
 	QuarantineTimeSeconds int
 }
 
+// Holds the configuration of a Radius Server Group
 type RadiusServerGroup struct {
 	Name    string
 	Servers []string
 
-	// policy may be "fixed", "random", "fixed-withclear", "random-withclear"
+	// policy may be "fixed" or "random"
 	Policy string
 }
 
+// Holds the RadiusServers and Groups configuration, as stored in the radiusServers.json file
 type RadiusServers struct {
 	Servers      map[string]RadiusServer
 	ServerGroups map[string]RadiusServerGroup
 }
 
-// Retrieves the radius servers configuration
+// Retrieves the radius servers configuration, forcing a refresh
 func (c *PolicyConfigurationManager) getRadiusServersConfig() (RadiusServers, error) {
 
 	// To unmarshal from JSON
@@ -244,13 +258,13 @@ func (c *PolicyConfigurationManager) getRadiusServersConfig() (RadiusServers, er
 		ServerGroups []RadiusServerGroup
 	}
 
-	// Returned value
+	// Returned value, with maps indexed by name
 	radiusServers := RadiusServers{
 		Servers:      make(map[string]RadiusServer),
 		ServerGroups: make(map[string]RadiusServerGroup),
 	}
 
-	rc, err := c.CM.GetConfigObject("radiusServers.json", true)
+	rc, err := c.cm.GetConfigObject("radiusServers.json", true)
 	if err != nil {
 		return radiusServers, err
 	}
@@ -258,7 +272,7 @@ func (c *PolicyConfigurationManager) getRadiusServersConfig() (RadiusServers, er
 		return radiusServers, err
 	}
 
-	// Format
+	// Do the formating, as maps indexed by name
 	for _, rs := range radiusServersArray.Servers {
 		radiusServers.Servers[rs.Name] = rs
 	}
@@ -269,6 +283,7 @@ func (c *PolicyConfigurationManager) getRadiusServersConfig() (RadiusServers, er
 	return radiusServers, nil
 }
 
+// Updates the radius servers configuration in the global variable
 func (c *PolicyConfigurationManager) UpdateRadiusServers() error {
 	radiusServers, error := c.getRadiusServersConfig()
 	if error != nil {
@@ -278,20 +293,22 @@ func (c *PolicyConfigurationManager) UpdateRadiusServers() error {
 	return nil
 }
 
+// Retrieves the contents of the global variable containing the radius servers configuration
 func (c *PolicyConfigurationManager) RadiusServersConf() RadiusServers {
 	return c.currentRadiusServers
 }
 
+// Holds the radius handlers configuration
 type RadiusHandlers struct {
 	AuthHandlers []string
 	AcctHandlers []string
 	COAHandlers  []string
 }
 
-// Retrieves the radius routes configuration
+// Retrieves the radius handlers configuration, forcing a refresh
 func (c *PolicyConfigurationManager) getRadiusHandlersConfig() (RadiusHandlers, error) {
 	var radiusHandlers RadiusHandlers
-	rc, err := c.CM.GetConfigObject("radiusHandlers.json", true)
+	rc, err := c.cm.GetConfigObject("radiusHandlers.json", true)
 	if err != nil {
 		return radiusHandlers, err
 	}
@@ -301,6 +318,7 @@ func (c *PolicyConfigurationManager) getRadiusHandlersConfig() (RadiusHandlers, 
 	return radiusHandlers, nil
 }
 
+// Updates the radius handlers configuration in the global variable
 func (c *PolicyConfigurationManager) UpdateRadiusHandlers() error {
 	radiusHandlers, error := c.getRadiusHandlersConfig()
 	if error != nil {
@@ -310,12 +328,14 @@ func (c *PolicyConfigurationManager) UpdateRadiusHandlers() error {
 	return nil
 }
 
+// Retrieves the contents of the global variable containing the radius handlers configuration
 func (c *PolicyConfigurationManager) RadiusHandlersConf() RadiusHandlers {
 	return c.currentRadiusHandlers
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// Holds a Diameter Routing rule
 type DiameterRoutingRule struct {
 	Realm         string
 	ApplicationId string
@@ -324,6 +344,7 @@ type DiameterRoutingRule struct {
 	Policy        string   // May be "fixed" or "random"
 }
 
+// Holds all the Diameter Routing rules
 type DiameterRoutingRules []DiameterRoutingRule
 
 // Finds the appropriate route, taking into account wildcards.
@@ -339,35 +360,41 @@ func (rr DiameterRoutingRules) FindDiameterRoute(realm string, application strin
 		}
 	}
 
-	return DiameterRoutingRule{}, fmt.Errorf("rule not found for realm %s, application %s, remote: %t", realm, application, remote)
+	return DiameterRoutingRule{}, fmt.Errorf("rule not found for realm %s and application %s, remote: %t", realm, application, remote)
 }
 
-// Retrieves the Routes configuration
+// Retrieves the Routes configuration, forcing a refresh
 func (c *PolicyConfigurationManager) getDiameterRoutingRules() (DiameterRoutingRules, error) {
 	var routingRules []DiameterRoutingRule
-	rr, err := c.CM.GetConfigObject("diameterRoutes.json", true)
+	rr, err := c.cm.GetConfigObject("diameterRoutes.json", true)
 	if err != nil {
 		return routingRules, err
 	}
-	json.Unmarshal(rr.RawBytes, &routingRules)
+	err = json.Unmarshal(rr.RawBytes, &routingRules)
+	if err != nil {
+		return routingRules, err
+	}
 	return routingRules, nil
 }
 
+// Updates the diameter routing rules configuration in the global variable
 func (c *PolicyConfigurationManager) UpdateDiameterRoutingRules() error {
 	drr, error := c.getDiameterRoutingRules()
 	if error != nil {
-		return fmt.Errorf("could not retrieve the Diameter Rules configuration: %w", error)
+		return fmt.Errorf("could not retrieve the Diameter Routing Rules configuration: %w", error)
 	}
 	c.currentRoutingRules = drr
 	return nil
 }
 
+// Retrieves the contents of the global variable containing the diameter routing rules configuration
 func (c *PolicyConfigurationManager) RoutingRulesConf() DiameterRoutingRules {
 	return c.currentRoutingRules
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// Holds the configuration of a Diameter Peer
 type DiameterPeer struct {
 	DiameterHost            string
 	IPAddress               string
@@ -379,43 +406,46 @@ type DiameterPeer struct {
 	ConnectionTimeoutMillis int
 }
 
+// Holds the configuration of all Diameter peers
 type DiameterPeers map[string]DiameterPeer
 
-// Gets the first Diameter Peer with the specified Diameter-Host
-func (dps *DiameterPeers) FindPeer(diameterHost string) (DiameterPeer, error) {
-
-	for _, peer := range *dps {
-		if peer.DiameterHost == diameterHost {
-			return peer, nil
-		}
-	}
-
-	return DiameterPeer{}, fmt.Errorf("no Peer found for Origin-host %s", diameterHost)
-}
-
-func (dps *DiameterPeers) ValidateIncomingAddress(host string, address net.IP) bool {
-	for _, peer := range *dps {
-		if peer.OriginNetworkCIDR.Contains(address) {
-			if host == "" || peer.DiameterHost == host {
+// Check that the ip address is in the valid range for the specified diameter-host
+func (dps DiameterPeers) ValidateIncomingAddress(diameterHost string, address net.IP) bool {
+	if diameterHost == "" {
+		// Check that at least there is a Diameter Host that allows that IP address
+		for _, peer := range dps {
+			if peer.OriginNetworkCIDR.Contains(address) {
 				return true
 			}
 		}
+		return false
+	} else if peer, found := dps[diameterHost]; found {
+		// Check that there is a match for this specified Diameter Host
+		return peer.OriginNetworkCIDR.Contains(address)
+	} else {
+		return false
 	}
-	return false
 }
 
-// Retrieves the Peers configuration
+// Retrieves the Peers configuration, forcing a refresh
 func (c *PolicyConfigurationManager) getDiameterPeers() (DiameterPeers, error) {
+
+	// Read from JSON
 	var peers []DiameterPeer
+
+	// To be returned
 	peersMap := make(map[string]DiameterPeer)
 
-	dp, err := c.CM.GetConfigObject("diameterPeers.json", true)
+	dp, err := c.cm.GetConfigObject("diameterPeers.json", true)
 	if err != nil {
 		return peersMap, err
 	}
-	json.Unmarshal(dp.RawBytes, &peers)
+	err = json.Unmarshal(dp.RawBytes, &peers)
+	if err != nil {
+		return peersMap, err
+	}
 
-	// Cooking
+	// Cooking. Adding parsed origin network and build as a map per diameter-host
 	for i := range peers {
 		_, ipNet, err := net.ParseCIDR(peers[i].OriginNetwork)
 		if err != nil {

@@ -7,7 +7,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// Must be initialized with a call to SetupLogger
+// Must be initialized with a call to initLogger, which is done
+// during the initialization of a default policyConfigurationManager or
+// handlerConfigurationManager
 var ilogger *zap.SugaredLogger
 
 // https://pkg.go.dev/go.uber.org/zap
@@ -40,14 +42,16 @@ func initLogger(cm *ConfigurationManager) {
 		jConfig = []byte(defaultLogConfig)
 	}
 
+	// Parse the JSON
 	var cfg zap.Config
-	if err := json.Unmarshal([]byte(jConfig), &cfg); err != nil {
-		panic(err)
+	if err := json.Unmarshal(jConfig, &cfg); err != nil {
+		panic("bad log configuration " + err.Error())
 	}
 
-	logger, logError := cfg.Build()
-	if logError != nil {
-		panic(logError)
+	// Build a logger with the specified configuration
+	logger, err := cfg.Build()
+	if err != nil {
+		panic("bad log configuration " + err.Error())
 	}
 
 	ilogger = logger.Sugar()

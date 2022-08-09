@@ -21,6 +21,13 @@ const CONTROL_QUEUE_SIZE = 16
 // Timeout in seconds for http2 handlers
 const HTTP_TIMEOUT_SECONDS = 10
 
+// TIcker for Diameter Peer checking
+const PEER_CHECK_INTERVAL_SECONDS = 60
+
+// Default timeout for requests, when not specified in the origin of the request
+// (e.g. diameter request that is routed to another peer instead of being handled)
+const DEFAULT_REQUEST_TIMEOUT_SECONDS = 10
+
 // Message to be sent for orderly shutdown of the Router
 type RouterSetDownCommand struct {
 }

@@ -97,7 +97,7 @@ type PeerDiameterRequestTimeoutEvent struct {
 }
 
 // Helper function to send a message to the instrumentation server when a diameter request timeout occurs
-func PushPeerDiameterRequestTimeout(peerName string, key PeerDiameterMetricKey) {
+func PushPeerDiameterRequestTimeout(key PeerDiameterMetricKey) {
 	MS.InputChan <- PeerDiameterRequestTimeoutEvent{Key: key}
 }
 

@@ -3,7 +3,6 @@ package httphandler
 import (
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"igor/config"
 	"igor/diamcodec"
 	"igor/handlerfunctions"
@@ -103,6 +102,4 @@ func TestBasicHandler(t *testing.T) {
 	if err != nil {
 		t.Errorf("unmarshal error for diameter message: %s", err)
 	}
-
-	fmt.Println(diameterAnswer)
 }

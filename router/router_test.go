@@ -3,10 +3,8 @@ package router
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"igor/config"
 	"igor/diamcodec"
-	"igor/handlerfunctions"
 	"igor/httphandler"
 	"igor/instrumentation"
 	"igor/radiuscodec"
@@ -14,6 +12,44 @@ import (
 	"testing"
 	"time"
 )
+
+// This message handler parses the franciscocardosogil1-Command, which may specify
+// whether to introduce a small delay (value "Slow") or a big one (value "VerySlow")
+// A User-Name attribute with the value "TestUserNameEcho" is added to the answer
+func localDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
+	answer := diamcodec.NewDiameterAnswer(request)
+	answer.AddOriginAVPs(config.GetPolicyConfig())
+	answer.Add("User-Name", "EchoLocal")
+	answer.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
+
+	command := request.GetStringAVP("franciscocardosogil-Command")
+	switch command {
+	case "Slow":
+		// Simulate the answer takes some time
+		time.Sleep(300 * time.Millisecond)
+	case "VerySlow":
+		// Simulate the answer takes more time
+		time.Sleep(5000 * time.Millisecond)
+	}
+
+	return answer, nil
+}
+
+// The most basic handler ever. Returns an empty response to the received message
+func httpDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
+	resp := diamcodec.NewDiameterAnswer(request)
+	resp.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
+	resp.Add("User-Name", "EchoHTTP")
+
+	return resp, nil
+}
+
+// The most basic handler ever. Returns an empty response to the received message
+func httpRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+	resp := radiuscodec.NewRadiusResponse(request, true)
+
+	return resp, nil
+}
 
 func TestMain(m *testing.M) {
 
@@ -30,22 +66,40 @@ func TestMain(m *testing.M) {
 }
 
 func TestDiameterBasicSetup(t *testing.T) {
-	superServerRouter := NewRouter("testSuperServer")
+
+	/* List of diameter servers and its peers
+
+	client.igorclient			server.igorserver		superserver.igorsuperserver
+	-----------------			----------------		---------------------------
+	server.igorserver			client.igorclient		server.igorserver
+	unreachable.igorserver
+
+	unkclient.igorclient	(testClientUnknownClient)
+	-------------------
+	server.igorserver
+
+	client.igorclient		(testClientUnknownServer)
+	-----------------
+	unkserver.igorserver
+
+	*/
+
+	superServerRouter := NewRouter("testSuperServer", localDiameterHandler)
 	time.Sleep(150 * time.Millisecond)
-	serverRouter := NewRouter("testServer")
+	serverRouter := NewRouter("testServer", localDiameterHandler)
 	time.Sleep(150 * time.Millisecond)
-	clientRouter := NewRouter("testClient")
+	clientRouter := NewRouter("testClient", localDiameterHandler)
 
 	// Bad peers
 	// This sleep time is important. Otherwise another client presenting himself
 	// as client.igor generates a race condition and none of the client.igor
 	// peers gets engaged
 	time.Sleep(200 * time.Millisecond)
-	NewRouter("testClientUnknownClient")
-	NewRouter("testClientUnknownServer")
+	b1 := NewRouter("testClientUnknownClient", localDiameterHandler)
+	b2 := NewRouter("testClientUnknownServer", localDiameterHandler)
 
 	// Time to settle connections
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	// Uncomment to debug
 	/*
@@ -120,20 +174,26 @@ func TestDiameterBasicSetup(t *testing.T) {
 	clientRouter.Close()
 	t.Log("Client Router terminated")
 
+	b1.SetDown()
+	b1.Close()
+
+	b2.SetDown()
+	b2.Close()
+
 }
 
-// Client will send message to Server, which will handle locally
-// The two types of routes are tested here
-func TestDiameterRouteMessage(t *testing.T) {
+// Client will send message to Server, which will handle using http
+// The two types of routes are tested here: to remote peer and to http handler
+func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 
 	// Start handler
-	httphandler.NewHttpHandler("testServer", handlerfunctions.EmptyDiameterHandler, handlerfunctions.EmptyRadiusHandler)
+	httphandler.NewHttpHandler("testServer", httpDiameterHandler, httpRadiusHandler)
 	time.Sleep(150 * time.Millisecond)
 
 	// Start Routers
-	NewRouter("testServer")
+	server := NewRouter("testServer", localDiameterHandler)
 	time.Sleep(150 * time.Millisecond)
-	client := NewRouter("testClient")
+	client := NewRouter("testClient", localDiameterHandler)
 
 	// Some time to settle
 	time.Sleep(500 * time.Millisecond)
@@ -151,6 +211,8 @@ func TestDiameterRouteMessage(t *testing.T) {
 		t.Fatalf("route message returned error %s", err)
 	} else if response.GetIntAVP("Result-Code") != diamcodec.DIAMETER_SUCCESS {
 		t.Fatalf("Result-Code not succes %d", response.GetIntAVP("Result-Code"))
+	} else if response.GetStringAVP("User-Name") != "EchoHTTP" {
+		t.Fatalf("Echoed User-Name incorrect %s", response.GetStringAVP("User-Name"))
 	}
 
 	time.Sleep(200 * time.Millisecond)
@@ -162,10 +224,52 @@ func TestDiameterRouteMessage(t *testing.T) {
 	if hm[instrumentation.HttpHandlerMetricKey{}] != 1 {
 		t.Fatalf("Handler Exchanges was not 1")
 	}
+
+	client.SetDown()
+	client.Close()
+	server.SetDown()
+	server.Close()
+}
+
+// Client sends to server, which sends to superserver, which handles locally
+func TestDiameterRouteMessagetoLocal(t *testing.T) {
+
+	// Start Routers
+	superServer := NewRouter("testSuperServer", localDiameterHandler)
+	server := NewRouter("testServer", nil)
+	time.Sleep(150 * time.Millisecond)
+	client := NewRouter("testClient", nil)
+
+	// Some time to settle
+	time.Sleep(500 * time.Millisecond)
+
+	// Build request
+	request, err := diamcodec.NewDiameterRequest("Gx", "Credit-Control")
+	if err != nil {
+		t.Fatalf("NewDiameterRequest error %s", err)
+	}
+	request.AddOriginAVPs(config.GetPolicyConfig())
+	request.Add("Destination-Realm", "igorsuperserver")
+	response, err := client.RouteDiameterRequest(request, time.Duration(1000*time.Millisecond))
+	if err != nil {
+		t.Fatalf("route message returned error %s", err)
+	} else if response.GetIntAVP("Result-Code") != diamcodec.DIAMETER_SUCCESS {
+		t.Fatalf("Result-Code not success %d", response.GetIntAVP("Result-Code"))
+	} else if response.GetStringAVP("User-Name") != "EchoLocal" {
+		t.Fatalf("Echoed User-Name incorrect %s", response.GetStringAVP("User-Name"))
+	}
+
+	superServer.SetDown()
+	server.SetDown()
+	client.SetDown()
+	superServer.Close()
+	server.Close()
+	client.Close()
+
 }
 
 func TestRouteRadiusPacket(t *testing.T) {
-	rrouter := NewRadiusRouter("testServer", echoHandler)
+	rrouter := NewRadiusRouter("testServer", httpRadiusHandler)
 
 	rrouter.updateRadiusServersTable()
 
@@ -181,8 +285,6 @@ func TestRouteRadiusPacket(t *testing.T) {
 	if reqParams[2].endpoint != "192.168.250.1:11812" {
 		t.Errorf("third try has wrong endpoint")
 	}
-	fmt.Println(reqParams)
-
 }
 
 // Helper to navigate through peers
@@ -205,15 +307,4 @@ func PrettyPrintJSON(j []byte) string {
 	}
 
 	return jBytes.String()
-}
-
-// Simple handler that generates a success response with the same attributes as in the request
-func echoHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-
-	response := radiuscodec.NewRadiusResponse(request, true)
-	for i := range request.AVPs {
-		response.AddAVP(&request.AVPs[i])
-	}
-
-	return response, nil
 }

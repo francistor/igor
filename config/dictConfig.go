@@ -5,7 +5,7 @@ import (
 	"igor/radiusdict"
 )
 
-// This global variable has to be initialized using SetupDictionaries
+// These global variables have to be initialized using initDictionaries
 var diameterDict *diamdict.DiameterDict
 var radiusDict *radiusdict.RadiusDict
 

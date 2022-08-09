@@ -1,7 +1,11 @@
 package diamcodec
 
 import (
+	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"os"
+	"strconv"
 	"sync/atomic"
 	"time"
 )
@@ -32,4 +36,51 @@ func getE2EId() uint32 {
 	return atomic.AddUint32(&nextE2EId, 1)
 }
 
-//The response message has the same E2EId and HopByHop Id. Probably error in generating the diameter answer
+// Manages the state id
+// Returns the state id, which may be started from 1 if clean is true
+// and is incremented if next is true (to be called this way on restart)
+func GetStateId(clean bool, next bool) int {
+
+	// Get the contents of the file
+	configBase := os.Getenv("IGOR_CONFIG_BASE")
+	if configBase == "" {
+		panic("environment variable IGOR_CONFIG_BASE undefined")
+	}
+	stateIdFileName := configBase + "state-id"
+
+	if clean {
+		os.Remove(stateIdFileName)
+	}
+
+	if resp, err := ioutil.ReadFile(stateIdFileName); err != nil {
+		// state-id file does not exist
+		return writeStateId(1)
+	} else {
+		if currentStateId, err := strconv.Atoi(string(resp)); err != nil {
+			return writeStateId(1)
+		} else {
+			if next {
+				return writeStateId(currentStateId + 1)
+			} else {
+				return currentStateId
+			}
+		}
+	}
+}
+
+// Writes the specified state-id in the state-id file
+func writeStateId(stateId int) int {
+
+	// Get the contents of the file
+	configBase := os.Getenv("IGOR_CONFIG_BASE")
+	if configBase == "" {
+		panic("environment variable IGOR_CONFIG_BASE undefined")
+	}
+	stateIdFileName := configBase + "state-id"
+
+	if ioutil.WriteFile(stateIdFileName, []byte(fmt.Sprintf("%d", stateId)), 0660) != nil {
+		panic("could not write state-id file")
+	}
+
+	return stateId
+}

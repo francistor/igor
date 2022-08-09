@@ -342,6 +342,19 @@ func (rp *RadiusPacket) GetStringAVP(avpName string) string {
 	return avp.GetString()
 }
 
+// Retrieves the specified AVP name as a string including the tag after
+// a semicolon, or the string default value
+// if not found (instead of returning an error. Use with care)
+func (rp *RadiusPacket) GetTaggedStringAVP(avpName string) string {
+	avp, err := rp.GetAVP(avpName)
+	if err != nil {
+		return ""
+	}
+
+	return avp.GetTaggedString()
+}
+
+// Gets the decoded password
 func (rp *RadiusPacket) GetPasswordStringAVP(avpName string) string {
 	avp, err := rp.GetAVP(avpName)
 	if err != nil {

@@ -9,6 +9,11 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
+)
+
+const (
+	HTTP_TIMEOUT_SECONDS = 5
 )
 
 // General utilities to read configuration files, locally or via http
@@ -20,26 +25,29 @@ type ConfigObject struct {
 	RawBytes []byte
 }
 
-// Types for Search Rules
-type searchRule struct {
+// Holds a SearchRule, which specifies where to look for a configuration object
+type SearchRule struct {
 	// Regex for the name of the object. If matching, we'll try to locate
 	// it prepending the Base property to compose the URL (file or http)
+	// The regex will contain a matching group that will be the part used to
+	// look for the object. For instance, in "Gy/(.*)", the part after "Gy/"
+	// will be taken as the resource name to look after when retreiving an object
+	// name such as Gy/peers.json
 	NameRegex string
 
-	// Compiled form of NameRegex
+	// Compiled form of nameRegex
 	Regex *regexp.Regexp
 
 	// Can be a URL or a path
 	Base string
 }
 
-// Tye applicable Search Rules
-type searchRules []searchRule
+// The applicable Search Rules
+type SearchRules []SearchRule
 
-// Holds a configuration instance
-// To be embedded in a handlerConfig or policyConfig object
-// Includes the basic methods to manage configuration files
-// without interpreting them.
+// Basic objects and methods to manage configuration files without yet
+// interpreting them. To be embedded in a handlerConfig or policyConfig object
+// Multiple "instances" can coexist in a single executable
 type ConfigurationManager struct {
 
 	// Configuration objects are to be searched for in a path that contains
@@ -48,17 +56,19 @@ type ConfigurationManager struct {
 	instanceName string
 
 	// The bootstrap file is the first configuration file read, and it contains
-	// the rules for searching other files
+	// the rules for searching other files. It can be a local file or a URL
 	bootstrapFile string
 
 	// The contents of the bootstrapFile are parsed here
-	sRules searchRules
+	searchRules SearchRules
 
 	// Cache of the configuration files already read
 	objectCache sync.Map
 
 	// inFlight contains a map of object names to Once objects that will retrieve the object
-	// from the remote and store in cache.
+	// from the remote and store in cache. The purpose of using this is to avoid having
+	// multiple requests to read the same object at the same time. The second and subsequent
+	// ones will block until the first one finishes
 	inFlight sync.Map
 }
 
@@ -76,33 +86,33 @@ func NewConfigurationManager(bootstrapFile string, instanceName string) Configur
 	return cm
 }
 
-// Reads the bootstrap file and fills the search rules for the Configuration Manager
-// To be called upon instantiation
+// Reads the bootstrap file and fills the search rules for the Configuration Manager.
+// To be called upon instantiation of the ConfigurationManager.
+// The bootstrap file is not subject to instance searching
 func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	// Get the search rules object
 	rules, err := c.readResource(bootstrapFile)
 	if err != nil {
-		panic("Could not retrieve the bootstrap file in " + bootstrapFile)
+		panic("could not retrieve the bootstrap file in " + bootstrapFile)
 	}
 
-	// Decode Search Rules
-	json.Unmarshal(rules, &c.sRules)
-	if len(c.sRules) == 0 {
-		panic("Could not decode the Search Rules")
+	// Decode Search Rules and add them to the ConfigurationManager object
+	err = json.Unmarshal(rules, &c.searchRules)
+	if err != nil || len(c.searchRules) == 0 {
+		panic("could not decode the Search Rules")
 	}
-	for i, sr := range c.sRules {
-		// Add the compiled regular expression for each rule
-		c.sRules[i].Regex, err = regexp.Compile(sr.NameRegex)
-		if err != nil {
-			panic("Could not compile Search Rule Regex " + sr.NameRegex)
+
+	// Add the compiled regular expression for each rule
+	for i, sr := range c.searchRules {
+		if c.searchRules[i].Regex, err = regexp.Compile(sr.NameRegex); err != nil {
+			panic("could not compile Search Rule Regex: " + sr.NameRegex)
 		}
 	}
 }
 
 // Returns the configuration object as a parsed Json
 func (c *ConfigurationManager) GetConfigObjectAsJson(objectName string, refresh bool) (interface{}, error) {
-	co, err := c.GetConfigObject(objectName, refresh)
-	if err == nil {
+	if co, err := c.GetConfigObject(objectName, refresh); err == nil {
 		return co.Json, nil
 	} else {
 		return nil, err
@@ -111,8 +121,7 @@ func (c *ConfigurationManager) GetConfigObjectAsJson(objectName string, refresh 
 
 // Returns the raw text of the configuration object
 func (c *ConfigurationManager) GetConfigObjectAsText(objectName string, refresh bool) ([]byte, error) {
-	co, err := c.GetConfigObject(objectName, refresh)
-	if err == nil {
+	if co, err := c.GetConfigObject(objectName, refresh); err == nil {
 		return co.RawBytes, nil
 	} else {
 		return nil, err
@@ -120,20 +129,20 @@ func (c *ConfigurationManager) GetConfigObjectAsText(objectName string, refresh 
 }
 
 // Retrieves the object form the cache or tries to get it from the remote
-// and caches it if not found
+// and caches it if not found. If refresh is true, ignores the contents of the
+// cache and tries to retrieve a fresh copy
 func (c *ConfigurationManager) GetConfigObject(objectName string, refresh bool) (ConfigObject, error) {
 	// Try cache
 	if !refresh {
-		obj, found := c.objectCache.Load(objectName)
-		if found {
+		if obj, found := c.objectCache.Load(objectName); found {
 			return obj.(ConfigObject), nil
 		}
 	}
 
-	// Not found. Retrieve
+	// Not found or forced refresh. Retrieve object from origin.
 	// InFlight contains a map of object names to Once objects that will retrieve the object
 	// from the remote and store in cache. The first requesting goroutine will push the
-	// Once to the map, the others will retrieve the once already pushed. The executing
+	// Once to the map, the others will retrieve the Once already pushed. The executing
 	// Once will delete the entry from the Inflight map
 
 	// Only one Once will be stored in the inFlight map. Late request will create a Once
@@ -143,10 +152,10 @@ func (c *ConfigurationManager) GetConfigObject(objectName string, refresh bool) 
 
 	// Once function
 	var retriever = func() {
-		obj, err := c.readConfigObject(objectName)
-		if err == nil {
+		if obj, err := c.readConfigObject(objectName); err == nil {
 			c.objectCache.Store(objectName, obj)
 		} else {
+			// Logger may not yet be initialized
 			if logger := GetLogger(); logger != nil {
 				GetLogger().Errorf("error retrieving %s: %v", objectName, err)
 			}
@@ -158,8 +167,7 @@ func (c *ConfigurationManager) GetConfigObject(objectName string, refresh bool) 
 	flightOncePtr.(*sync.Once).Do(retriever)
 
 	// Try again
-	obj, found := c.objectCache.Load(objectName)
-	if found {
+	if obj, found := c.objectCache.Load(objectName); found {
 		return obj.(ConfigObject), nil
 	} else {
 		return ConfigObject{}, errors.New("could not get configuration object " + objectName)
@@ -183,9 +191,9 @@ func (c *ConfigurationManager) readConfigObject(objectName string) (ConfigObject
 	// Iterate through Search Rules
 	var base string
 	var innerName string
-	for _, rule := range c.sRules {
-		matches := rule.Regex.FindStringSubmatch(objectName)
-		if matches != nil {
+
+	for _, rule := range c.searchRules {
+		if matches := rule.Regex.FindStringSubmatch(objectName); matches != nil {
 			innerName = matches[1]
 			base = rule.Base
 		}
@@ -196,25 +204,20 @@ func (c *ConfigurationManager) readConfigObject(objectName string) (ConfigObject
 	}
 
 	// Found, base var contains the prefix
-	var objectLocation string
 
 	// Try first with instance name
 	if c.instanceName != "" {
-		objectLocation = base + c.instanceName + "/" + innerName
-		object, err := c.readResource(objectLocation)
-		if err == nil {
+		if object, err := c.readResource(base + c.instanceName + "/" + innerName); err == nil {
 			return newConfigObjectFromBytes(object), nil
 		}
 	}
 
 	// Try without instance name
-	objectLocation = base + innerName
-	object, err := c.readResource(objectLocation)
-	if err == nil {
-		configObject = newConfigObjectFromBytes(object)
+	if object, err := c.readResource(base + innerName); err == nil {
+		return newConfigObjectFromBytes(object), nil
+	} else {
+		return configObject, err
 	}
-
-	return configObject, err
 }
 
 // Reads the configuration item from the specified location, which may be
@@ -222,32 +225,39 @@ func (c *ConfigurationManager) readConfigObject(objectName string) (ConfigObject
 func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 
 	if strings.HasPrefix(location, "http") {
+		// Read from http
+
+		// Create client with timeout
+		httpClient := http.Client{Timeout: HTTP_TIMEOUT_SECONDS * time.Second}
 
 		// Location is a http URL
-		resp, err := http.Get(location)
+		resp, err := httpClient.Get(location)
 		if err != nil {
 			return nil, err
 		}
 		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
+		if body, err := ioutil.ReadAll(resp.Body); err != nil {
 			return nil, err
+		} else {
+			return body, nil
 		}
-		return body, nil
 
 	} else {
-
-		resp, err := ioutil.ReadFile(os.Getenv("IGOR_CONFIG_BASE") + location)
-		if err != nil {
-			return nil, err
+		// Read from file
+		configBase := os.Getenv("IGOR_CONFIG_BASE")
+		if configBase == "" {
+			panic("environment variable IGOR_CONFIG_BASE undefined")
 		}
-		return resp, nil
+		if resp, err := ioutil.ReadFile(configBase + location); err != nil {
+			return nil, err
+		} else {
+			return resp, nil
+		}
 	}
 }
 
-// Takes a raw string and turns it into a ConfigObject, which is
-// trying to parse the string as Json and returing both the
-// original string and the JSON in a composite ConfigObject
+// Takes a raw string and turns it into a ConfigObject,
+// trying to parse the string as JSON
 func newConfigObjectFromBytes(object []byte) ConfigObject {
 	configObject := ConfigObject{
 		RawBytes: object,

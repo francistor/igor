@@ -401,5 +401,48 @@ func TestJSONAVP(t *testing.T) {
 			t.Errorf("serialized avp not as expected. got <%s>", string(jsonBytes))
 		}
 	}
+}
 
+func TestJSONPacket(t *testing.T) {
+
+	jsonPacket := `{
+				"Code": 1,
+				"AVPs":[
+					{"Igor-OctetsAttribute": "0102030405060708090a0b"},
+					{"Igor-StringAttribute": "stringvalue"},
+					{"Igor-IntegerAttribute": "Zero"},
+					{"Igor-IntegerAttribute": "1"},
+					{"Igor-IntegerAttribute": 1},
+					{"Igor-AddressAttribute": "127.0.0.1:1"},
+					{"Igor-TimeAttribute": "1966-11-26T03:34:08 UTC"},
+					{"Igor-IPv6AddressAttribute": "bebe:cafe::0"},
+					{"Igor-IPv6PrefixAttribute": "bebe:cafe:cccc::0/64"},
+					{"Igor-InterfaceIdAttribute": "00aabbccdd"},
+					{"Igor-Integer64Attribute": 999999999999},
+					{"Igor-SaltedOctetsAttribute": "1122aabbccdd"},
+					{"User-Name":"MyUserName"}
+				]
+			}`
+
+	// Read JSON to Radius Packet
+	radiusPacket := RadiusPacket{}
+	if err := json.Unmarshal([]byte(jsonPacket), &radiusPacket); err != nil {
+		t.Fatalf("unmarshal error for radius packet: %s", err)
+	}
+
+	// Check attributes
+	taggedIPAddress := radiusPacket.GetTaggedStringAVP("Igor-AddressAttribute")
+	if taggedIPAddress != "127.0.0.1:1" {
+		t.Fatalf("bad tagged IPAddress attribute %s", taggedIPAddress)
+	}
+	timeAttribute := radiusPacket.GetDateAVP("Igor-TimeAttribute")
+	if timeAttribute.Hour() != 3 {
+		t.Fatalf("bad time attribute %v", timeAttribute)
+	}
+
+	// Write RadiusPacket message as JSON
+	jsonPacketNew, _ := json.Marshal(&radiusPacket)
+	if !strings.Contains(string(jsonPacketNew), "1966-11-26T03:34:08 UTC") || !strings.Contains(string(jsonPacketNew), "Zero") {
+		t.Errorf("marshalled json does not contain the expected attributes: %s", string(jsonPacketNew))
+	}
 }

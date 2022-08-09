@@ -5,14 +5,15 @@ import (
 	"fmt"
 )
 
+// Manages the configuration items for the http handlers
 type HandlerConfigurationManager struct {
-	CM ConfigurationManager
-
+	cm                   ConfigurationManager
 	currentHandlerConfig HandlerConfig
 }
 
 // Slice of configuration managers
-// Except during testing, there will be only one instance, which will be retrieved by GetConfig()
+// Except during testing, there will be only one instance, which will be retrieved by GetConfig(). A
+// specific instance is retrieved with GetConfigInstance()
 var handlerConfigs []*HandlerConfigurationManager = make([]*HandlerConfigurationManager, 0)
 
 // Adds a Handler configuration object with the specified name
@@ -20,19 +21,19 @@ func InitHandlerConfigInstance(bootstrapFile string, instanceName string, isDefa
 
 	// Check not already instantiated
 	for i := range handlerConfigs {
-		if handlerConfigs[i].CM.instanceName == instanceName {
+		if handlerConfigs[i].cm.instanceName == instanceName {
 			panic(instanceName + " already initalized")
 		}
 	}
 
 	// Better to create asap
-	handlerConfig := HandlerConfigurationManager{CM: NewConfigurationManager(bootstrapFile, instanceName)}
+	handlerConfig := HandlerConfigurationManager{cm: NewConfigurationManager(bootstrapFile, instanceName)}
 	handlerConfigs = append(handlerConfigs, &handlerConfig)
 
 	// Initialize logger and dictionary, if default
 	if isDefault {
-		initLogger(&handlerConfig.CM)
-		initDictionaries(&handlerConfig.CM)
+		initLogger(&handlerConfig.cm)
+		initDictionaries(&handlerConfig.cm)
 	}
 
 	// Load handler configuraton
@@ -45,7 +46,7 @@ func InitHandlerConfigInstance(bootstrapFile string, instanceName string, isDefa
 func GetHandlerConfigInstance(instanceName string) *HandlerConfigurationManager {
 
 	for i := range handlerConfigs {
-		if handlerConfigs[i].CM.instanceName == instanceName {
+		if handlerConfigs[i].cm.instanceName == instanceName {
 			return handlerConfigs[i]
 		}
 	}
@@ -60,24 +61,33 @@ func GetHandlerConfig() *HandlerConfigurationManager {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// Holds a http handler configuration
 type HandlerConfig struct {
-	BindAddress     string
-	BindPort        int
+	// The IP address in which the http server will listen
+	BindAddress string
+	// The port number in which the http server will listen
+	BindPort int
+	// The IP address of the Radius&Diameter router to which the requests from the handler must be sent
 	RouterIPAddress string
-	RouterPort      int
+	// The TCP port of the Radius&Diameter router to which the requests from the handler must be sent
+	RouterPort int
 }
 
-// Retrieves the handler configuration
+// Retrieves the handler configuration, forcing a refresh
 func (c *HandlerConfigurationManager) getHandlerConfig() (HandlerConfig, error) {
 	hc := HandlerConfig{}
-	h, err := c.CM.GetConfigObject("handler.json", true)
+	h, err := c.cm.GetConfigObject("handler.json", true)
 	if err != nil {
 		return hc, err
 	}
-	json.Unmarshal(h.RawBytes, &hc)
+	err = json.Unmarshal(h.RawBytes, &hc)
+	if err != nil {
+		return hc, err
+	}
 	return hc, nil
 }
 
+// Updates the global variable with the http handler configuration
 func (c *HandlerConfigurationManager) UpdateHandlerConfig() error {
 	hc, error := c.getHandlerConfig()
 	if error != nil {
@@ -87,6 +97,7 @@ func (c *HandlerConfigurationManager) UpdateHandlerConfig() error {
 	return nil
 }
 
+// Retrieves the current http handler configuration
 func (c *HandlerConfigurationManager) HandlerConf() HandlerConfig {
 	return c.currentHandlerConfig
 }
