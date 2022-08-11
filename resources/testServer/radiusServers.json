@@ -18,8 +18,8 @@
         "authPort": 11812,
         "acctPort": 11813,
         "coaPort": 13799,
-        "errorLimit": 3,
-        "quarantineTimeSeconds": 60
+        "errorLimit": 2,
+        "quarantineTimeSeconds": 5
       }
 	],
 	"serverGroups" :

@@ -1,6 +1,7 @@
 package httphandler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"igor/config"
@@ -16,16 +17,33 @@ import (
 type HttpHandler struct {
 	// Holds the configuration instance for this Handler
 	ci *config.HandlerConfigurationManager
+
+	// Holds the httpserver
+	httpServer *http.Server
+
+	// For signaling finalization
+	doneChannel chan interface{}
 }
 
 // Creates a new DiameterHandler object
 func NewHttpHandler(instanceName string, diameterHandler diampeer.MessageHandler, radiusHandler radiusserver.RadiusPacketHandler) HttpHandler {
-	h := HttpHandler{ci: config.GetHandlerConfigInstance(instanceName)}
+
+	// 	https://stackoverflow.com/questions/40786526/resetting-http-handlers-in-golang-for-unit-testing
+	http.DefaultServeMux = new(http.ServeMux)
+
+	ci := config.GetHandlerConfigInstance(instanceName)
+	bindAddrPort := fmt.Sprintf("%s:%d", ci.HandlerConf().BindAddress, ci.HandlerConf().BindPort)
+	config.GetLogger().Infof("Handler listening in %s", bindAddrPort)
+
+	h := HttpHandler{
+		ci:          ci,
+		httpServer:  &http.Server{Addr: bindAddrPort},
+		doneChannel: make(chan interface{}, 1),
+	}
 
 	http.HandleFunc("/diameterRequest", getDiameterRequestHandler(diameterHandler))
 	http.HandleFunc("/radiusRequest", getRadiusRequestHandler(radiusHandler))
 
-	// TODO: Close gracefully
 	go h.Run()
 	return h
 }
@@ -34,13 +52,17 @@ func NewHttpHandler(instanceName string, diameterHandler diampeer.MessageHandler
 // in a goroutine.
 func (dh *HttpHandler) Run() {
 
-	bindAddrPort := fmt.Sprintf("%s:%d", dh.ci.HandlerConf().BindAddress, dh.ci.HandlerConf().BindPort)
-
-	config.GetLogger().Infof("listening in %s", bindAddrPort)
-	http.ListenAndServeTLS(bindAddrPort,
+	dh.httpServer.ListenAndServeTLS(
 		"/home/francisco/cert.pem",
-		"/home/francisco/key.pem",
-		nil)
+		"/home/francisco/key.pem")
+
+	close(dh.doneChannel)
+}
+
+// Gracefully shutdown
+func (dh *HttpHandler) Close() {
+	dh.httpServer.Shutdown(context.Background())
+	<-dh.doneChannel
 }
 
 // Given a Diameter Handler function, builds an http handler that unserializes, executes the handler and serializes the response

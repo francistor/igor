@@ -504,6 +504,11 @@
                     "name": "SaltedOctetsAttribute",
                     "type": "Octets",
                     "salted": true
+                },
+                {
+                    "code": 12,
+                    "name": "Command",
+                    "type": "String"
                 }
             ]
         }

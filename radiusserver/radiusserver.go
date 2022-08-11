@@ -9,36 +9,41 @@ import (
 	"sync/atomic"
 )
 
+// Valid statuses
 const (
-	StatusClosing = 1
+	StatusTerminated = 1
 )
 
 // Type for functions that handle the radius requests received
 type RadiusPacketHandler func(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error)
 
 // Implements a radius server socket
-// Validates incoming messages, sends them to the router for processing and sends the responses
+// Validates incoming messages, sends them to the router for processing and replies back
+// with the responses
 type RadiusServer struct {
 
 	// Configuration instance object
 	ci *config.PolicyConfigurationManager
 
-	// Handler function
+	// Handler function for incoming packets
 	handler RadiusPacketHandler
 
 	// The UDP socket
 	socket net.PacketConn
 
-	// Status
+	// Status. Initially 0 and 1 (StatusClosing) if we are shutting down
 	status int32
 }
 
 // Creates a Radius Server
 func NewRadiusServer(ci *config.PolicyConfigurationManager, bindIPAddress string, bindPort int, handler RadiusPacketHandler) *RadiusServer {
 
+	// Create the server socket
 	socket, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", bindIPAddress, bindPort))
 	if err != nil {
 		panic(fmt.Sprintf("could not create listen socket in %s:%d : %s", bindIPAddress, bindPort, err))
+	} else {
+		config.GetLogger().Infof("RADIUS server listening in %s:%d", bindIPAddress, bindPort)
 	}
 
 	radiusServer := RadiusServer{
@@ -53,9 +58,10 @@ func NewRadiusServer(ci *config.PolicyConfigurationManager, bindIPAddress string
 	return &radiusServer
 }
 
+// Frees the server socket. No need to call any SetDown() here
 func (rs *RadiusServer) Close() {
 	// Set the status
-	atomic.StoreInt32(&rs.status, StatusClosing)
+	atomic.StoreInt32(&rs.status, StatusTerminated)
 
 	// Will generate an error in the loop, and the readerLoop will return
 	rs.socket.Close()
@@ -71,7 +77,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 		packetSize, clientAddr, err := socket.ReadFrom(reqBuf)
 		if err != nil {
 			// Check here if the error is due to the socket being closed
-			if atomic.LoadInt32(&rs.status) == StatusClosing {
+			if atomic.LoadInt32(&rs.status) == StatusTerminated {
 				// The socket was closed gracefully
 				config.GetLogger().Infof("finished radius server socket %s", socket.LocalAddr().String())
 				return
@@ -81,7 +87,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 			}
 		}
 
-		// Verify client and get secret
+		// Verify client and get shared secret
 		clientIPAddr := clientAddr.(*net.UDPAddr).IP.String()
 		radiusClient, found := rs.ci.RadiusClientsConf()[clientIPAddr]
 
@@ -94,6 +100,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 		radiusPacket, err := radiuscodec.RadiusPacketFromBytes((reqBuf[:packetSize]), radiusClient.Secret)
 		if err != nil {
 			config.GetLogger().Errorf("error decoding packet %s", err)
+			continue
 		}
 
 		instrumentation.PushRadiusServerRequest(clientIPAddr, string(radiusPacket.Code))

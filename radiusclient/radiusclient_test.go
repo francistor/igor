@@ -47,7 +47,7 @@ func TestRadiusClientSocket(t *testing.T) {
 
 	// Create the RadiusClientSocket
 	cchan := make(chan interface{})
-	rcs := NewRadiusClientSocket(cchan, pci, "127.0.0.1", 18120)
+	rcs := NewRadiusClientSocket(pci, cchan, "127.0.0.1", 18120)
 
 	// Create a request radius packet
 	request := radiuscodec.NewRadiusRequest(1)
@@ -55,7 +55,7 @@ func TestRadiusClientSocket(t *testing.T) {
 
 	// Create channel for the request
 	rchan1 := make(chan interface{}, 1)
-	m1 := RadiusRequestMsg{
+	m1 := ClientRadiusRequestMsg{
 		endpoint: "127.0.0.1:1812",
 		packet:   request,
 		timeout:  1 * time.Second,
@@ -81,7 +81,7 @@ func TestRadiusClientSocket(t *testing.T) {
 	request.Add("Session-Timeout", 1)
 	// Create channel for the request
 	rchan2 := make(chan interface{}, 1)
-	m2 := RadiusRequestMsg{
+	m2 := ClientRadiusRequestMsg{
 		endpoint: "127.0.0.1:1812",
 		packet:   request,
 		timeout:  500 * time.Millisecond,
@@ -105,12 +105,44 @@ func TestRadiusClientSocket(t *testing.T) {
 	rcs.SetDown()
 
 	// Wait to receive Socket down
-	<-cchan
+	ev := <-cchan
+	switch e := ev.(type) {
+	case SocketDownEvent:
+		if e.Error != nil {
+			t.Fatalf("socketdown event with non nil error %#v", e)
+		}
+	default:
+		t.Fatalf("unexpected event %#v", e)
+	}
 
+	// Terminate the client socket
 	rcs.Close()
 
 	// Terminate the server
 	rs.Close()
+}
+
+func TestRadiusClientSocketClose(t *testing.T) {
+	// Get the configuration
+	pci := config.GetPolicyConfigInstance("testServer")
+
+	// Create the RadiusClientSocket
+	cchan := make(chan interface{})
+	rcs := NewRadiusClientSocket(pci, cchan, "127.0.0.1", 18120)
+
+	rcs.closeSocket()
+
+	ev := <-cchan
+	switch e := ev.(type) {
+	case SocketDownEvent:
+		if e.Error == nil {
+			t.Fatalf("socketdown event with nil error")
+		}
+	default:
+		t.Fatalf("unexpected event %#v", e)
+	}
+
+	rcs.Close()
 }
 
 func TestRadiusClientOnly(t *testing.T) {
@@ -134,7 +166,7 @@ func TestRadiusClientOnly(t *testing.T) {
 	// Create channel for the request
 	rchan1 := make(chan interface{}, 1)
 
-	rc.RadiusExchange("servername", "127.0.0.1:1812", 2000, request, 100*time.Millisecond, "secret", rchan1)
+	rc.RadiusExchange("127.0.0.1:1812", 2000, request, 100*time.Millisecond, 1, "secret", rchan1)
 
 	// Verify answer
 	response1 := <-rchan1
@@ -153,7 +185,7 @@ func TestRadiusClientOnly(t *testing.T) {
 	// Create channel for the request
 	rchan2 := make(chan interface{}, 1)
 
-	rc.RadiusExchange("servername", "127.0.0.1:1888", 18120, request, 100*time.Millisecond, "secret", rchan2)
+	rc.RadiusExchange("127.0.0.1:1888", 18120, request, 100*time.Millisecond, 1, "secret", rchan2)
 	response2 := <-rchan2
 	switch v := response2.(type) {
 	case error:
@@ -166,8 +198,8 @@ func TestRadiusClientOnly(t *testing.T) {
 	// The following requests will be cancelled, not timed out
 	rchan3 := make(chan interface{}, 1)
 	rchan4 := make(chan interface{}, 1)
-	rc.RadiusExchange("servername", "127.0.0.1:1888", 18130, request, 1000*time.Second, "secret", rchan3)
-	rc.RadiusExchange("servername", "127.0.0.1:1888", 18140, request, 1000*time.Second, "secret", rchan4)
+	rc.RadiusExchange("127.0.0.1:1888", 18130, request, 1000*time.Second, 1, "secret", rchan3)
+	rc.RadiusExchange("127.0.0.1:1888", 18140, request, 1000*time.Second, 1, "secret", rchan4)
 
 	rc.SetDown()
 	<-rchan3
@@ -182,5 +214,3 @@ func TestRadiusClientOnly(t *testing.T) {
 
 	rs.Close()
 }
-
-// TODO: Test cancellation of outstanding requests

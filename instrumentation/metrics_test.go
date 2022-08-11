@@ -152,6 +152,7 @@ func TestRadiusMetrics(t *testing.T) {
 	PushRadiusClientResponse("127.0.0.1:1812", "2")
 	PushRadiusClientTimeout("127.0.0.1:1812", "1")
 	PushRadiusClientResponseStalled("127.0.0.1:1812", "1")
+	PushRadiusClientResponseDrop("127.0.0.1:1812", "1")
 
 	time.Sleep(100 * time.Millisecond)
 	rm := MS.RadiusQuery("RadiusServerRequests", nil, []string{"Endpoint"})
@@ -196,6 +197,12 @@ func TestRadiusMetrics(t *testing.T) {
 		t.Fatalf("RadiusClientResponsesStalled not found")
 	} else if v != 1 {
 		t.Fatalf("RadiusClientResponsesStalled is not 1")
+	}
+	rm = MS.RadiusQuery("RadiusClientResponsesDrop", nil, []string{"Endpoint"})
+	if v, ok := rm[RadiusMetricKey{Endpoint: "127.0.0.1:1812"}]; !ok {
+		t.Fatalf("RadiusClientResponsesDrop not found")
+	} else if v != 1 {
+		t.Fatalf("RadiusClientResponsesDrop is not 1")
 	}
 
 }

@@ -345,7 +345,7 @@ func (dp *DiameterPeer) eventLoop() {
 			// Start the event loop and CER/CEA handshake
 			case ConnectionEstablishedMsg:
 
-				config.GetLogger().Debugf("connection established with %s", v.connection.RemoteAddr().String)
+				config.GetLogger().Debugf("connection established with %s", v.connection.RemoteAddr().String())
 
 				dp.connection = v.connection
 				dp.connReader = bufio.NewReader(dp.connection)
@@ -656,8 +656,12 @@ func (dp *DiameterPeer) eventLoop() {
 								// The after func has not been called
 								dp.wg.Done()
 							} else {
-								// Drain the channel
-								<-requestContext.timer.C
+								// Drain the channel so that the tick is not read by anybody else
+								// https://itnext.io/go-timer-101252c45166
+								select {
+								case <-requestContext.timer.C:
+								default:
+								}
 							}
 							// Send the response
 							requestContext.rchan <- v.message
@@ -877,7 +881,11 @@ func (dp *DiameterPeer) cancelAll() {
 			dp.wg.Done()
 		} else {
 			// Drain the channel so that the tick is not read by anybody else
-			<-requestContext.timer.C
+			// https://itnext.io/go-timer-101252c45166
+			select {
+			case <-requestContext.timer.C:
+			default:
+			}
 		}
 		// Send the error
 		requestContext.rchan <- fmt.Errorf("request cancelled due to Peer down")

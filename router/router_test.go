@@ -36,17 +36,35 @@ func localDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.Diamet
 }
 
 // The most basic handler ever. Returns an empty response to the received message
-func httpDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-	resp := diamcodec.NewDiameterAnswer(request)
-	resp.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
-	resp.Add("User-Name", "EchoHTTP")
+func localRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+	resp := radiuscodec.NewRadiusResponse(request, true)
+	resp.Add("User-Name", "EchoLocal")
+
+	command := request.GetStringAVP("Igor-Command")
+	switch command {
+	case "Slow":
+		// Simulate the answer takes some time
+		time.Sleep(300 * time.Millisecond)
+	case "VerySlow":
+		// Simulate the answer takes more time
+		time.Sleep(5000 * time.Millisecond)
+	}
 
 	return resp, nil
+}
+
+func httpDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
+	answer := diamcodec.NewDiameterAnswer(request)
+	answer.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
+	answer.Add("User-Name", "EchoHTTP")
+
+	return answer, nil
 }
 
 // The most basic handler ever. Returns an empty response to the received message
 func httpRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
 	resp := radiuscodec.NewRadiusResponse(request, true)
+	resp.Add("User-Name", "EchoHTTP")
 
 	return resp, nil
 }
@@ -84,19 +102,19 @@ func TestDiameterBasicSetup(t *testing.T) {
 
 	*/
 
-	superServerRouter := NewRouter("testSuperServer", localDiameterHandler)
+	superServerRouter := NewDiameterRouter("testSuperServer", localDiameterHandler)
 	time.Sleep(150 * time.Millisecond)
-	serverRouter := NewRouter("testServer", localDiameterHandler)
+	serverRouter := NewDiameterRouter("testServer", localDiameterHandler)
 	time.Sleep(150 * time.Millisecond)
-	clientRouter := NewRouter("testClient", localDiameterHandler)
+	clientRouter := NewDiameterRouter("testClient", localDiameterHandler)
 
 	// Bad peers
 	// This sleep time is important. Otherwise another client presenting himself
 	// as client.igor generates a race condition and none of the client.igor
 	// peers gets engaged
 	time.Sleep(200 * time.Millisecond)
-	b1 := NewRouter("testClientUnknownClient", localDiameterHandler)
-	b2 := NewRouter("testClientUnknownServer", localDiameterHandler)
+	b1 := NewDiameterRouter("testClientUnknownClient", localDiameterHandler)
+	b2 := NewDiameterRouter("testClientUnknownServer", localDiameterHandler)
 
 	// Time to settle connections
 	time.Sleep(500 * time.Millisecond)
@@ -187,13 +205,13 @@ func TestDiameterBasicSetup(t *testing.T) {
 func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 
 	// Start handler
-	httphandler.NewHttpHandler("testServer", httpDiameterHandler, httpRadiusHandler)
+	httpHandler := httphandler.NewHttpHandler("testServer", httpDiameterHandler, httpRadiusHandler)
 	time.Sleep(150 * time.Millisecond)
 
 	// Start Routers
-	server := NewRouter("testServer", localDiameterHandler)
+	server := NewDiameterRouter("testServer", localDiameterHandler)
 	time.Sleep(150 * time.Millisecond)
-	client := NewRouter("testClient", localDiameterHandler)
+	client := NewDiameterRouter("testClient", localDiameterHandler)
 
 	// Some time to settle
 	time.Sleep(500 * time.Millisecond)
@@ -229,16 +247,18 @@ func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 	client.Close()
 	server.SetDown()
 	server.Close()
+
+	httpHandler.Close()
 }
 
 // Client sends to server, which sends to superserver, which handles locally
 func TestDiameterRouteMessagetoLocal(t *testing.T) {
 
 	// Start Routers
-	superServer := NewRouter("testSuperServer", localDiameterHandler)
-	server := NewRouter("testServer", nil)
+	superServer := NewDiameterRouter("testSuperServer", localDiameterHandler)
+	server := NewDiameterRouter("testServer", nil)
 	time.Sleep(150 * time.Millisecond)
-	client := NewRouter("testClient", nil)
+	client := NewDiameterRouter("testClient", nil)
 
 	// Some time to settle
 	time.Sleep(500 * time.Millisecond)
@@ -262,30 +282,195 @@ func TestDiameterRouteMessagetoLocal(t *testing.T) {
 	superServer.SetDown()
 	server.SetDown()
 	client.SetDown()
+
 	superServer.Close()
 	server.Close()
 	client.Close()
-
 }
 
-func TestRouteRadiusPacket(t *testing.T) {
+func TestRouteParamRadiusPacket(t *testing.T) {
 	rrouter := NewRadiusRouter("testServer", httpRadiusHandler)
 
 	rrouter.updateRadiusServersTable()
 
 	rchan := make(chan interface{}, 1)
 	req := RoutableRadiusRequest{
-		destination: "igor-server-ne-group",
-		packet:      radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST),
-		rchan:       rchan,
-		timeout:     1 * time.Second,
-		retries:     2,
+		destination:       "igor-server-ne-group",
+		packet:            radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST),
+		rchan:             rchan,
+		perRequestTimeout: 1 * time.Second,
+		tries:             3, // 1 will go to ne-server, 2 will go to igor-server, 3 will go again to ne-server
 	}
 	reqParams := rrouter.getRouteParams(req)
 	if reqParams[2].endpoint != "192.168.250.1:11812" {
 		t.Errorf("third try has wrong endpoint")
 	}
+
+	rrouter.SetDown()
+	rrouter.Close()
 }
+
+// Client --> radiusPacket to --> Server --> httpHandler
+func TestRadiusRouteMessagetoHTTP(t *testing.T) {
+	// Start handler
+	httpHandler := httphandler.NewHttpHandler("testServer", httpDiameterHandler, httpRadiusHandler)
+	time.Sleep(150 * time.Millisecond)
+
+	// Start Routers
+	server := NewRadiusRouter("testServer", localRadiusHandler)
+	time.Sleep(150 * time.Millisecond)
+	client := NewRadiusRouter("testClient", localRadiusHandler)
+
+	// Generate request
+	req := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
+	req.Add("User-Name", "myUserName")
+
+	// Send to named group
+	resp, err := client.RouteRadiusRequest("igor-server-group", req, 2*time.Second, 1, 1, "secret")
+	if err != nil {
+		t.Fatalf("error sending request to igor-server-group %s", err)
+	}
+	if resp.GetStringAVP("User-Name") != "EchoHTTP" {
+		t.Fatalf("bad response from server igor-server-group. Got %s", resp.GetStringAVP("User-Name"))
+	}
+
+	// Send to specific endpoint
+	// Send to named group
+	resp, err = client.RouteRadiusRequest("127.0.0.1:1812", req, 2*time.Second, 1, 1, "secret")
+	if err != nil {
+		t.Fatalf("error sending request to 127.0.0.1:1812: %s", err)
+	}
+	if resp.GetStringAVP("User-Name") != "EchoHTTP" {
+		t.Fatalf("bad response from server 127.0.0.1:1812. Got %s", resp.GetStringAVP("User-Name"))
+	}
+
+	client.SetDown()
+	server.SetDown()
+
+	client.Close()
+	server.Close()
+
+	httpHandler.Close()
+}
+
+func TestRadiusHandleLocal(t *testing.T) {
+
+	// Start Routers
+	client := NewRadiusRouter("testClient", localRadiusHandler)
+
+	// Generate request
+	req := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
+	req.Add("User-Name", "myUserName")
+
+	// No destination: handle locally
+	resp, err := client.RouteRadiusRequest("", req, 2*time.Second, 1, 1, "")
+	if err != nil {
+		t.Fatalf("error sending request to testClient %s", err)
+	}
+	if resp.GetStringAVP("User-Name") != "EchoLocal" {
+		t.Fatalf("bad response from server testClient. Got %s", resp.GetStringAVP("User-Name"))
+	}
+
+	client.SetDown()
+	client.Close()
+}
+
+func TestRadiusTimeout(t *testing.T) {
+
+	// Start handler
+	httpHandler := httphandler.NewHttpHandler("testServer", httpDiameterHandler, httpRadiusHandler)
+	time.Sleep(50 * time.Millisecond)
+
+	// Start Routers
+	superserver := NewRadiusRouter("testSuperServer", localRadiusHandler)
+	time.Sleep(50 * time.Millisecond)
+	server := NewRadiusRouter("testServer", localRadiusHandler)
+
+	// Generate request
+	req := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
+	req.Add("User-Name", "myUserName")
+
+	// Send to first server of named group (non existing) twice
+	_, err := server.RouteRadiusRequest("igor-server-ne-group", req, 100*time.Millisecond, 1, 2, "secret")
+	if err == nil {
+		t.Fatalf("request did not get a timeout %s", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	// Two packets will be sent. Server not in quarantine
+	requestsSentMetrics := instrumentation.MS.RadiusQuery("RadiusClientRequests", nil, nil)
+	if requestsSentMetrics[instrumentation.RadiusMetricKey{}] != 2 {
+		t.Fatal("bad number of packets sent (could be due to network unavailable)", err)
+	}
+	serverTable := instrumentation.MS.RadiusServersTableQuery()
+	if !findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
+		t.Fatal("non-existing-server is not available")
+	}
+	timeoutMetrics := instrumentation.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
+	if timeoutMetrics[instrumentation.RadiusMetricKey{}] != 2 {
+		t.Fatal("bad number of timeouts")
+	}
+
+	// Repeat
+	_, err = server.RouteRadiusRequest("igor-server-ne-group", req, 100*time.Millisecond, 1, 2, "secret")
+	if err == nil {
+		t.Fatalf("request did not get a timeout %s", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	// Repeat. Four packets will be reported as sent. Sever in quarantine
+	requestsSentMetrics = instrumentation.MS.RadiusQuery("RadiusClientRequests", nil, nil)
+	if requestsSentMetrics[instrumentation.RadiusMetricKey{}] != 4 {
+		t.Fatal("bad number of packets sent", err)
+	}
+	serverTable = instrumentation.MS.RadiusServersTableQuery()
+	if findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
+		t.Fatal("non-existing-server is available")
+	}
+	timeoutMetrics = instrumentation.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
+	if timeoutMetrics[instrumentation.RadiusMetricKey{}] != 4 {
+		t.Fatal("bad number of timeouts")
+	}
+
+	// Repeat. Request will not get a timeout and will increment client requests by one
+	_, err = server.RouteRadiusRequest("igor-server-ne-group", req, 100*time.Millisecond, 1, 2, "secret")
+	if err != nil {
+		t.Fatalf("request failed %s", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	requestsSentMetrics = instrumentation.MS.RadiusQuery("RadiusClientRequests", nil, nil)
+	if requestsSentMetrics[instrumentation.RadiusMetricKey{}] != 5 {
+		t.Fatal("bad number of packets sent", err)
+	}
+	serverTable = instrumentation.MS.RadiusServersTableQuery()
+	if findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
+		t.Fatal("non-existing-server is available")
+	}
+	timeoutMetrics = instrumentation.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
+	if timeoutMetrics[instrumentation.RadiusMetricKey{}] != 4 {
+		t.Fatal("bad number of timeouts")
+	}
+
+	// Send to specific server
+	_, err = server.RouteRadiusRequest("127.0.0.1:7777", req, 100*time.Millisecond, 1, 2, "secret")
+	if err == nil {
+		t.Fatal("should get a timeout sending to non existing specific server")
+	}
+	timeoutMetrics = instrumentation.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
+	if timeoutMetrics[instrumentation.RadiusMetricKey{}] != 6 {
+		t.Fatal("bad number of timeouts")
+	}
+
+	time.Sleep(1 * time.Second)
+
+	superserver.SetDown()
+	server.SetDown()
+
+	superserver.Close()
+	server.Close()
+
+	httpHandler.Close()
+}
+
+///////////////////////////////////////////////////////////////////////////////////
 
 // Helper to navigate through peers
 func findPeer(diameterHost string, table instrumentation.DiameterPeersTable) instrumentation.DiameterPeersTableEntry {
@@ -296,7 +481,16 @@ func findPeer(diameterHost string, table instrumentation.DiameterPeersTable) ins
 	}
 
 	return instrumentation.DiameterPeersTableEntry{}
+}
 
+func findRadiusServer(serverName string, table instrumentation.RadiusServersTable) instrumentation.RadiusServerTableEntry {
+	for _, tableEntry := range table {
+		if tableEntry.ServerName == serverName {
+			return tableEntry
+		}
+	}
+
+	return instrumentation.RadiusServerTableEntry{}
 }
 
 // Helper to show JSON to humans

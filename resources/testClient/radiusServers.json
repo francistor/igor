@@ -1,0 +1,23 @@
+{
+	"servers" : 
+	[
+		{
+        "name": "igor-server",
+        "IPAddress": "localhost",
+        "secret": "secret",
+        "authPort": 1812,
+        "acctPort": 1813,
+        "coaPort": 3799,
+        "errorLimit": 3,
+        "quarantineTimeSeconds": 60
+      }
+	],
+	"serverGroups" :
+	[
+	  {
+        "name": "igor-server-group",
+        "servers": ["igor-server"],
+        "policy": "fixed"
+    }
+	]
+}

@@ -73,6 +73,14 @@ func PushRadiusClientResponseStalled(endpoint string, Code string) {
 	MS.InputChan <- RadiusClientResponseStalledEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
+type RadiusClientResponseDropEvent struct {
+	Key RadiusMetricKey
+}
+
+func PushRadiusClientResponseDrop(endpoint string, Code string) {
+	MS.InputChan <- RadiusClientResponseDropEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
+}
+
 // Instrumentation of Diameter Peers table
 type RadiusServerTableEntry struct {
 	ServerName       string

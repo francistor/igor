@@ -9,6 +9,17 @@ import (
 	"time"
 )
 
+// Simple handler that generates a success response with the same attributes as in the request
+func echoHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+
+	response := radiuscodec.NewRadiusResponse(request, true)
+	for i := range request.AVPs {
+		response.AddAVP(&request.AVPs[i])
+	}
+
+	return response, nil
+}
+
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
@@ -19,6 +30,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestRadiusServer(t *testing.T) {
+
+	theUserName := "myUserName"
 
 	// Get the configuration
 	pci := config.GetPolicyConfigInstance("testServer")
@@ -31,8 +44,8 @@ func TestRadiusServer(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Create a request radius packet
-	request := radiuscodec.NewRadiusRequest(1)
-	request.Add("User-Name", "myUserName")
+	request := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
+	request.Add("User-Name", theUserName)
 
 	// Send a request using a local socket
 	clientSocket, err := net.ListenPacket("udp", "127.0.0.1:")
@@ -59,23 +72,9 @@ func TestRadiusServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if receivedPacket.GetStringAVP("User-Name") != "myUserName" {
+	if receivedPacket.GetStringAVP("User-Name") != theUserName {
 		t.Errorf("unexpected class attribute in response <%s>", receivedPacket.GetStringAVP("User-Name"))
 	}
 
 	rs.Close()
-
-	// Wait fo the socket to be created
-	time.Sleep(1000 * time.Millisecond)
-}
-
-// Simple handler that generates a success response with the same attributes as in the request
-func echoHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-
-	response := radiuscodec.NewRadiusResponse(request, true)
-	for i := range request.AVPs {
-		response.AddAVP(&request.AVPs[i])
-	}
-
-	return response, nil
 }

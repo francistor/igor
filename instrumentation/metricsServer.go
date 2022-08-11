@@ -55,6 +55,7 @@ type MetricsServer struct {
 	radiusClientResponses        RadiusMetrics
 	radiusClientTimeouts         RadiusMetrics
 	radiusClientResponsesStalled RadiusMetrics
+	radiusClientResponsesDrop    RadiusMetrics
 
 	// Router
 	diameterRouteNotFound   PeerDiameterMetrics
@@ -431,6 +432,7 @@ func (ms *MetricsServer) resetMetrics() {
 	ms.radiusClientResponses = make(RadiusMetrics)
 	ms.radiusClientTimeouts = make(RadiusMetrics)
 	ms.radiusClientResponsesStalled = make(RadiusMetrics)
+	ms.radiusClientResponsesDrop = make(RadiusMetrics)
 
 	ms.httpClientExchanges = make(HttpClientMetrics)
 
@@ -498,7 +500,7 @@ func (ms *MetricsServer) PeersTableQuery() map[string]DiameterPeersTable {
 }
 
 // Wrapper to get RadiusServersTable
-func (ms *MetricsServer) RadiusServerQuery() map[string]RadiusServersTable {
+func (ms *MetricsServer) RadiusServersTableQuery() map[string]RadiusServersTable {
 	query := Query{Name: "RadiusServersTables", RChan: make(chan interface{})}
 	ms.QueryChan <- query
 	return (<-query.RChan).(map[string]RadiusServersTable)
@@ -548,6 +550,8 @@ func (ms *MetricsServer) metricServerLoop() {
 				query.RChan <- GetRadiusMetrics(ms.radiusClientTimeouts, query.Filter, query.AggLabels)
 			case "RadiusClientResponsesStalled":
 				query.RChan <- GetRadiusMetrics(ms.radiusClientResponsesStalled, query.Filter, query.AggLabels)
+			case "RadiusClientResponsesDrop":
+				query.RChan <- GetRadiusMetrics(ms.radiusClientResponsesDrop, query.Filter, query.AggLabels)
 
 			case "HttpClientExchanges":
 				query.RChan <- GetHttpClientMetrics(ms.httpClientExchanges, query.Filter, query.AggLabels)
@@ -665,6 +669,13 @@ func (ms *MetricsServer) metricServerLoop() {
 					ms.radiusClientResponsesStalled[e.Key] = 1
 				} else {
 					ms.radiusClientResponsesStalled[e.Key] = curr + 1
+				}
+
+			case RadiusClientResponseDropEvent:
+				if curr, ok := ms.radiusClientResponsesDrop[e.Key]; !ok {
+					ms.radiusClientResponsesDrop[e.Key] = 1
+				} else {
+					ms.radiusClientResponsesDrop[e.Key] = curr + 1
 				}
 
 			// Router Events

@@ -90,7 +90,7 @@ type DiameterRouter struct {
 }
 
 // Creates and runs a Router
-func NewRouter(instanceName string, handler diampeer.MessageHandler) *DiameterRouter {
+func NewDiameterRouter(instanceName string, handler diampeer.MessageHandler) *DiameterRouter {
 
 	router := DiameterRouter{
 		instanceName:         instanceName,

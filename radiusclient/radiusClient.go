@@ -10,13 +10,16 @@ import (
 const (
 	CONTROL_QUEUE_SIZE  = 16
 	REQUESTS_QUEUE_SIZE = 100
+	EVENTLOOP_CAPACITY  = 100
+)
+
+// Valid statuses
+const (
+	StatusTerminated = 1
 )
 
 // Specification of the Radius packet to send and associated metadata
-type RadiusRequestMsg struct {
-
-	// Server name
-	serverName string
+type ClientRadiusRequestMsg struct {
 
 	// Where to send the message to
 	endpoint string
@@ -29,6 +32,12 @@ type RadiusRequestMsg struct {
 
 	// Timeout
 	timeout time.Duration
+
+	// Retries
+	serverTries int
+
+	// If not 0, reuse instead of allocate, because it is a re-transmission
+	radiusId byte
 
 	// The secret shared with the endpoint
 	secret string
@@ -50,7 +59,7 @@ type RadiusClient struct {
 	// Receives events from the RadiusClientSockets and from the external world
 	controlChannel chan interface{}
 
-	// For the Actor model
+	// For receiving the requests to send
 	requestsChannel chan interface{}
 
 	// To signal termination
@@ -59,8 +68,8 @@ type RadiusClient struct {
 	// Map of created RadiusClientSockets by origin port
 	clientSockets map[int]*RadiusClientSocket
 
-	// Set to true if we are terminating
-	terminating bool
+	// Status may be StatusClosing
+	status int32
 }
 
 // Creates a new instance of the Radius Client
@@ -96,6 +105,7 @@ func (r *RadiusClient) eventLoop() {
 		select {
 		case m := <-r.controlChannel:
 			switch v := m.(type) {
+			// RadiusClientSocket reported it is down
 			case SocketDownEvent:
 				// Close and delete from map
 				rcs := v.Sender
@@ -105,7 +115,7 @@ func (r *RadiusClient) eventLoop() {
 				go v.Sender.Close()
 
 				// Check if we are completely finished
-				if r.terminating && len(r.clientSockets) == 0 {
+				if r.status == StatusTerminated && len(r.clientSockets) == 0 {
 					close(r.requestsChannel)
 					close(r.controlChannel)
 					close(r.doneChannel)
@@ -115,7 +125,7 @@ func (r *RadiusClient) eventLoop() {
 
 			case SetDownCommandMsg:
 
-				r.terminating = true
+				r.status = StatusTerminated
 
 				// If no clients, we are done
 				if len(r.clientSockets) == 0 {
@@ -126,7 +136,7 @@ func (r *RadiusClient) eventLoop() {
 					return
 				} else {
 
-					// Terminate all radius clients
+					// Terminate all radius client sockets. Will terminate when all sockets are down
 					for i := range r.clientSockets {
 						r.clientSockets[i].SetDown()
 					}
@@ -138,10 +148,10 @@ func (r *RadiusClient) eventLoop() {
 
 		case m := <-r.requestsChannel:
 			switch v := m.(type) {
-			case RadiusRequestMsg:
+			case ClientRadiusRequestMsg:
 
 				// Do not serve new requests if terminating
-				if r.terminating {
+				if r.status == StatusTerminated {
 					v.rchan <- fmt.Errorf("radius client terminating")
 					close(v.rchan)
 					continue
@@ -151,7 +161,7 @@ func (r *RadiusClient) eventLoop() {
 				var rcs *RadiusClientSocket
 				var found bool
 				if rcs, found = r.clientSockets[v.originPort]; !found {
-					rcs = NewRadiusClientSocket(r.controlChannel, r.ci, config.GetPolicyConfig().RadiusServerConf().BindAddress, v.originPort)
+					rcs = NewRadiusClientSocket(r.ci, r.controlChannel, config.GetPolicyConfig().RadiusServerConf().BindAddress, v.originPort)
 					r.clientSockets[v.originPort] = rcs
 				}
 
@@ -163,16 +173,16 @@ func (r *RadiusClient) eventLoop() {
 }
 
 // Send the radius packet to the target socket and receive the answer or error in the specified channel
-func (r *RadiusClient) RadiusExchange(serverName string, endpoint string, originPort int, packet *radiuscodec.RadiusPacket, timeout time.Duration, secret string, rchan chan interface{}) {
+func (r *RadiusClient) RadiusExchange(endpoint string, originPort int, packet *radiuscodec.RadiusPacket, timeout time.Duration, serverTries int, secret string, rchan chan interface{}) {
 
 	// Send myself the message
-	r.requestsChannel <- RadiusRequestMsg{
-		serverName: serverName,
-		endpoint:   endpoint,
-		originPort: originPort,
-		packet:     packet,
-		timeout:    timeout,
-		secret:     secret,
-		rchan:      rchan,
+	r.requestsChannel <- ClientRadiusRequestMsg{
+		endpoint:    endpoint,
+		originPort:  originPort,
+		packet:      packet,
+		timeout:     timeout,
+		serverTries: serverTries,
+		secret:      secret,
+		rchan:       rchan,
 	}
 }

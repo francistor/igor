@@ -1,6 +1,6 @@
 [
 	{
-		"name": "radiusclient",
+		"name": "radiuserver",
 		"IPAddress": "127.0.0.1",
 		"secret": "secret"
 	}
