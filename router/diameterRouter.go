@@ -238,7 +238,6 @@ func (router *DiameterRouter) eventLoop() {
 
 				// If here, all peers are not up
 				// Signal to the outside
-				fmt.Println("-------------- all peers")
 				close(router.routerDoneChannel)
 
 				// FRG break routerEventLoop
@@ -333,8 +332,6 @@ func (router *DiameterRouter) eventLoop() {
 					// If here, all peers are not up
 					// Signal to the outside
 					close(router.routerDoneChannel)
-
-					// FRG break routerEventLoop
 				}
 			}
 

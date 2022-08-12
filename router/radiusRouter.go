@@ -334,13 +334,17 @@ func (router *RadiusRouter) eventLoop() {
 
 				// Handle locally
 				if len(destinationURLs) == 0 {
-					resp, err := router.localHandler(rrr.packet)
-					if err != nil {
-						rrr.rchan <- err
-					} else {
-						rrr.rchan <- resp
-					}
-					close(rrr.rchan)
+					// Send to local handler asyncronously
+					go func(rc chan interface{}, radiusPacket *radiuscodec.RadiusPacket) {
+						resp, err := router.localHandler(radiusPacket)
+						if err != nil {
+							rc <- err
+						} else {
+							rc <- resp
+						}
+						close(rrr.rchan)
+					}(rrr.rchan, rrr.packet)
+
 				} else {
 					// Send to http handler
 
@@ -348,12 +352,10 @@ func (router *RadiusRouter) eventLoop() {
 					rand.Shuffle(len(destinationURLs), func(i, j int) { destinationURLs[i], destinationURLs[j] = destinationURLs[j], destinationURLs[i] })
 
 					// Send to the handler asynchronously
-					router.wg.Add(1)
 					go func(rchan chan interface{}, radiusPacket *radiuscodec.RadiusPacket) {
 
 						// Make sure the response channel is closed
 						defer func() {
-							router.wg.Done()
 							close(rchan)
 						}()
 

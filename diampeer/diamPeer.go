@@ -15,10 +15,11 @@ import (
 )
 
 const (
-	StatusConnecting = 1
-	StatusConnected  = 2
-	StatusEngaged    = 3
-	StatusTerminated = 4 // In the process of shuting down
+	StatusConnecting  = 1
+	StatusConnected   = 2
+	StatusEngaged     = 3
+	StatusTerminating = 4 // In the process of shuting down
+	StatusTerminated  = 5
 )
 
 const (
@@ -63,6 +64,10 @@ type PeerUpEvent struct {
 type PeerUpMsg struct {
 	// Reported identity of the remote peer
 	diameterHost string
+}
+
+// To signal that we may terminate the event loop
+type PeerCloseMsg struct {
 }
 
 // Message from me to a Diameteer Peer. May be a Request or an Answer
@@ -304,6 +309,9 @@ func (dp *DiameterPeer) Close() {
 	// Wait until all goroutines exit, including timers in outstanding requests
 	dp.wg.Wait()
 
+	// Terminate the event loop
+	dp.eventLoopChannel <- PeerCloseMsg{}
+
 	close(dp.eventLoopChannel)
 
 	config.GetLogger().Debugf("%s closed", dp.peerConfig.DiameterHost)
@@ -344,6 +352,10 @@ func (dp *DiameterPeer) eventLoop() {
 
 			switch v := in.(type) {
 
+			case PeerCloseMsg:
+
+				return
+
 			// Connect goroutine reports connection established
 			// Start the event loop and CER/CEA handshake
 			case ConnectionEstablishedMsg:
@@ -378,77 +390,82 @@ func (dp *DiameterPeer) eventLoop() {
 			case ConnectionErrorMsg:
 
 				config.GetLogger().Errorf("connection error %s", v.err)
-				dp.status = StatusTerminated
-				dp.routerControlChannel <- PeerDownEvent{Sender: dp, Error: v.err}
-				return
+				if dp.status < StatusTerminated {
+					dp.status = StatusTerminated
+					dp.routerControlChannel <- PeerDownEvent{Sender: dp, Error: v.err}
+				}
 
 			// readLoop goroutine reports the connection is closed
 			// the DiameterPeer will terminate the event loop, send the Down event
 			// and the Router must recycle it
 			case ReadEOFMsg:
 
-				if dp.status <= StatusTerminated {
+				if dp.status <= StatusTerminating {
 					config.GetLogger().Debugf("connection terminated by remote peer %s", dp.connection.RemoteAddr().String())
 				} else {
 					config.GetLogger().Errorf("connection terminated with remote peer %s", dp.connection.RemoteAddr().String())
 				}
 
-				if dp.connection != nil {
-					dp.connection.Close()
+				if dp.status < StatusTerminated {
+
+					dp.status = StatusTerminated
+
+					if dp.connection != nil {
+						dp.connection.Close()
+					}
+
+					// Cancels all outstanding requests with error
+					dp.cancelAll()
+
+					// Tell the router that we are down
+					dp.routerControlChannel <- PeerDownEvent{Sender: dp, Error: nil}
 				}
-
-				dp.status = StatusTerminated
-
-				// Cancels all outstanding requests with error
-				dp.cancelAll()
-
-				// Tell the router that we are down
-				dp.routerControlChannel <- PeerDownEvent{Sender: dp, Error: nil}
-				return
 
 			// readLoop goroutine reports a read error
 			// the DiameterPeer will terminate the event loop, send the Down event
 			// and the Router must recycle it
 			case ReadErrorMsg:
 
-				if dp.status <= StatusTerminated {
+				if dp.status <= StatusTerminating {
 					config.GetLogger().Errorf("connection read error %v with remote peer %s", v.err, dp.connection.RemoteAddr().String())
 				} else {
 					config.GetLogger().Debugf("connection terminating with remote peer %s. Last error %v", dp.connection.RemoteAddr().String(), v.err)
 				}
 
-				if dp.connection != nil {
-					dp.connection.Close()
+				if dp.status < StatusTerminated {
+
+					dp.status = StatusTerminated
+
+					if dp.connection != nil {
+						dp.connection.Close()
+					}
+
+					// Cancels all outstanding requests with error
+					dp.cancelAll()
+
+					// Tell the router that we are down
+					dp.routerControlChannel <- PeerDownEvent{Sender: dp, Error: nil}
 				}
-
-				dp.status = StatusTerminated
-
-				// Cancels all outstanding requests with error
-				dp.cancelAll()
-
-				// Tell the router we are down
-				dp.routerControlChannel <- PeerDownEvent{Sender: dp, Error: v.err}
-
-				return
 
 			// Same for writes
 			case WriteErrorMsg:
 
 				config.GetLogger().Errorf("write error %s with remote peer %s", v.err, dp.connection.RemoteAddr().String)
 
-				if dp.connection != nil {
-					dp.connection.Close()
+				if dp.status < StatusTerminated {
+
+					dp.status = StatusTerminated
+
+					if dp.connection != nil {
+						dp.connection.Close()
+					}
+
+					// Cancels all outstanding requests with error
+					dp.cancelAll()
+
+					// Tell the router that we are down
+					dp.routerControlChannel <- PeerDownEvent{Sender: dp, Error: nil}
 				}
-
-				dp.status = StatusTerminated
-
-				// Cancels all outstanding requests with error
-				dp.cancelAll()
-
-				// Tell the router we are down
-				dp.eventLoopChannel <- PeerDownEvent{Sender: dp, Error: v.err}
-
-				return
 
 			case PeerUpMsg:
 				dp.status = StatusEngaged
@@ -465,23 +482,20 @@ func (dp *DiameterPeer) eventLoop() {
 
 				config.GetLogger().Debug("processing PeerSetDownCommandMsg")
 
-				dp.status = StatusTerminated
+				if dp.status < StatusTerminated {
 
-				// In case it was still connecting
-				if dp.cancel != nil {
-					dp.cancel()
+					dp.status = StatusTerminated
+
+					if dp.connection != nil {
+						dp.connection.Close()
+					}
+
+					// Cancels all outstanding requests with error
+					dp.cancelAll()
+
+					// Tell the router that we are down
+					dp.routerControlChannel <- PeerDownEvent{Sender: dp, Error: nil}
 				}
-
-				if dp.connection != nil {
-					dp.connection.Close()
-				}
-
-				dp.cancelAll()
-
-				// Tell the Router we are finished
-				dp.routerControlChannel <- PeerDownEvent{Sender: dp, Error: v.err}
-
-				return
 
 				// Send a message to the peer. May be a request or an answer
 			case EgressDiameterMsg:
@@ -498,9 +512,9 @@ func (dp *DiameterPeer) eventLoop() {
 						config.GetLogger().Debugf("-> Sending Message %s\n", v.message)
 						if _, err := v.message.WriteTo(dp.connection); err != nil {
 							// There was an error writing. Will close the connection
-							if dp.status <= StatusTerminated {
+							if dp.status < StatusTerminating {
 								dp.eventLoopChannel <- WriteErrorMsg{err}
-								dp.status = StatusTerminated
+								dp.status = StatusTerminating
 							}
 
 							// Signal the error in the response channel for the input request
@@ -564,7 +578,7 @@ func (dp *DiameterPeer) eventLoop() {
 							if originHost, err := dp.handleCER(v.message); err != nil {
 								// There was an error
 								dp.eventLoopChannel <- PeerSetDownCommandMsg{err: err}
-								dp.status = StatusTerminated
+								dp.status = StatusTerminating
 							} else {
 								// The router must check that there is no other connection for the same peer
 								// and set state to active
@@ -582,7 +596,7 @@ func (dp *DiameterPeer) eventLoop() {
 							dpa.AddOriginAVPs(dp.ci)
 							dp.eventLoopChannel <- EgressDiameterMsg{message: dpa}
 							dp.eventLoopChannel <- PeerSetDownCommandMsg{err: fmt.Errorf("received disconnect-peer")}
-							dp.status = StatusTerminated
+							dp.status = StatusTerminating
 
 						default:
 							config.GetLogger().Warnf("command %d for base applicaton not found in dictionary", v.message.CommandCode)
@@ -630,7 +644,7 @@ func (dp *DiameterPeer) eventLoop() {
 							}
 
 							if doDisconnect {
-								dp.status = StatusTerminated
+								dp.status = StatusTerminating
 								dp.eventLoopChannel <- PeerSetDownCommandMsg{err: fmt.Errorf("CER/CEA error %w", err)}
 							} else {
 								dp.eventLoopChannel <- PeerUpMsg{diameterHost: dp.peerConfig.DiameterHost}
@@ -640,7 +654,7 @@ func (dp *DiameterPeer) eventLoop() {
 							config.GetLogger().Debug("received dwa")
 							if v.message.GetResultCode() != diamcodec.DIAMETER_SUCCESS {
 								config.GetLogger().Errorf("bad result code in answer to DWR: %d", v.message.GetResultCode())
-								dp.status = StatusTerminated
+								dp.status = StatusTerminating
 								dp.eventLoopChannel <- PeerSetDownCommandMsg{err: fmt.Errorf("watchdog answer is not DIAMETER_SUCCESS")}
 							} else {
 								dp.outstandingDWA--
@@ -697,7 +711,7 @@ func (dp *DiameterPeer) eventLoop() {
 				// Here we do the checking of the DWA that are pending
 				if dp.outstandingDWA > MAX_UNANSWERED_WATCHDOG_REQUESTS {
 					config.GetLogger().Errorf("too many unanswered DWR: %d", MAX_UNANSWERED_WATCHDOG_REQUESTS)
-					dp.status = StatusTerminated
+					dp.status = StatusTerminating
 					dp.eventLoopChannel <- PeerSetDownCommandMsg{err: fmt.Errorf("too many unasnwered DWR")}
 				}
 

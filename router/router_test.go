@@ -289,11 +289,13 @@ func TestDiameterRouteMessagetoLocal(t *testing.T) {
 	client.Close()
 }
 
+// Notice that http2 and local handlers do not get cancelled upon router termination
+// and are not waited
 func TestDiameterRequestCancellation(t *testing.T) {
 	server := NewDiameterRouter("testServer", localDiameterHandler)
 	superserver := NewDiameterRouter("testSuperServer", localDiameterHandler)
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 
 	// Build request that will be sent to superserver
 	request, err := diamcodec.NewDiameterRequest("NASREQ", "AA")
@@ -314,13 +316,17 @@ func TestDiameterRequestCancellation(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	server.SetDown()
-	superserver.SetDown()
 	server.Close()
-	superserver.Close()
+
+	// Give sometime for the async handler to execute
+	time.Sleep(100 * time.Millisecond)
 
 	if atomic.LoadInt32(&handlerCalled) != int32(1) {
 		t.Fatalf("async handler was not called on router cancellation %d", atomic.LoadInt32(&handlerCalled))
 	}
+
+	superserver.SetDown()
+	superserver.Close()
 }
 
 func TestRouteParamRadiusPacket(t *testing.T) {
@@ -535,8 +541,12 @@ func TestRadiusRequestCancellation(t *testing.T) {
 	})
 
 	time.Sleep(100 * time.Millisecond)
+
 	client.SetDown()
 	client.Close()
+
+	// Give some time for the async handler to execute
+	time.Sleep(100 * time.Millisecond)
 
 	if atomic.LoadInt32(&handlerCalled) != int32(1) {
 		t.Fatalf("async handler was not called on router cancellation %d", atomic.LoadInt32(&handlerCalled))
