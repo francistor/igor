@@ -289,6 +289,40 @@ func TestDiameterRouteMessagetoLocal(t *testing.T) {
 	client.Close()
 }
 
+func TestDiameterRequestCancellation(t *testing.T) {
+	server := NewDiameterRouter("testServer", localDiameterHandler)
+	superserver := NewDiameterRouter("testSuperServer", localDiameterHandler)
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Build request that will be sent to superserver
+	request, err := diamcodec.NewDiameterRequest("NASREQ", "AA")
+	if err != nil {
+		t.Fatalf("NewDiameterRequest error %s", err)
+	}
+	request.AddOriginAVPs(config.GetPolicyConfig())
+	request.Add("Destination-Realm", "igorsuperserver")
+	request.Add("franciscocardosogil-Command", "VerySlow")
+
+	var handlerCalled int32
+	server.RouteDiameterRequestAsync(request, 200*time.Second, func(m *diamcodec.DiameterMessage, err error) {
+		if err != nil {
+			atomic.StoreInt32(&handlerCalled, 1)
+		}
+	})
+
+	time.Sleep(100 * time.Millisecond)
+
+	server.SetDown()
+	superserver.SetDown()
+	server.Close()
+	superserver.Close()
+
+	if atomic.LoadInt32(&handlerCalled) != int32(1) {
+		t.Fatalf("async handler was not called on router cancellation %d", atomic.LoadInt32(&handlerCalled))
+	}
+}
+
 func TestRouteParamRadiusPacket(t *testing.T) {
 	rrouter := NewRadiusRouter("testServer", httpRadiusHandler)
 
@@ -496,14 +530,12 @@ func TestRadiusRequestCancellation(t *testing.T) {
 	var handlerCalled int32
 	client.RouteRadiusRequestAsync("127.0.0.1:7777", req, 200*time.Second, 1, 1, "", func(resp *radiuscodec.RadiusPacket, err error) {
 		if err != nil {
-			t.Logf("-----------------%v", err)
 			atomic.StoreInt32(&handlerCalled, 1)
-			t.Logf("----------------- done")
 		}
 	})
 
+	time.Sleep(100 * time.Millisecond)
 	client.SetDown()
-	time.Sleep(200 * time.Millisecond)
 	client.Close()
 
 	if atomic.LoadInt32(&handlerCalled) != int32(1) {

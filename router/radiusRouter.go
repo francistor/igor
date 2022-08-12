@@ -394,10 +394,10 @@ func (router *RadiusRouter) RouteRadiusRequest(destination string, packet *radiu
 		serverTries:       serverTries,
 	}
 
-	router.radiusRequestsChan <- req
-
 	// Will be Done() after processing the request message
 	router.wg.Add(1)
+
+	router.radiusRequestsChan <- req
 
 	r := <-rchan
 	switch v := r.(type) {
@@ -424,10 +424,10 @@ func (router *RadiusRouter) RouteRadiusRequestAsync(destination string, packet *
 		serverTries:       serverTries,
 	}
 
-	router.radiusRequestsChan <- req
-
 	// Will be Done() after processing the request message
 	router.wg.Add(1)
+
+	router.radiusRequestsChan <- req
 
 	go func(rc chan interface{}) {
 		r := <-rc

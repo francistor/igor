@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -82,6 +83,9 @@ type DiameterRouter struct {
 	// used only to wait on Close() until finalization
 	routerDoneChannel chan struct{}
 
+	// To make sure there are no outstanding requests pending
+	wg sync.WaitGroup
+
 	// HTTP2 client for sending requests to http handlers
 	http2Client http.Client
 
@@ -126,6 +130,11 @@ func (router *DiameterRouter) SetDown() {
 // Waits until the Router is finished
 func (router *DiameterRouter) Close() {
 	<-router.routerDoneChannel
+
+	router.wg.Wait()
+
+	// Terminate the event loop
+	router.routerControlChannel <- RouterCloseCommand{}
 }
 
 // Actor model event loop
@@ -189,7 +198,7 @@ func (router *DiameterRouter) eventLoop() {
 	// First pass
 	router.updatePeersTable()
 
-routerEventLoop:
+	// FRG routerEventLoop:
 	for {
 	messageHandler:
 		select {
@@ -197,6 +206,11 @@ routerEventLoop:
 		// Handle peer lifecycle messages for this Router
 		case m := <-router.routerControlChannel:
 			switch m.(type) {
+
+			case RouterCloseCommand:
+				// Terminate the event loop
+				return
+
 			case RouterSetDownCommand:
 				// Set the status
 				atomic.StoreInt32(&router.status, StatusTerminated)
@@ -224,8 +238,10 @@ routerEventLoop:
 
 				// If here, all peers are not up
 				// Signal to the outside
+				fmt.Println("-------------- all peers")
 				close(router.routerDoneChannel)
-				break routerEventLoop
+
+				// FRG break routerEventLoop
 			}
 
 		case <-router.peerTableTicker.C:
@@ -317,12 +333,14 @@ routerEventLoop:
 					// If here, all peers are not up
 					// Signal to the outside
 					close(router.routerDoneChannel)
-					break routerEventLoop
+
+					// FRG break routerEventLoop
 				}
 			}
 
 			// Diameter Request message to be routed
 		case rdr := <-router.diameterRequestsChan:
+
 			route, err := router.ci.RoutingRulesConf().FindDiameterRoute(
 				rdr.Message.GetStringAVP("Destination-Realm"),
 				rdr.Message.ApplicationName,
@@ -331,84 +349,95 @@ routerEventLoop:
 			if err != nil {
 				instrumentation.PushRouterRouteNotFound("", rdr.Message)
 				rdr.RChan <- fmt.Errorf("request not sent: no route found")
-				break messageHandler
-			}
-
-			if len(route.Peers) > 0 {
-				// Route to destination peer
-				// If policy is "random", shuffle the destination-hosts
-				var peers []string
-				peers = append(peers, route.Peers...)
-
-				if route.Policy == "random" {
-					rand.Shuffle(len(peers), func(i, j int) { peers[i], peers[j] = peers[j], peers[i] })
-				}
-
-				for _, destinationHost := range peers {
-					targetPeer := router.diameterPeersTable[destinationHost]
-					if targetPeer.isEngaged {
-						// Route found. Send request asyncronously
-						go targetPeer.peer.DiameterExchange(rdr.Message, rdr.Timeout, rdr.RChan)
-						break messageHandler
-					}
-				}
-
-				// If here, could not find a peer
-				instrumentation.PushRouterNoAvailablePeer("", rdr.Message)
-				rdr.RChan <- fmt.Errorf("resquest not sent: no engaged peer")
 				close(rdr.RChan)
-
-			} else if len(route.Handlers) > 0 {
-				// Use http handlers
-
-				// For handlers there is not such a thing as fixed policy
-				var destinationURLs []string
-				destinationURLs = append(destinationURLs, route.Handlers...)
-				//rand.Seed(time.Now().UnixNano())
-				rand.Shuffle(len(destinationURLs), func(i, j int) { destinationURLs[i], destinationURLs[j] = destinationURLs[j], destinationURLs[i] })
-
-				// Send to the handler asynchronously
-				go func(rchan chan interface{}, diameterRequest *diamcodec.DiameterMessage, url string) {
-
-					// Make sure the response channel is closed
-					defer close(rchan)
-
-					answer, err := httphandler.HttpDiameterRequest(router.http2Client, url, diameterRequest)
-					if err != nil {
-						logger.Errorf("http handler %s returned error: %s", url, err.Error())
-						rchan <- err
-					} else {
-						// Add the Origin-Host and Origin-Realm, that are not set by the handler
-						// because it lacks that configuration
-						answer.AddOriginAVPs(router.ci)
-						rchan <- answer
-					}
-
-				}(rdr.RChan, rdr.Message, destinationURLs[0])
-
 			} else {
-				// Send to the handler asynchronously
-				go func(rchan chan interface{}, diameterRequest *diamcodec.DiameterMessage) {
+				// Route found
 
-					// Make sure the response channel is closed
-					defer close(rchan)
+				if len(route.Peers) > 0 {
+					// Route to destination peer
+					// If policy is "random", shuffle the destination-hosts
+					var peers []string
+					peers = append(peers, route.Peers...)
 
-					answer, err := router.localHandler(diameterRequest)
-					if err != nil {
-						logger.Errorf("local handler returned error: %s", err.Error())
-						rchan <- err
-					} else {
-						// Add the Origin-Host and Origin-Realm, that are not set by the handler
-						// because it lacks that configuration
-						answer.AddOriginAVPs(router.ci)
-						rchan <- answer
+					if route.Policy == "random" {
+						rand.Shuffle(len(peers), func(i, j int) { peers[i], peers[j] = peers[j], peers[i] })
 					}
 
-				}(rdr.RChan, rdr.Message)
+					for _, destinationHost := range peers {
+						targetPeer := router.diameterPeersTable[destinationHost]
+						if targetPeer.isEngaged {
+							// Route found. Send request asyncronously
+							go func() {
+								targetPeer.peer.DiameterExchange(rdr.Message, rdr.Timeout, rdr.RChan)
+							}()
+
+							// Corresponding to RouteDiameterMessage
+							router.wg.Done()
+							break messageHandler
+						}
+					}
+
+					// If here, could not find a peer
+					instrumentation.PushRouterNoAvailablePeer("", rdr.Message)
+					rdr.RChan <- fmt.Errorf("resquest not sent: no engaged peer")
+					close(rdr.RChan)
+
+				} else if len(route.Handlers) > 0 {
+					// Use http handlers
+
+					// For handlers there is not such a thing as fixed policy
+					var destinationURLs []string
+					destinationURLs = append(destinationURLs, route.Handlers...)
+					//rand.Seed(time.Now().UnixNano())
+					rand.Shuffle(len(destinationURLs), func(i, j int) { destinationURLs[i], destinationURLs[j] = destinationURLs[j], destinationURLs[i] })
+
+					// Send to the handler asynchronously
+					go func(rchan chan interface{}, diameterRequest *diamcodec.DiameterMessage, url string) {
+
+						// Make sure the response channel is closed
+						defer close(rchan)
+
+						answer, err := httphandler.HttpDiameterRequest(router.http2Client, url, diameterRequest)
+						if err != nil {
+							logger.Errorf("http handler %s returned error: %s", url, err.Error())
+							rchan <- err
+						} else {
+							// Add the Origin-Host and Origin-Realm, that are not set by the handler
+							// because it lacks that configuration
+							answer.AddOriginAVPs(router.ci)
+							rchan <- answer
+						}
+
+					}(rdr.RChan, rdr.Message, destinationURLs[0])
+
+				} else {
+					// Handle locally
+					go func(rchan chan interface{}, diameterRequest *diamcodec.DiameterMessage) {
+
+						// Make sure the response channel is closed
+						defer func() {
+							close(rchan)
+						}()
+
+						answer, err := router.localHandler(diameterRequest)
+						if err != nil {
+							logger.Errorf("local handler returned error: %s", err.Error())
+							rchan <- err
+						} else {
+							// Add the Origin-Host and Origin-Realm, that are not set by the handler
+							// because it lacks that configuration
+							answer.AddOriginAVPs(router.ci)
+							rchan <- answer
+						}
+
+					}(rdr.RChan, rdr.Message)
+				}
 			}
+
+			// Corresponding to RouteDiameterRequest
+			router.wg.Done()
 		}
 	}
-	logger.Infof("finished Peer manager %s ", router.instanceName)
 }
 
 // Sends a DiameterMessage and returns the answer. Blocking
@@ -420,6 +449,10 @@ func (router *DiameterRouter) RouteDiameterRequest(request *diamcodec.DiameterMe
 		RChan:   responseChannel,
 		Timeout: timeout,
 	}
+
+	// Will be Done() after processing the message
+	router.wg.Add(1)
+
 	router.diameterRequestsChan <- routableRequest
 
 	r := <-responseChannel
@@ -441,17 +474,23 @@ func (router *DiameterRouter) RouteDiameterRequestAsync(request *diamcodec.Diame
 		RChan:   rchan,
 		Timeout: timeout,
 	}
+
+	// Will be Done() after processing the message
+	router.wg.Add(1)
+
 	router.diameterRequestsChan <- routableRequest
 
-	go func(chan interface{}) {
-		r := <-rchan
+	go func(rc chan interface{}) {
+		r := <-rc
 		switch v := r.(type) {
 		case error:
 			handler(nil, v)
 		case *diamcodec.DiameterMessage:
 			handler(v, nil)
+		default:
+			panic("got an answer that was not error or pointer to diameter message")
 		}
-		panic("got an answer that was not error or pointer to diameter message")
+
 	}(rchan)
 }
 

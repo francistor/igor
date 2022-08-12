@@ -76,6 +76,9 @@ type EgressDiameterMsg struct {
 
 	// Timeout to set
 	timeout time.Duration
+
+	// Set if wg.Done() has to be called
+	waited bool
 }
 
 // Message received from a Diameter Peer. May be a Request or an Answer
@@ -490,57 +493,58 @@ func (dp *DiameterPeer) eventLoop() {
 					if _, ok := dp.requestsMap[hbhId]; ok && v.rchan != nil {
 						v.rchan <- fmt.Errorf("duplicated HopByHopId")
 						close(v.rchan)
-						break
-					}
-
-					config.GetLogger().Debugf("-> Sending Message %s\n", v.message)
-					_, err := v.message.WriteTo(dp.connection)
-					if err != nil {
-						// There was an error writing. Will close the connection
-						if dp.status <= StatusTerminated {
-							dp.eventLoopChannel <- WriteErrorMsg{err}
-							dp.status = StatusTerminated
-						}
-
-						// Signal the error in the response channel for the input request
-						// Do all necessary things to cancell the request
-						if v.message.IsRequest && v.rchan != nil {
-							v.rchan <- err
-							close(v.rchan)
-						}
-
-						// No statistics, because the Peer will die
-
-						break
-					}
-
-					// All good.
-					// If it was a Request, store in the outstanding request map
-					// RChan may be nil if it is a base application message
-					if v.message.IsRequest {
-						instrumentation.PushPeerDiameterRequestSent(dp.peerConfig.DiameterHost, v.message)
-						if v.rchan != nil {
-							// Set timer
-							dp.wg.Add(1)
-							timer := time.AfterFunc(v.timeout, func() {
-								// This will be called if the timer expires
-								dp.eventLoopChannel <- CancelRequestMsg{hopByHopId: v.message.HopByHopId, reason: fmt.Errorf("Timeout")}
-								defer dp.wg.Done()
-							})
-
-							// Add to requests map
-							dp.requestsMap[v.message.HopByHopId] = RequestContext{rchan: v.rchan, timer: timer, key: instrumentation.PeerDiameterMetricFromMessage(dp.peerConfig.DiameterHost, v.message)}
-						}
 					} else {
-						instrumentation.PushPeerDiameterAnswerSent(dp.peerConfig.DiameterHost, v.message)
-					}
+						// Not duplicate. Proceed.
+						config.GetLogger().Debugf("-> Sending Message %s\n", v.message)
+						if _, err := v.message.WriteTo(dp.connection); err != nil {
+							// There was an error writing. Will close the connection
+							if dp.status <= StatusTerminated {
+								dp.eventLoopChannel <- WriteErrorMsg{err}
+								dp.status = StatusTerminated
+							}
 
+							// Signal the error in the response channel for the input request
+							// Do all necessary things to cancell the request
+							if v.message.IsRequest && v.rchan != nil {
+								v.rchan <- err
+								close(v.rchan)
+							}
+
+							// No statistics, because the Peer will die
+						} else {
+							// All good.
+							// If it was a Request, store in the outstanding request map
+							// RChan may be nil if it is a base application message
+							if v.message.IsRequest {
+								instrumentation.PushPeerDiameterRequestSent(dp.peerConfig.DiameterHost, v.message)
+								if v.rchan != nil {
+									// Set timer
+									dp.wg.Add(1)
+									timer := time.AfterFunc(v.timeout, func() {
+										// This will be called if the timer expires
+										dp.eventLoopChannel <- CancelRequestMsg{hopByHopId: v.message.HopByHopId, reason: fmt.Errorf("Timeout")}
+										defer dp.wg.Done()
+									})
+
+									// Add to requests map
+									dp.requestsMap[v.message.HopByHopId] = RequestContext{rchan: v.rchan, timer: timer, key: instrumentation.PeerDiameterMetricFromMessage(dp.peerConfig.DiameterHost, v.message)}
+								}
+							} else {
+								instrumentation.PushPeerDiameterAnswerSent(dp.peerConfig.DiameterHost, v.message)
+							}
+						}
+					}
 				} else {
 					config.GetLogger().Errorf("%s %s message was not sent because status is %d", v.message.ApplicationName, v.message.CommandName, dp.status)
 					if v.rchan != nil {
 						v.rchan <- fmt.Errorf("message not sent. Status is not Engaged")
 						close(v.rchan)
 					}
+				}
+
+				// Corresponding to DiameterExchange
+				if v.waited {
+					dp.wg.Done()
 				}
 
 				// Received message from peer
@@ -780,7 +784,9 @@ func (dp *DiameterPeer) DiameterExchange(dm *diamcodec.DiameterMessage, timeout 
 	}
 
 	// Send myself the message
-	dp.eventLoopChannel <- EgressDiameterMsg{message: dm, rchan: rchan, timeout: timeout}
+	// Will call Close() when processing EgressDiameterMessage. Singnal that we must Done() with waited: true
+	dp.wg.Add(1)
+	dp.eventLoopChannel <- EgressDiameterMsg{message: dm, rchan: rchan, timeout: timeout, waited: true}
 }
 
 // Handle received CER message, sending the CEA that may be successful or not
