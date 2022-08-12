@@ -125,8 +125,8 @@ func TestRadiusConfig(t *testing.T) {
 
 	// Get Radius Servers configuration
 	rs := GetPolicyConfig().RadiusServersConf()
-	if rs.Servers["non-existing-server"].IPAddress != "192.168.250.1" {
-		t.Fatalf("address of non-existing-server is not 192.168.250.1")
+	if rs.Servers["non-existing-server"].IPAddress != "127.0.0.2" {
+		t.Fatalf("address of non-existing-server is not 127.0.0.2")
 	}
 	if rs.Servers["igor-superserver"].OriginPorts[0] != 8000 {
 		t.Fatalf("igor-superserver has unexpected origin port")

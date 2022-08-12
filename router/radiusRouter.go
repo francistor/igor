@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/net/http2"
@@ -121,6 +122,12 @@ type RadiusRouter struct {
 
 	// Function to handle messages not sent to http handlers
 	localHandler radiusserver.RadiusPacketHandler
+
+	// Status
+	status int32
+
+	// To make sure we wait for the goroutines to end
+	wg sync.WaitGroup
 }
 
 // Creates and runs a Router
@@ -194,6 +201,12 @@ func (router *RadiusRouter) Close() {
 	// Client
 	router.radiusClient.Close()
 
+	// Wait until all goroutines exit, including timers in outstanding requests
+	router.wg.Wait()
+
+	// Terminate event loop
+	router.routerControlChan <- RouterCloseCommand{}
+
 	// Close channels
 	close(router.radiusRequestsChan)
 	close(router.routerControlChan)
@@ -206,13 +219,21 @@ func (router *RadiusRouter) eventLoop() {
 
 		case in := <-router.routerControlChan:
 			switch v := in.(type) {
+
+			case RouterCloseCommand:
+
+				// Terminate the event loop
+				return
+
 			case RouterSetDownCommand:
+
+				router.status = StatusTerminated
 
 				// Close the client. This will cancel all requests
 				router.radiusClient.SetDown()
 
 				// Terminate the event loop
-				return
+				// FRG return
 
 			case UpdateRadiusMetrics:
 
@@ -227,7 +248,7 @@ func (router *RadiusRouter) eventLoop() {
 					if rsws.isAvailable {
 						if !v.ok {
 							// Take the error into account
-							// Notice that only the tries, not the serverTries, increments the number of errors
+							// Notice that only the tries, *not the serverTries*, increment the number of errors
 							rsws.numErrors++
 							if rsws.numErrors >= rsws.conf.ErrorLimit {
 								rsws.isAvailable = false
@@ -249,37 +270,49 @@ func (router *RadiusRouter) eventLoop() {
 			}
 
 		case rrr := <-router.radiusRequestsChan:
+
+			// If closing, do not serve more requests
+			if router.status == StatusTerminated {
+				rrr.rchan <- fmt.Errorf("router terminated")
+				close(rrr.rchan)
+				// Corresponding to RouteRadiusRequest
+				router.wg.Done()
+				continue
+			}
+
 			if rrr.destination != "" {
 				// Route the message to upstream server
 				routeParams := router.getRouteParams(rrr)
 				if len(routeParams) == 0 {
 					rrr.rchan <- fmt.Errorf("no server available to send request")
 					close(rrr.rchan)
-					continue
+				} else {
+					// Retry loop
+					router.wg.Add(1)
+					go func(rps []RadiusRouteParam, req RoutableRadiusRequest) {
+						defer router.wg.Done()
+						for _, routeParam := range rps {
+							rchan := make(chan interface{}, 1)
+							router.radiusClient.RadiusExchange(routeParam.endpoint, routeParam.originPort, req.packet, req.perRequestTimeout, req.serverTries, req.secret, rchan)
+							response := <-rchan
+							// rchan closed in RadiusExchange
+							switch response.(type) {
+							case *radiuscodec.RadiusPacket:
+								req.rchan <- response
+								close(req.rchan)
+								router.routerControlChan <- RadiusRequestResult{serverName: routeParam.serverName, ok: true}
+								return
+							case error:
+								router.routerControlChan <- RadiusRequestResult{serverName: routeParam.serverName, ok: false}
+								config.GetLogger().Debugf("answer not received from %s %s", routeParam.serverName, routeParam.endpoint)
+							}
+						}
+						req.rchan <- fmt.Errorf("answer not received after %d tries", len(rps))
+						close(req.rchan)
+
+					}(routeParams, rrr)
 				}
 
-				// Retry loop
-				go func(rps []RadiusRouteParam, req RoutableRadiusRequest) {
-					for _, routeParam := range rps {
-						rchan := make(chan interface{}, 1)
-						router.radiusClient.RadiusExchange(routeParam.endpoint, routeParam.originPort, req.packet, req.perRequestTimeout, req.serverTries, req.secret, rchan)
-						response := <-rchan
-						// rchan closed in RadiusExchange
-						switch response.(type) {
-						case *radiuscodec.RadiusPacket:
-							req.rchan <- response
-							close(req.rchan)
-							router.routerControlChan <- RadiusRequestResult{serverName: routeParam.serverName, ok: true}
-							return
-						case error:
-							router.routerControlChan <- RadiusRequestResult{serverName: routeParam.serverName, ok: false}
-							config.GetLogger().Debugf("answer not received from %s %s", routeParam.serverName, routeParam.endpoint)
-						}
-					}
-					req.rchan <- fmt.Errorf("answer not received after %d tries", len(rps))
-					close(req.rchan)
-
-				}(routeParams, rrr)
 			} else {
 				// Handle the message
 				rh := router.ci.RadiusHandlersConf()
@@ -294,6 +327,8 @@ func (router *RadiusRouter) eventLoop() {
 				default:
 					rrr.rchan <- fmt.Errorf("server received a not request packet")
 					close(rrr.rchan)
+					// Corresponding to the one in RouteRadiusRequest
+					router.wg.Done()
 					continue
 				}
 
@@ -306,31 +341,37 @@ func (router *RadiusRouter) eventLoop() {
 						rrr.rchan <- resp
 					}
 					close(rrr.rchan)
-					continue
+				} else {
+					// Send to http handler
+
+					// Select one destination randomly
+					rand.Shuffle(len(destinationURLs), func(i, j int) { destinationURLs[i], destinationURLs[j] = destinationURLs[j], destinationURLs[i] })
+
+					// Send to the handler asynchronously
+					router.wg.Add(1)
+					go func(rchan chan interface{}, radiusPacket *radiuscodec.RadiusPacket) {
+
+						// Make sure the response channel is closed
+						defer func() {
+							router.wg.Done()
+							close(rchan)
+						}()
+
+						response, err := httphandler.HttpRadiusRequest(router.http2Client, destinationURLs[0], radiusPacket)
+						if err != nil {
+							config.GetLogger().Error(fmt.Sprintf("http handler error: %s", err.Error()))
+							rchan <- err
+						} else {
+							rchan <- response
+						}
+
+					}(rrr.rchan, rrr.packet)
 				}
-
-				// Send to http handler
-
-				// Select one destination randomly
-				rand.Shuffle(len(destinationURLs), func(i, j int) { destinationURLs[i], destinationURLs[j] = destinationURLs[j], destinationURLs[i] })
-
-				// Send to the handler asynchronously
-				go func(rchan chan interface{}, radiusPacket *radiuscodec.RadiusPacket) {
-
-					// Make sure the response channel is closed
-					defer close(rchan)
-
-					response, err := httphandler.HttpRadiusRequest(router.http2Client, destinationURLs[0], radiusPacket)
-					if err != nil {
-						config.GetLogger().Error(fmt.Sprintf("http handler error: %s", err.Error()))
-						rchan <- err
-					} else {
-						rchan <- response
-					}
-
-				}(rrr.rchan, rrr.packet)
-
 			}
+
+			// Done processing of request
+			// Corresponding to the one in RouteRadiusRequest
+			router.wg.Done()
 		}
 	}
 }
@@ -355,6 +396,9 @@ func (router *RadiusRouter) RouteRadiusRequest(destination string, packet *radiu
 
 	router.radiusRequestsChan <- req
 
+	// Will be Done() after processing the request message
+	router.wg.Add(1)
+
 	r := <-rchan
 	switch v := r.(type) {
 	case error:
@@ -363,6 +407,40 @@ func (router *RadiusRouter) RouteRadiusRequest(destination string, packet *radiu
 		return v, nil
 	}
 	panic("got an answer that was not error or pointer to radius packet")
+}
+
+// Same as RouteRadiusRequests, but does not block: executes the specified handler
+func (router *RadiusRouter) RouteRadiusRequestAsync(destination string, packet *radiuscodec.RadiusPacket,
+	perRequestTimeout time.Duration, tries int, serverTries int, secret string, handler func(*radiuscodec.RadiusPacket, error)) {
+
+	rchan := make(chan interface{}, 1)
+	req := RoutableRadiusRequest{
+		destination:       destination,
+		secret:            secret,
+		packet:            packet,
+		rchan:             rchan,
+		perRequestTimeout: perRequestTimeout,
+		tries:             tries,
+		serverTries:       serverTries,
+	}
+
+	router.radiusRequestsChan <- req
+
+	// Will be Done() after processing the request message
+	router.wg.Add(1)
+
+	go func(rc chan interface{}) {
+		r := <-rc
+		switch v := r.(type) {
+		case error:
+			handler(nil, v)
+		case *radiuscodec.RadiusPacket:
+			handler(v, nil)
+		default:
+			panic("got an answer that was not error or pointer to radius packet")
+		}
+
+	}(rchan)
 }
 
 // Obtains the parameters to use when sending the request to the radius client, taking into

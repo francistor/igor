@@ -149,7 +149,7 @@ func (router *DiameterRouter) eventLoop() {
 			connection, err := router.listener.Accept()
 			if err != nil {
 				// Use atomic to avoid races, because this is in reality of the eventLoop (goroutine)
-				if atomic.LoadInt32(&router.status) != StatusClosing {
+				if atomic.LoadInt32(&router.status) != StatusTerminated {
 					logger.Info("error accepting connection", err)
 					panic(err)
 				}
@@ -180,7 +180,6 @@ func (router *DiameterRouter) eventLoop() {
 				connection,
 				// The handler injects me the message
 				func(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-					// TODOFRG: Check what happens if this message is sent to another peer with a timeout of 0
 					return router.RouteDiameterRequest(request, DEFAULT_REQUEST_TIMEOUT_SECONDS*time.Second)
 				},
 			)
@@ -200,7 +199,7 @@ routerEventLoop:
 			switch m.(type) {
 			case RouterSetDownCommand:
 				// Set the status
-				atomic.StoreInt32(&router.status, StatusClosing)
+				atomic.StoreInt32(&router.status, StatusTerminated)
 
 				// Stop the ticker
 				router.peerTableTicker.Stop()
@@ -267,7 +266,7 @@ routerEventLoop:
 					}
 
 					// If we are closing the shop, set peer down
-					if atomic.LoadInt32(&router.status) == StatusClosing {
+					if atomic.LoadInt32(&router.status) == StatusTerminated {
 						v.Sender.SetDown()
 					}
 				} else {
@@ -307,7 +306,7 @@ routerEventLoop:
 				instrumentation.PushDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
 
 				// Check if we must exit
-				if atomic.LoadInt32(&router.status) == StatusClosing {
+				if atomic.LoadInt32(&router.status) == StatusTerminated {
 					// Check if we can exit
 					for peer := range router.diameterPeersTable {
 						if router.diameterPeersTable[peer].peer != nil {
@@ -431,6 +430,29 @@ func (router *DiameterRouter) RouteDiameterRequest(request *diamcodec.DiameterMe
 		return v, nil
 	}
 	panic("got an answer that was not error or pointer to diameter message")
+}
+
+// Same as RouteDiameterRequest but non blocking: executes the handler asyncrhronously
+func (router *DiameterRouter) RouteDiameterRequestAsync(request *diamcodec.DiameterMessage, timeout time.Duration, handler func(*diamcodec.DiameterMessage, error)) {
+	rchan := make(chan interface{}, 1)
+
+	routableRequest := RoutableDiameterRequest{
+		Message: request,
+		RChan:   rchan,
+		Timeout: timeout,
+	}
+	router.diameterRequestsChan <- routableRequest
+
+	go func(chan interface{}) {
+		r := <-rchan
+		switch v := r.(type) {
+		case error:
+			handler(nil, v)
+		case *diamcodec.DiameterMessage:
+			handler(v, nil)
+		}
+		panic("got an answer that was not error or pointer to diameter message")
+	}(rchan)
 }
 
 // Takes the current map of DiameterPeers and generates a new one based on the current configuration

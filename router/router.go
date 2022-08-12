@@ -3,7 +3,7 @@ package router
 // Statuses of the Router
 const (
 	StatusOperational = int32(0)
-	StatusClosing     = int32(1)
+	StatusTerminated  = int32(1)
 )
 
 // Size of the channel for getting messages to route
@@ -30,4 +30,8 @@ const DEFAULT_REQUEST_TIMEOUT_SECONDS = 10
 
 // Message to be sent for orderly shutdown of the Router
 type RouterSetDownCommand struct {
+}
+
+// Mesaage to stop the eventloop of the routers
+type RouterCloseCommand struct {
 }

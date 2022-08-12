@@ -165,8 +165,11 @@ func (rcs *RadiusClientSocket) Close() {
 		<-rcs.readLoopDoneChannel
 	}
 
-	// Wait until all goroutines exit
+	// Wait until all goroutines and outstanding requests exit
 	rcs.wg.Wait()
+
+	// Terminate the event loop
+	rcs.eventLoopChannel <- ClientCloseCommand{}
 
 	close(rcs.eventLoopChannel)
 
@@ -188,6 +191,11 @@ func (rcs *RadiusClientSocket) eventLoop() {
 
 		switch v := in.(type) {
 
+		case ClientCloseCommand:
+
+			// Terminate the event loop
+			return
+
 		case ReadErrorMsg:
 
 			rcs.socket.Close()
@@ -197,8 +205,6 @@ func (rcs *RadiusClientSocket) eventLoop() {
 
 			// Tell the radiusclient we are down
 			rcs.controlChannel <- SocketDownEvent{Sender: rcs, Error: v.Error}
-
-			return
 
 		case SetDownCommandMsg:
 
@@ -212,8 +218,6 @@ func (rcs *RadiusClientSocket) eventLoop() {
 
 			// Tell the radiusclient we are down
 			rcs.controlChannel <- SocketDownEvent{Sender: rcs}
-
-			return
 
 			// Received message in the UDP Socket. Sent by the readLoop
 		case RadiusResponseMsg:
@@ -285,6 +289,9 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				config.GetLogger().Errorf("could not get an id: %s", err)
 				v.rchan <- err
 				close(v.rchan)
+
+				// Corresponding to the Add(1) in SendRadiusRequest
+				rcs.wg.Done()
 				continue
 			}
 
@@ -293,18 +300,24 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				config.GetLogger().Errorf("error marshaling packet: %s", err)
 				v.rchan <- err
 				close(v.rchan)
+
+				// Corresponding to the Add(1) in SendRadiusRequest
+				rcs.wg.Done()
 				continue
 			}
 
 			remoteAddr, _ := net.ResolveUDPAddr("udp", v.endpoint)
 			_, err = rcs.socket.WriteTo(packetBytes, remoteAddr)
 			if err != nil {
-				config.GetLogger().Errorf("error writing packet: %v", err)
+				config.GetLogger().Errorf("error writing packet or socket closed: %v", err)
 				v.rchan <- err
 				close(v.rchan)
 
 				// Finalize
 				rcs.eventLoopChannel <- SetDownCommandMsg{}
+
+				// Corresponding to the Add(1) in SendRadiusRequest
+				rcs.wg.Done()
 				continue
 			}
 
@@ -321,13 +334,17 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				rchan: v.rchan,
 				timer: time.AfterFunc(v.timeout, func() {
 					// This will be called if the timer expires
-					defer rcs.wg.Done()
+					defer func() {
+						rcs.wg.Done()
+					}()
 					if v.serverTries <= 1 {
 						rcs.eventLoopChannel <- CancelRequestMsg{endpoint: v.endpoint, radiusId: radiusId, reason: fmt.Errorf("timeout")}
 					} else {
 						retriedClientRadiusRequest := v
 						retriedClientRadiusRequest.serverTries--
 						retriedClientRadiusRequest.radiusId = radiusId
+
+						rcs.wg.Add(1)
 						rcs.eventLoopChannel <- retriedClientRadiusRequest
 					}
 					instrumentation.PushRadiusClientTimeout(v.endpoint, string(v.packet.Code))
@@ -339,6 +356,9 @@ func (rcs *RadiusClientSocket) eventLoop() {
 
 			instrumentation.PushRadiusClientRequest(v.endpoint, string(v.packet.Code))
 			config.GetLogger().Debugf("-> Client sent RadiusPacket with Identifier %d - %s\n", radiusId, v.packet)
+
+			// Corresponding to the Add(1) in SendRadiusRequest
+			rcs.wg.Done()
 
 		case CancelRequestMsg:
 
@@ -402,6 +422,8 @@ func (rcs *RadiusClientSocket) SendRadiusRequest(request ClientRadiusRequestMsg)
 		return
 	}
 
+	// Make sure the message is processed
+	rcs.wg.Add(1)
 	// Send myself the message
 	rcs.eventLoopChannel <- request
 }

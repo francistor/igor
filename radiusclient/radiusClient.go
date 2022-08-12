@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"igor/config"
 	"igor/radiuscodec"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,10 @@ const (
 const (
 	StatusTerminated = 1
 )
+
+// To terminate the event loop
+type ClientCloseCommand struct {
+}
 
 // Specification of the Radius packet to send and associated metadata
 type ClientRadiusRequestMsg struct {
@@ -70,6 +75,10 @@ type RadiusClient struct {
 
 	// Status may be StatusClosing
 	status int32
+
+	// To make sure we don't close too soon
+	// The eventloop must not finish until all request messages have been processed
+	wg sync.WaitGroup
 }
 
 // Creates a new instance of the Radius Client
@@ -96,7 +105,18 @@ func (r *RadiusClient) SetDown() {
 
 // Wait until everything is closed
 func (r *RadiusClient) Close() {
+	// Wait until we have cleaned up our resources
 	<-r.doneChannel
+
+	// And all outstanding messages have been processed
+	r.wg.Wait()
+
+	// Stop the event loop
+	r.controlChannel <- ClientCloseCommand{}
+
+	// No more messages will be sent on these channels, and is safe to close
+	close(r.requestsChannel)
+	close(r.controlChannel)
 }
 
 func (r *RadiusClient) eventLoop() {
@@ -105,6 +125,11 @@ func (r *RadiusClient) eventLoop() {
 		select {
 		case m := <-r.controlChannel:
 			switch v := m.(type) {
+
+			case ClientCloseCommand:
+				// Finish the event loop
+				return
+
 			// RadiusClientSocket reported it is down
 			case SocketDownEvent:
 				// Close and delete from map
@@ -116,26 +141,19 @@ func (r *RadiusClient) eventLoop() {
 
 				// Check if we are completely finished
 				if r.status == StatusTerminated && len(r.clientSockets) == 0 {
-					close(r.requestsChannel)
-					close(r.controlChannel)
+					config.GetLogger().Info("last socket -> radius client closed")
 					close(r.doneChannel)
-					config.GetLogger().Info("radius client closed")
-					return
 				}
 
 			case SetDownCommandMsg:
-
+				// Signal that we are done and no more requests will be processed
 				r.status = StatusTerminated
 
 				// If no clients, we are done
 				if len(r.clientSockets) == 0 {
-					close(r.requestsChannel)
-					close(r.controlChannel)
+					config.GetLogger().Info("no sockets -> radius client closed")
 					close(r.doneChannel)
-					config.GetLogger().Info("radius client closed")
-					return
 				} else {
-
 					// Terminate all radius client sockets. Will terminate when all sockets are down
 					for i := range r.clientSockets {
 						r.clientSockets[i].SetDown()
@@ -147,6 +165,7 @@ func (r *RadiusClient) eventLoop() {
 			}
 
 		case m := <-r.requestsChannel:
+
 			switch v := m.(type) {
 			case ClientRadiusRequestMsg:
 
@@ -154,6 +173,9 @@ func (r *RadiusClient) eventLoop() {
 				if r.status == StatusTerminated {
 					v.rchan <- fmt.Errorf("radius client terminating")
 					close(v.rchan)
+
+					// Corresponding to the Add(1) in RadiusExchange
+					r.wg.Done()
 					continue
 				}
 
@@ -167,6 +189,9 @@ func (r *RadiusClient) eventLoop() {
 
 				// Invoke the operation
 				rcs.SendRadiusRequest(v)
+
+				// Corresponding to the Add(1) in RadiusExchange
+				r.wg.Done()
 			}
 		}
 	}
@@ -174,6 +199,9 @@ func (r *RadiusClient) eventLoop() {
 
 // Send the radius packet to the target socket and receive the answer or error in the specified channel
 func (r *RadiusClient) RadiusExchange(endpoint string, originPort int, packet *radiuscodec.RadiusPacket, timeout time.Duration, serverTries int, secret string, rchan chan interface{}) {
+
+	// Will be Done() after processing the message
+	r.wg.Add(1)
 
 	// Send myself the message
 	r.requestsChannel <- ClientRadiusRequestMsg{

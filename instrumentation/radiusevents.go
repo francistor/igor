@@ -7,7 +7,7 @@ import (
 // Used as key for radius metrics, both in storage and as a way to specify queries,
 // where the fields with non zero values will be used for aggregation
 type RadiusMetricKey struct {
-	// ip address : port
+	// <ipaddress>:<port> or <ipaddress>
 	Endpoint string
 	// Radius code
 	Code string

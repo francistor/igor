@@ -9,6 +9,7 @@ import (
 	"igor/instrumentation"
 	"igor/radiuscodec"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -112,12 +113,12 @@ func TestDiameterBasicSetup(t *testing.T) {
 	// This sleep time is important. Otherwise another client presenting himself
 	// as client.igor generates a race condition and none of the client.igor
 	// peers gets engaged
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	b1 := NewDiameterRouter("testClientUnknownClient", localDiameterHandler)
 	b2 := NewDiameterRouter("testClientUnknownServer", localDiameterHandler)
 
 	// Time to settle connections
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// Uncomment to debug
 	/*
@@ -214,7 +215,7 @@ func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 	client := NewDiameterRouter("testClient", localDiameterHandler)
 
 	// Some time to settle
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 
 	// Build request
 	request, err := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
@@ -233,7 +234,7 @@ func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 		t.Fatalf("Echoed User-Name incorrect %s", response.GetStringAVP("User-Name"))
 	}
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	cm := instrumentation.MS.HttpClientQuery("HttpClientExchanges", nil, []string{})
 	if cm[instrumentation.HttpClientMetricKey{}] != 1 {
 		t.Fatalf("Client Exchanges was not 1")
@@ -261,7 +262,7 @@ func TestDiameterRouteMessagetoLocal(t *testing.T) {
 	client := NewDiameterRouter("testClient", nil)
 
 	// Some time to settle
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 
 	// Build request
 	request, err := diamcodec.NewDiameterRequest("Gx", "Credit-Control")
@@ -302,7 +303,7 @@ func TestRouteParamRadiusPacket(t *testing.T) {
 		tries:             3, // 1 will go to ne-server, 2 will go to igor-server, 3 will go again to ne-server
 	}
 	reqParams := rrouter.getRouteParams(req)
-	if reqParams[2].endpoint != "192.168.250.1:11812" {
+	if reqParams[2].endpoint != "127.0.0.2:51812" {
 		t.Errorf("third try has wrong endpoint")
 	}
 
@@ -377,6 +378,8 @@ func TestRadiusHandleLocal(t *testing.T) {
 
 func TestRadiusTimeout(t *testing.T) {
 
+	instrumentation.MS.ResetMetrics()
+
 	// Start handler
 	httpHandler := httphandler.NewHttpHandler("testServer", httpDiameterHandler, httpRadiusHandler)
 	time.Sleep(50 * time.Millisecond)
@@ -399,7 +402,7 @@ func TestRadiusTimeout(t *testing.T) {
 	// Two packets will be sent. Server not in quarantine
 	requestsSentMetrics := instrumentation.MS.RadiusQuery("RadiusClientRequests", nil, nil)
 	if requestsSentMetrics[instrumentation.RadiusMetricKey{}] != 2 {
-		t.Fatal("bad number of packets sent (could be due to network unavailable)", err)
+		t.Fatalf("bad number of packets sent (could be due to network unavailable) %d", requestsSentMetrics[instrumentation.RadiusMetricKey{}])
 	}
 	serverTable := instrumentation.MS.RadiusServersTableQuery()
 	if !findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
@@ -407,7 +410,7 @@ func TestRadiusTimeout(t *testing.T) {
 	}
 	timeoutMetrics := instrumentation.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
 	if timeoutMetrics[instrumentation.RadiusMetricKey{}] != 2 {
-		t.Fatal("bad number of timeouts")
+		t.Fatal("bad number of timeouts (could be due to network unavailable)")
 	}
 
 	// Repeat
@@ -448,6 +451,16 @@ func TestRadiusTimeout(t *testing.T) {
 	if timeoutMetrics[instrumentation.RadiusMetricKey{}] != 4 {
 		t.Fatal("bad number of timeouts")
 	}
+	serverRequestsMetrics := instrumentation.MS.RadiusQuery("RadiusServerRequests", nil, []string{"Endpoint"})
+	if serverRequestsMetrics[instrumentation.RadiusMetricKey{Endpoint: "127.0.0.1"}] != 1 {
+		t.Fatalf("bad number of server requests %v", serverRequestsMetrics)
+	} else {
+		t.Log(serverRequestsMetrics)
+	}
+	serverResponsesMetrics := instrumentation.MS.RadiusQuery("RadiusServerResponses", nil, []string{"Endpoint"})
+	if serverResponsesMetrics[instrumentation.RadiusMetricKey{Endpoint: "127.0.0.1"}] != 1 {
+		t.Fatalf("bad number of server responses %v", serverResponsesMetrics)
+	}
 
 	// Send to specific server
 	_, err = server.RouteRadiusRequest("127.0.0.1:7777", req, 100*time.Millisecond, 1, 2, "secret")
@@ -468,6 +481,34 @@ func TestRadiusTimeout(t *testing.T) {
 	server.Close()
 
 	httpHandler.Close()
+}
+
+func TestRadiusRequestCancellation(t *testing.T) {
+
+	// Start Routers
+	client := NewRadiusRouter("testClient", localRadiusHandler)
+
+	// Generate request
+	req := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
+	req.Add("User-Name", "myUserName")
+
+	// Send the packet nowhere
+	var handlerCalled int32
+	client.RouteRadiusRequestAsync("127.0.0.1:7777", req, 200*time.Second, 1, 1, "", func(resp *radiuscodec.RadiusPacket, err error) {
+		if err != nil {
+			t.Logf("-----------------%v", err)
+			atomic.StoreInt32(&handlerCalled, 1)
+			t.Logf("----------------- done")
+		}
+	})
+
+	client.SetDown()
+	time.Sleep(200 * time.Millisecond)
+	client.Close()
+
+	if atomic.LoadInt32(&handlerCalled) != int32(1) {
+		t.Fatalf("async handler was not called on router cancellation %d", atomic.LoadInt32(&handlerCalled))
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////

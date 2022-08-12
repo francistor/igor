@@ -13,11 +13,11 @@
       },
       {
         "name": "non-existing-server",
-        "IPAddress": "192.168.250.1",
+        "IPAddress": "127.0.0.2",
         "secret": "secret",
-        "authPort": 11812,
-        "acctPort": 11813,
-        "coaPort": 13799,
+        "authPort": 51812,
+        "acctPort": 51813,
+        "coaPort": 53799,
         "errorLimit": 2,
         "quarantineTimeSeconds": 5
       }
