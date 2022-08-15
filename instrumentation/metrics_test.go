@@ -105,16 +105,21 @@ func TestDiameterMetrics(t *testing.T) {
 	}
 }
 
-func TestHttpClientMetrics(t *testing.T) {
+func TestHttpMetrics(t *testing.T) {
 
 	MS.ResetMetrics()
 	time.Sleep(100 * time.Millisecond)
 
 	PushHttpClientExchange("https://localhost", "200")
 	PushHttpClientExchange("https://localhost", "200")
-	PushHttpHandlerExchange("500")
-	PushHttpHandlerExchange("300")
-	PushHttpHandlerExchange("300")
+
+	PushHttpHandlerExchange("500", "/DiameterRequest")
+	PushHttpHandlerExchange("300", "/DiameterRequest")
+	PushHttpHandlerExchange("300", "/RadiusRequest")
+
+	PushHttpRouterExchange("200", "/RouteRadiusRequest")
+	PushHttpRouterExchange("200", "/RouteDiameterRequest")
+	PushHttpRouterExchange("300", "/RouteDiameterRequest")
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -126,6 +131,7 @@ func TestHttpClientMetrics(t *testing.T) {
 		t.Fatalf("HttpClientExchanges is not 2")
 	}
 
+	// Check Http Handler Metrics
 	hm1 := MS.HttpHandlerQuery("HttpHandlerExchanges", nil, []string{"ErrorCode"})
 	if v, ok := hm1[HttpHandlerMetricKey{ErrorCode: "300"}]; !ok {
 		t.Fatalf("HttpHandlerExchanges not found")
@@ -138,6 +144,21 @@ func TestHttpClientMetrics(t *testing.T) {
 		t.Fatalf("HttpHandlerExchanges not found")
 	} else if v != 3 {
 		t.Fatalf("HttpHandlerExchanges is not 3")
+	}
+
+	hm3 := MS.HttpHandlerQuery("HttpHandlerExchanges", nil, []string{"Path"})
+	if v, ok := hm3[HttpHandlerMetricKey{Path: "/DiameterRequest"}]; !ok {
+		t.Fatalf("HttpHandlerExchanges not found")
+	} else if v != 2 {
+		t.Fatalf("HttpHandlerExchanges is not 1")
+	}
+
+	// Check Http Router Metrics
+	rm1 := MS.HttpRouterQuery("HttpRouterExchanges", nil, []string{"Path"})
+	if v, ok := rm1[HttpRouterMetricKey{Path: "/RouteDiameterRequest"}]; !ok {
+		t.Fatalf("HttpRouterExchanges not found")
+	} else if v != 2 {
+		t.Fatalf("HttpRouterExchanges is not 2")
 	}
 }
 

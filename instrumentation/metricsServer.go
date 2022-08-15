@@ -12,9 +12,10 @@ type ResetMetricsEvent struct{}
 var MS *MetricsServer = NewMetricsServer()
 
 type PeerDiameterMetrics map[PeerDiameterMetricKey]uint64
+type RadiusMetrics map[RadiusMetricKey]uint64
 type HttpClientMetrics map[HttpClientMetricKey]uint64
 type HttpHandlerMetrics map[HttpHandlerMetricKey]uint64
-type RadiusMetrics map[RadiusMetricKey]uint64
+type HttpRouterMetrics map[HttpRouterMetricKey]uint64
 
 type Query struct {
 
@@ -67,6 +68,9 @@ type MetricsServer struct {
 
 	// HttpHandler
 	httpHandlerExchanges HttpHandlerMetrics
+
+	// HttpRouter
+	httpRouterExchanges HttpRouterMetrics
 
 	// One PeerTable per instance
 	diameterPeersTables map[string]DiameterPeersTable
@@ -344,6 +348,8 @@ func GetAggHttpHandlerMetrics(httpHandlerMetrics HttpHandlerMetrics, aggLabels [
 			switch key {
 			case "ErrorCode":
 				mk.ErrorCode = metricKey.ErrorCode
+			case "Path":
+				mk.Path = metricKey.Path
 			}
 		}
 		if m, found := outMetrics[mk]; found {
@@ -378,6 +384,11 @@ func GetFilteredHttpHandlerMetrics(httpHandlerMetrics HttpHandlerMetrics, filter
 					match = false
 					break outer
 				}
+			case "Path":
+				if metricKey.Path != filter["Path"] {
+					match = false
+					break outer
+				}
 			}
 		}
 
@@ -392,6 +403,78 @@ func GetFilteredHttpHandlerMetrics(httpHandlerMetrics HttpHandlerMetrics, filter
 
 func GetHttpHandlerMetrics(httpHandlerMetrics HttpHandlerMetrics, filter map[string]string, aggLabels []string) HttpHandlerMetrics {
 	return GetAggHttpHandlerMetrics(GetFilteredHttpHandlerMetrics(httpHandlerMetrics, filter), aggLabels)
+}
+
+////////////////////////////////////////////////////////////
+// Http Router Metrics
+////////////////////////////////////////////////////////////
+
+func GetAggHttpRouterMetrics(httpRouterMetrics HttpRouterMetrics, aggLabels []string) HttpRouterMetrics {
+	outMetrics := make(HttpRouterMetrics)
+
+	// Iterate through the items in the metrics map, group & add by the value of the labels
+	for metricKey, v := range httpRouterMetrics {
+		// metricKey will contain the values of the labels that we are aggregating by, the others are zeroed (not initialized)
+		mk := HttpRouterMetricKey{}
+		for _, key := range aggLabels {
+			switch key {
+			case "ErrorCode":
+				mk.ErrorCode = metricKey.ErrorCode
+			case "Path":
+				mk.Path = metricKey.Path
+			}
+		}
+		if m, found := outMetrics[mk]; found {
+			outMetrics[mk] = m + v
+		} else {
+			outMetrics[mk] = v
+		}
+	}
+
+	return outMetrics
+}
+
+func GetFilteredHttpRouterMetrics(httpRouterMetrics HttpRouterMetrics, filter map[string]string) HttpRouterMetrics {
+
+	// If no filter specified, do nothing
+	if filter == nil {
+		return httpRouterMetrics
+	}
+
+	// We'll put the output here
+	outMetrics := make(HttpRouterMetrics)
+
+	for metricKey := range httpRouterMetrics {
+
+		// Check all the items in the filter. If mismatch, get out of the loop
+		match := true
+	outer:
+		for key := range filter {
+			switch key {
+			case "ErrorCode":
+				if metricKey.ErrorCode != filter["ErrorCode"] {
+					match = false
+					break outer
+				}
+			case "Path":
+				if metricKey.Path != filter["Path"] {
+					match = false
+					break outer
+				}
+			}
+		}
+
+		// Filter match
+		if match {
+			outMetrics[metricKey] = httpRouterMetrics[metricKey]
+		}
+	}
+
+	return outMetrics
+}
+
+func GetHttpRouterMetrics(httpRouterMetrics HttpRouterMetrics, filter map[string]string, aggLabels []string) HttpRouterMetrics {
+	return GetAggHttpRouterMetrics(GetFilteredHttpRouterMetrics(httpRouterMetrics, filter), aggLabels)
 }
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -437,6 +520,8 @@ func (ms *MetricsServer) resetMetrics() {
 	ms.httpClientExchanges = make(HttpClientMetrics)
 
 	ms.httpHandlerExchanges = make(HttpHandlerMetrics)
+
+	ms.httpRouterExchanges = make(HttpRouterMetrics)
 }
 
 // Wrapper to reset Diameter Metrics
@@ -489,6 +574,18 @@ func (ms *MetricsServer) HttpHandlerQuery(name string, filter map[string]string,
 		return v
 	} else {
 		return HttpHandlerMetrics{}
+	}
+}
+
+// Wrapper to get HttpRouter metrics
+func (ms *MetricsServer) HttpRouterQuery(name string, filter map[string]string, aggLabels []string) HttpRouterMetrics {
+	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
+	ms.QueryChan <- query
+	v, ok := (<-query.RChan).(HttpRouterMetrics)
+	if ok {
+		return v
+	} else {
+		return HttpRouterMetrics{}
 	}
 }
 
@@ -558,6 +655,9 @@ func (ms *MetricsServer) metricServerLoop() {
 
 			case "HttpHandlerExchanges":
 				query.RChan <- GetHttpHandlerMetrics(ms.httpHandlerExchanges, query.Filter, query.AggLabels)
+
+			case "HttpRouterExchanges":
+				query.RChan <- GetHttpRouterMetrics(ms.httpRouterExchanges, query.Filter, query.AggLabels)
 
 			case "DiameterPeersTables":
 				query.RChan <- ms.diameterPeersTables
@@ -713,6 +813,14 @@ func (ms *MetricsServer) metricServerLoop() {
 					ms.httpHandlerExchanges[e.Key] = 1
 				} else {
 					ms.httpHandlerExchanges[e.Key] = curr + 1
+				}
+
+			// HttpHandler Events
+			case HttpRouterExchangeEvent:
+				if curr, ok := ms.httpRouterExchanges[e.Key]; !ok {
+					ms.httpRouterExchanges[e.Key] = 1
+				} else {
+					ms.httpRouterExchanges[e.Key] = curr + 1
 				}
 
 			// PeersTable

@@ -150,10 +150,20 @@ func TestHandlerConfig(t *testing.T) {
 	if hc.BindPort != 8080 {
 		t.Fatalf("BindPort was %d", hc.BindPort)
 	}
-	if hc.RouterIPAddress != "127.0.0.1" {
-		t.Fatalf("RouterIPAddress was <%s>", hc.RouterIPAddress)
+	if hc.RouterAddress != "127.0.0.1" {
+		t.Fatalf("RouterAddress was <%s>", hc.RouterAddress)
 	}
-	if hc.RouterPort != 23868 {
+	if hc.RouterPort != 20000 {
 		t.Fatalf("RouterPort was %d", hc.RouterPort)
+	}
+}
+
+func TestHttpRouterConfig(t *testing.T) {
+	hrc := GetPolicyConfig().HttpRouterConf()
+	if hrc.BindAddress != "0.0.0.0" {
+		t.Fatalf("BindAddress was <%s>", hrc.BindAddress)
+	}
+	if hrc.BindPort != 20000 {
+		t.Fatalf("BindPort was %d", hrc.BindPort)
 	}
 }

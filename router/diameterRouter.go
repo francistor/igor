@@ -31,19 +31,6 @@ type DiameterPeerWithStatus struct {
 	lastError        error
 }
 
-// Represents a Diameter Message to be routed, either to a handler
-// or to another Diameter Peer
-type RoutableDiameterRequest struct {
-	// Pointer to the actual Diameter message
-	Message *diamcodec.DiameterMessage
-
-	// The channel to send the answer or error
-	RChan chan interface{}
-
-	// Timeout
-	Timeout time.Duration
-}
-
 // The Router handles the lifecycle of peers and routes Diameter requests
 // to the appropriate destinations
 // It follows the Actor model. All actions take place in the event loop
@@ -349,7 +336,7 @@ func (router *DiameterRouter) eventLoop() {
 				close(rdr.RChan)
 			} else {
 				// Route found
-
+				logger.Debugf("Found matching rule %v", route)
 				if len(route.Peers) > 0 {
 					// Route to destination peer
 					// If policy is "random", shuffle the destination-hosts
@@ -364,6 +351,7 @@ func (router *DiameterRouter) eventLoop() {
 						targetPeer := router.diameterPeersTable[destinationHost]
 						if targetPeer.isEngaged {
 							// Route found. Send request asyncronously
+							logger.Debugf("Selected Peer: %s", destinationHost)
 							go func() {
 								targetPeer.peer.DiameterExchange(rdr.Message, rdr.Timeout, rdr.RChan)
 							}()
@@ -389,6 +377,7 @@ func (router *DiameterRouter) eventLoop() {
 					rand.Shuffle(len(destinationURLs), func(i, j int) { destinationURLs[i], destinationURLs[j] = destinationURLs[j], destinationURLs[i] })
 
 					// Send to the handler asynchronously
+					logger.Debugf("Selected Handler: %s", destinationURLs[0])
 					go func(rchan chan interface{}, diameterRequest *diamcodec.DiameterMessage, url string) {
 
 						// Make sure the response channel is closed

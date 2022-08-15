@@ -18,6 +18,8 @@ type PolicyConfigurationManager struct {
 	currentRadiusClients      RadiusClients
 	currentRadiusServers      RadiusServers
 	currentRadiusHandlers     RadiusHandlers
+
+	currentHttpRouterConfig HttpRouterConfig
 }
 
 // Slice of configuration managers
@@ -72,6 +74,11 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefau
 		panic(cerr)
 	}
 
+	// Load http router configuration
+	if cerr = policyConfig.UpdateHttpRouterConfig(); cerr != nil {
+		panic(cerr)
+	}
+
 	return &policyConfig
 }
 
@@ -122,9 +129,9 @@ func (c *PolicyConfigurationManager) getDiameterServerConfig() (DiameterServerCo
 
 // Updates the diameter server configuration in the global variable
 func (c *PolicyConfigurationManager) UpdateDiameterServerConfig() error {
-	dsc, error := c.getDiameterServerConfig()
-	if error != nil {
-		return fmt.Errorf("could not retrieve the Diameter Server configuration: %w", error)
+	dsc, err := c.getDiameterServerConfig()
+	if err != nil {
+		return fmt.Errorf("could not retrieve the Diameter Server configuration: %w", err)
 	}
 	c.currentDiameterServerConfig = dsc
 	return nil
@@ -159,9 +166,9 @@ func (c *PolicyConfigurationManager) getRadiusServerConfig() (RadiusServerConfig
 
 // Updates the radius server configuration in the global variable
 func (c *PolicyConfigurationManager) UpdateRadiusServerConfig() error {
-	rsc, error := c.getRadiusServerConfig()
-	if error != nil {
-		return fmt.Errorf("could not retrieve the Radius Server configuration: %w", error)
+	rsc, err := c.getRadiusServerConfig()
+	if err != nil {
+		return fmt.Errorf("could not retrieve the Radius Server configuration: %w", err)
 	}
 	c.currentRadiusServerConfig = rsc
 	return nil
@@ -208,9 +215,9 @@ func (c *PolicyConfigurationManager) getRadiusClientsConfig() (RadiusClients, er
 
 // Updates the radius clients configuration in the global variable
 func (c *PolicyConfigurationManager) UpdateRadiusClients() error {
-	radiusClients, error := c.getRadiusClientsConfig()
-	if error != nil {
-		return fmt.Errorf("could not retrieve the Radius Clients configuration: %w", error)
+	radiusClients, err := c.getRadiusClientsConfig()
+	if err != nil {
+		return fmt.Errorf("could not retrieve the Radius Clients configuration: %w", err)
 	}
 	c.currentRadiusClients = radiusClients
 	return nil
@@ -285,9 +292,9 @@ func (c *PolicyConfigurationManager) getRadiusServersConfig() (RadiusServers, er
 
 // Updates the radius servers configuration in the global variable
 func (c *PolicyConfigurationManager) UpdateRadiusServers() error {
-	radiusServers, error := c.getRadiusServersConfig()
-	if error != nil {
-		return fmt.Errorf("could not retrieve the Radius Servers configuration: %w", error)
+	radiusServers, err := c.getRadiusServersConfig()
+	if err != nil {
+		return fmt.Errorf("could not retrieve the Radius Servers configuration: %w", err)
 	}
 	c.currentRadiusServers = radiusServers
 	return nil
@@ -460,9 +467,9 @@ func (c *PolicyConfigurationManager) getDiameterPeers() (DiameterPeers, error) {
 
 // Updates the DiameterPeers configuration
 func (c *PolicyConfigurationManager) UpdateDiameterPeers() error {
-	dp, error := c.getDiameterPeers()
-	if error != nil {
-		return fmt.Errorf("could not retrieve the Peers configuration: %w", error)
+	dp, err := c.getDiameterPeers()
+	if err != nil {
+		return fmt.Errorf("could not retrieve the Peers configuration: %w", err)
 	}
 	c.currentDiameterPeers = dp
 	return nil
@@ -471,4 +478,40 @@ func (c *PolicyConfigurationManager) UpdateDiameterPeers() error {
 // Returs the current DiameterPeers configuration
 func (c *PolicyConfigurationManager) PeersConf() DiameterPeers {
 	return c.currentDiameterPeers
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Holds the configuration fot the HTTP Router
+type HttpRouterConfig struct {
+	BindAddress string
+	BindPort    int
+}
+
+// Retrieves the http router configuration, forcing a refresh
+func (c *PolicyConfigurationManager) getHttpRouterConfig() (HttpRouterConfig, error) {
+	hrc := HttpRouterConfig{}
+	co, err := c.cm.GetConfigObject("httpRouter.json", true)
+	if err != nil {
+		return hrc, err
+	}
+	if err := json.Unmarshal(co.RawBytes, &hrc); err != nil {
+		return hrc, err
+	}
+	return hrc, nil
+}
+
+// Updates the diameter server configuration in the global variable
+func (c *PolicyConfigurationManager) UpdateHttpRouterConfig() error {
+	hrc, err := c.getHttpRouterConfig()
+	if err != nil {
+		return fmt.Errorf("could not retrieve the Diameter Server configuration: %w", err)
+	}
+	c.currentHttpRouterConfig = hrc
+	return nil
+}
+
+// Retrieves the contents of the global variable containing the diameter server configuration
+func (c *PolicyConfigurationManager) HttpRouterConf() HttpRouterConfig {
+	return c.currentHttpRouterConfig
 }

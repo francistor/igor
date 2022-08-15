@@ -36,14 +36,14 @@ type RadiusServer struct {
 }
 
 // Creates a Radius Server
-func NewRadiusServer(ci *config.PolicyConfigurationManager, bindIPAddress string, bindPort int, handler RadiusPacketHandler) *RadiusServer {
+func NewRadiusServer(ci *config.PolicyConfigurationManager, bindAddress string, bindPort int, handler RadiusPacketHandler) *RadiusServer {
 
 	// Create the server socket
-	socket, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", bindIPAddress, bindPort))
+	socket, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", bindAddress, bindPort))
 	if err != nil {
-		panic(fmt.Sprintf("could not create listen socket in %s:%d : %s", bindIPAddress, bindPort, err))
+		panic(fmt.Sprintf("could not create listen socket in %s:%d : %s", bindAddress, bindPort, err))
 	} else {
-		config.GetLogger().Infof("RADIUS server listening in %s:%d", bindIPAddress, bindPort)
+		config.GetLogger().Infof("RADIUS server listening in %s:%d", bindAddress, bindPort)
 	}
 
 	radiusServer := RadiusServer{

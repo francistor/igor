@@ -19,7 +19,6 @@ import (
 // A User-Name attribute with the value "TestUserNameEcho" is added to the answer
 func localDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
 	answer := diamcodec.NewDiameterAnswer(request)
-	answer.AddOriginAVPs(config.GetPolicyConfig())
 	answer.Add("User-Name", "EchoLocal")
 	answer.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
 
@@ -336,11 +335,11 @@ func TestRouteParamRadiusPacket(t *testing.T) {
 
 	rchan := make(chan interface{}, 1)
 	req := RoutableRadiusRequest{
-		destination:       "igor-server-ne-group",
-		packet:            radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST),
-		rchan:             rchan,
-		perRequestTimeout: 1 * time.Second,
-		tries:             3, // 1 will go to ne-server, 2 will go to igor-server, 3 will go again to ne-server
+		Destination:       "igor-server-ne-group",
+		Packet:            radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST),
+		RChan:             rchan,
+		PerRequestTimeout: 1 * time.Second,
+		Tries:             3, // 1 will go to ne-server, 2 will go to igor-server, 3 will go again to ne-server
 	}
 	reqParams := rrouter.getRouteParams(req)
 	if reqParams[2].endpoint != "127.0.0.2:51812" {
@@ -352,7 +351,7 @@ func TestRouteParamRadiusPacket(t *testing.T) {
 }
 
 // Client --> radiusPacket to --> Server --> httpHandler
-func TestRadiusRouteMessagetoHTTP(t *testing.T) {
+func TestRadiusRouteToHTTP(t *testing.T) {
 	// Start handler
 	httpHandler := httphandler.NewHttpHandler("testServer", httpDiameterHandler, httpRadiusHandler)
 	time.Sleep(150 * time.Millisecond)

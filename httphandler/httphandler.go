@@ -77,7 +77,7 @@ func getDiameterRequestHandler(handlerFunc diampeer.MessageHandler) func(w http.
 			logger.Error("error reading request %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(NETWORK_ERROR)
+			instrumentation.PushHttpHandlerExchange(req.RequestURI, NETWORK_ERROR)
 			return
 		}
 		var request diamcodec.DiameterMessage
@@ -85,7 +85,7 @@ func getDiameterRequestHandler(handlerFunc diampeer.MessageHandler) func(w http.
 			logger.Error("error unmarshalling request %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(UNSERIALIZATION_ERROR)
+			instrumentation.PushHttpHandlerExchange(req.RequestURI, UNSERIALIZATION_ERROR)
 			return
 		}
 
@@ -95,7 +95,7 @@ func getDiameterRequestHandler(handlerFunc diampeer.MessageHandler) func(w http.
 			logger.Errorf("error handling request %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(HANDLER_FUNCTION_ERROR)
+			instrumentation.PushHttpHandlerExchange(req.RequestURI, HANDLER_FUNCTION_ERROR)
 			return
 		}
 		jAnswer, err := json.Marshal(answer)
@@ -103,12 +103,12 @@ func getDiameterRequestHandler(handlerFunc diampeer.MessageHandler) func(w http.
 			logger.Errorf("error marshaling response %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(SERIALIZATION_ERROR)
+			instrumentation.PushHttpHandlerExchange(req.RequestURI, SERIALIZATION_ERROR)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		instrumentation.PushHttpHandlerExchange(SUCCESS)
+		instrumentation.PushHttpHandlerExchange(req.RequestURI, SUCCESS)
 	}
 }
 
@@ -124,7 +124,7 @@ func getRadiusRequestHandler(handlerFunc radiusserver.RadiusPacketHandler) func(
 			logger.Error("error reading request %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(NETWORK_ERROR)
+			instrumentation.PushHttpHandlerExchange(req.RequestURI, NETWORK_ERROR)
 			return
 		}
 		var request radiuscodec.RadiusPacket
@@ -132,7 +132,7 @@ func getRadiusRequestHandler(handlerFunc radiusserver.RadiusPacketHandler) func(
 			logger.Error("error unmarshalling request %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(UNSERIALIZATION_ERROR)
+			instrumentation.PushHttpHandlerExchange(req.RequestURI, UNSERIALIZATION_ERROR)
 			return
 		}
 
@@ -142,7 +142,7 @@ func getRadiusRequestHandler(handlerFunc radiusserver.RadiusPacketHandler) func(
 			logger.Errorf("error handling request %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(HANDLER_FUNCTION_ERROR)
+			instrumentation.PushHttpHandlerExchange(req.RequestURI, HANDLER_FUNCTION_ERROR)
 			return
 		}
 		jAnswer, err := json.Marshal(answer)
@@ -150,11 +150,11 @@ func getRadiusRequestHandler(handlerFunc radiusserver.RadiusPacketHandler) func(
 			logger.Errorf("error marshaling response %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(SERIALIZATION_ERROR)
+			instrumentation.PushHttpHandlerExchange(req.RequestURI, SERIALIZATION_ERROR)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		instrumentation.PushHttpHandlerExchange(SUCCESS)
+		instrumentation.PushHttpHandlerExchange(req.RequestURI, SUCCESS)
 	}
 }

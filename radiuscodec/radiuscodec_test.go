@@ -417,7 +417,7 @@ func TestJSONPacket(t *testing.T) {
 					{"Igor-TimeAttribute": "1966-11-26T03:34:08 UTC"},
 					{"Igor-IPv6AddressAttribute": "bebe:cafe::0"},
 					{"Igor-IPv6PrefixAttribute": "bebe:cafe:cccc::0/64"},
-					{"Igor-InterfaceIdAttribute": "00aabbccdd"},
+					{"Igor-InterfaceIdAttribute": "00aabbccddeeff11"},
 					{"Igor-Integer64Attribute": 999999999999},
 					{"Igor-SaltedOctetsAttribute": "1122aabbccdd"},
 					{"User-Name":"MyUserName"}

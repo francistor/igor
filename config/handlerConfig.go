@@ -68,7 +68,7 @@ type HandlerConfig struct {
 	// The port number in which the http server will listen
 	BindPort int
 	// The IP address of the Radius&Diameter router to which the requests from the handler must be sent
-	RouterIPAddress string
+	RouterAddress string
 	// The TCP port of the Radius&Diameter router to which the requests from the handler must be sent
 	RouterPort int
 }

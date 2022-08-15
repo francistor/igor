@@ -123,12 +123,12 @@ type RadiusClientSocket struct {
 }
 
 // Creation function
-func NewRadiusClientSocket(ci *config.PolicyConfigurationManager, controlChannel chan interface{}, bindIPAddress string, originPort int) *RadiusClientSocket {
+func NewRadiusClientSocket(ci *config.PolicyConfigurationManager, controlChannel chan interface{}, bindAddress string, originPort int) *RadiusClientSocket {
 
 	// Bind socket
-	socket, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", bindIPAddress, originPort))
+	socket, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", bindAddress, originPort))
 	if err != nil {
-		panic(fmt.Sprintf("could not bind client socket to %s:%d: %s", bindIPAddress, originPort, err))
+		panic(fmt.Sprintf("could not bind client socket to %s:%d: %s", bindAddress, originPort, err))
 	}
 
 	rcs := RadiusClientSocket{

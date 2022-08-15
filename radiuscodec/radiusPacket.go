@@ -421,6 +421,8 @@ func NewRadiusResponse(request *RadiusPacket, isSuccess bool) *RadiusPacket {
 ///////////////////////////////////////////////////////////////
 
 // Checks the response authenticator
+// Response authenticator must be the md5 hash of the response bytes with the authenticator replaced by the
+// request authenticator, followed by the secret
 func ValidateResponseAuthenticator(packetBytes []byte, requestAuthenticator [16]byte, secret string) bool {
 
 	hasher := md5.New()

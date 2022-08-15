@@ -14,6 +14,7 @@ func PushHttpClientExchange(endpoint string, errorCode string) {
 }
 
 type HttpHandlerMetricKey struct {
+	Path      string
 	ErrorCode string
 }
 
@@ -21,6 +22,19 @@ type HttpHandlerExchangeEvent struct {
 	Key HttpHandlerMetricKey
 }
 
-func PushHttpHandlerExchange(errorCode string) {
-	MS.InputChan <- HttpHandlerExchangeEvent{Key: HttpHandlerMetricKey{ErrorCode: errorCode}}
+func PushHttpHandlerExchange(errorCode string, path string) {
+	MS.InputChan <- HttpHandlerExchangeEvent{Key: HttpHandlerMetricKey{ErrorCode: errorCode, Path: path}}
+}
+
+type HttpRouterMetricKey struct {
+	Path      string
+	ErrorCode string
+}
+
+type HttpRouterExchangeEvent struct {
+	Key HttpRouterMetricKey
+}
+
+func PushHttpRouterExchange(errorCode string, path string) {
+	MS.InputChan <- HttpRouterExchangeEvent{Key: HttpRouterMetricKey{ErrorCode: errorCode, Path: path}}
 }

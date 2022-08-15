@@ -412,10 +412,10 @@ func TestRequestsCancellation(t *testing.T) {
 
 	// Simulate two long requests
 	request1, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
-	request1.AddOriginAVPs(config.GetPolicyConfig())
+	request1.AddOriginAVPs(config.GetPolicyConfigInstance("testClient"))
 	request1.Add("franciscocardosogil-Command", "Slow")
 	request2, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
-	request2.AddOriginAVPs(config.GetPolicyConfig())
+	request2.AddOriginAVPs(config.GetPolicyConfigInstance("testClient"))
 	request2.Add("franciscocardosogil-Command", "Slow")
 
 	rc1 := make(chan interface{}, 1)
