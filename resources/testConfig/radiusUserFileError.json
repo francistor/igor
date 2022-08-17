@@ -8,7 +8,8 @@
             {"Class": "theClassAttribute"},
             {"Igor-IntegerAttribute": "Zero"},
             {"Igor-IntegerAttribute": "1"},
-            {"Igor-IntegerAttribute": 2}
+            {"Igor-IntegerAttribute": 2},
+            {"Non-existing-attribute": "no-value"}
         ]
     }
 }

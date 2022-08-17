@@ -34,7 +34,7 @@ type DiameterAVP struct {
 	Value interface{}
 
 	// Dictionary item
-	DictItem diamdict.AVPDictItem
+	DictItem *diamdict.AVPDictItem
 }
 
 // AVP Header is
@@ -107,7 +107,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get the relevant info from the dictionary
 	// If not in the dictionary, will get some defaults
-	avp.DictItem, _ = config.GetDDict().GetFromCode(diamdict.AVPCode{VendorId: avp.VendorId, Code: avp.Code})
+	avp.DictItem, _ = config.GetDDict().GetAVPFromCode(diamdict.AVPCode{VendorId: avp.VendorId, Code: avp.Code})
 	avp.Name = avp.DictItem.Name
 
 	// Parse according to type
@@ -784,11 +784,12 @@ func (avp *DiameterAVP) GetIPAddress() net.IP {
 func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 	var avp = DiameterAVP{}
 
-	avp.DictItem = config.GetDDict().AVPByName[name]
-	if avp.DictItem.DiameterType == diamdict.None {
+	di, e := config.GetDDict().GetAVPFromName(name)
+	if e != nil {
 		return &avp, fmt.Errorf("%s not found in dictionary", name)
 	}
 
+	avp.DictItem = di
 	avp.Name = name
 	avp.Code = avp.DictItem.Code
 	avp.VendorId = avp.DictItem.VendorId

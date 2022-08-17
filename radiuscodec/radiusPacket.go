@@ -173,9 +173,8 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 		rp.Authenticator = GetAuthenticator()
 	} else if rp.Code == ACCOUNTING_REQUEST || rp.Code == DISCONNECT_REQUEST || rp.Code == COA_REQUEST {
 		rp.Authenticator = zero_authenticator
-	} else {
-		// Do nothing. Authenticator will be set to the one in the request
 	}
+	// else Do nothing. Authenticator will be set to the one in the request
 	if err = binary.Write(&writer, binary.BigEndian, rp.Authenticator); err != nil {
 		return 0, err
 	}

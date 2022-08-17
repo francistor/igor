@@ -35,7 +35,7 @@ type RadiusAVP struct {
 	Value interface{}
 
 	// Dictionary item
-	DictItem radiusdict.AVPDictItem
+	DictItem *radiusdict.AVPDictItem
 }
 
 // AVP Header is
@@ -663,11 +663,12 @@ func (avp *RadiusAVP) GetTag() byte {
 func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 	var avp = RadiusAVP{}
 
-	avp.DictItem = config.GetRDict().AVPByName[name]
-	if avp.DictItem.RadiusType == radiusdict.None {
+	di, e := config.GetRDict().GetFromName(name)
+	if e != nil {
 		return &avp, fmt.Errorf("%s not found in dictionary", name)
 	}
 
+	avp.DictItem = di
 	avp.Name = name
 	avp.Code = avp.DictItem.Code
 	avp.VendorId = avp.DictItem.VendorId

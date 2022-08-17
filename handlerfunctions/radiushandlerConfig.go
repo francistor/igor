@@ -6,6 +6,7 @@ import (
 	"igor/radiuscodec"
 )
 
+// Represents an entry in a UserFile
 type RadiusUserFileEntry struct {
 	Key                      string
 	CheckItems               map[string]string
@@ -13,6 +14,7 @@ type RadiusUserFileEntry struct {
 	NonOverridableReplyItems []radiuscodec.RadiusAVP
 }
 
+// Loads an entry from an existing configuration object
 func NewRadiusUserFileEntry(key string, configObjectName string, ci *config.PolicyConfigurationManager) (RadiusUserFileEntry, error) {
 
 	radiusEntry := RadiusUserFileEntry{
@@ -30,19 +32,26 @@ func NewRadiusUserFileEntry(key string, configObjectName string, ci *config.Poli
 		myCi = ci
 	}
 
-	configObject, err := myCi.CM.GetConfigObjectAsJson(configObjectName, false)
+	/*
+		configObject, err := myCi.CM.GetConfigObjectAsJson(configObjectName, false)
+		if err != nil {
+			return RadiusUserFileEntry{}, err
+		}
+
+		objectMap, ok := configObject.(map[string]interface{})
+		if !ok {
+			return RadiusUserFileEntry{}, fmt.Errorf("%s bad file format", configObjectName)
+		}
+
+		keyEntry, found := objectMap[key]
+		if !found {
+			return RadiusUserFileEntry{}, fmt.Errorf("%s not found in %s", key, configObjectName)
+		}
+	*/
+
+	keyEntry, err := myCi.CM.GetConfigObjectKeyAsJson(configObjectName, key, false)
 	if err != nil {
 		return RadiusUserFileEntry{}, err
-	}
-
-	objectMap, ok := configObject.(map[string]interface{})
-	if !ok {
-		return RadiusUserFileEntry{}, fmt.Errorf("%s could not be indexed by key", configObjectName)
-	}
-
-	keyEntry, found := objectMap[key]
-	if !found {
-		return RadiusUserFileEntry{}, fmt.Errorf("%s not found in %s", key, configObjectName)
 	}
 
 	keyEntryMap, ok := keyEntry.(map[string]interface{})

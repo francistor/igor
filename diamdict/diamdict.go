@@ -35,6 +35,10 @@ const (
 	IPv6Prefix  = 1003
 )
 
+var UnknownDictItem = AVPDictItem{
+	Name: "UNKNOWN",
+}
+
 // VendorId and code of AVP in a single attribute
 type AVPCode struct {
 	VendorId uint32
@@ -74,9 +78,9 @@ type DiameterApplication struct {
 	AppType  string
 	Commands []DiameterCommand
 
-	CommandByName map[string]DiameterCommand
+	CommandByName map[string]*DiameterCommand
 
-	CommandByCode map[uint32]DiameterCommand
+	CommandByCode map[uint32]*DiameterCommand
 }
 
 // Represents the full Diameter Dictionary
@@ -88,44 +92,51 @@ type DiameterDict struct {
 	VendorByName map[string]uint32
 
 	// Map of avp code to name. Name is <vendorName>-<attributeName>
-	AVPByCode map[AVPCode]AVPDictItem
+	AVPByCode map[AVPCode]*AVPDictItem
 
 	// Map of avp name to code
-	AVPByName map[string]AVPDictItem
+	AVPByName map[string]*AVPDictItem
 
 	// Map of app names
-	AppByName map[string]DiameterApplication
+	AppByName map[string]*DiameterApplication
 
 	// Map of app codes
-	AppByCode map[uint32]DiameterApplication
+	AppByCode map[uint32]*DiameterApplication
 }
 
 // Returns an empty dictionary item if the code is not found
 // The user may decide to go on with an UNKNOWN dictionary item when the error is returned
-func (dd *DiameterDict) GetFromCode(code AVPCode) (AVPDictItem, error) {
-	di := dd.AVPByCode[code]
-	if di.Name == "" {
-		di.Name = "UNKNOWN"
-		return di, fmt.Errorf("%v not found in dictionary", code)
+func (dd *DiameterDict) GetAVPFromCode(code AVPCode) (*AVPDictItem, error) {
+	if di, found := dd.AVPByCode[code]; !found {
+		return &UnknownDictItem, fmt.Errorf("%v not found in dictionary", code)
+	} else {
+		return di, nil
 	}
-	return di, nil
 }
 
 // Returns an empty dictionary item if the code is not found
 // The user may decide to go on with an UNKNOWN dictionary item when the error is returned
-func (dd *DiameterDict) GetFromName(name string) (AVPDictItem, error) {
-	di, ok := dd.AVPByName[name]
-	if !ok {
-		di.Name = "UNKNOWN"
-		return di, fmt.Errorf("%s not found in dictionary", name)
+func (dd *DiameterDict) GetAVPFromName(name string) (*AVPDictItem, error) {
+	if di, found := dd.AVPByName[name]; !found {
+		return &UnknownDictItem, fmt.Errorf("%s not found in dictionary", name)
+	} else {
+		return di, nil
 	}
-	return di, nil
+}
+
+// Returns a DiameterAppplication given the appid and command code
+func (dd *DiameterDict) GetApplication(appId uint32, commandCode uint32) (*DiameterApplication, error) {
+	if command, ok := dd.AppByCode[appId]; !ok {
+		return nil, fmt.Errorf("appId %d not found", appId)
+	} else {
+		return command, nil
+	}
 }
 
 // Returns a DiameterCommand given the appid and command code
-func (dd *DiameterDict) GetCommand(appId uint32, commandCode uint32) (DiameterCommand, error) {
+func (dd *DiameterDict) GetCommand(appId uint32, commandCode uint32) (*DiameterCommand, error) {
 	if command, ok := dd.AppByCode[appId].CommandByCode[commandCode]; !ok {
-		return DiameterCommand{}, fmt.Errorf("appId %d and command %d not found", appId, commandCode)
+		return nil, fmt.Errorf("appId %d and command %d not found", appId, commandCode)
 	} else {
 		return command, nil
 	}
@@ -152,8 +163,8 @@ func NewDictionaryFromJSON(data []byte) *DiameterDict {
 	}
 
 	// Build the AVP maps
-	dict.AVPByCode = make(map[AVPCode]AVPDictItem)
-	dict.AVPByName = make(map[string]AVPDictItem)
+	dict.AVPByCode = make(map[AVPCode]*AVPDictItem)
+	dict.AVPByName = make(map[string]*AVPDictItem)
 	for _, vendorAVPs := range jDict.Avps {
 		vendorId := vendorAVPs.VendorId
 		vendorName := dict.VendorById[vendorId]
@@ -161,26 +172,28 @@ func NewDictionaryFromJSON(data []byte) *DiameterDict {
 		// For a specific vendor
 		for _, attr := range vendorAVPs.Attributes {
 			avpDictItem := attr.toAVPDictItem(vendorId, vendorName)
-			dict.AVPByCode[AVPCode{vendorId, attr.Code}] = avpDictItem
-			dict.AVPByName[avpDictItem.Name] = avpDictItem
+			dict.AVPByCode[AVPCode{vendorId, attr.Code}] = &avpDictItem
+			dict.AVPByName[avpDictItem.Name] = &avpDictItem
 		}
 	}
 
 	// Build the applications map
-	dict.AppByCode = make(map[uint32]DiameterApplication)
-	dict.AppByName = make(map[string]DiameterApplication)
-	for _, app := range jDict.Applications {
-		app.CommandByName = make(map[string]DiameterCommand)
-		app.CommandByCode = make(map[uint32]DiameterCommand)
-		for _, command := range app.Commands {
-			// Fill the commands map for the application
-			app.CommandByCode[command.Code] = command
-			app.CommandByName[command.Name] = command
-		}
-
+	dict.AppByCode = make(map[uint32]*DiameterApplication)
+	dict.AppByName = make(map[string]*DiameterApplication)
+	for i := range jDict.Applications {
 		// Fill the Applications map
+		// Do not use the value in the range. Copy the pointer as done here!
+		app := &jDict.Applications[i]
 		dict.AppByCode[app.Code] = app
 		dict.AppByName[app.Name] = app
+
+		// Fill the commands map for the application
+		app.CommandByCode = make(map[uint32]*DiameterCommand)
+		app.CommandByName = make(map[string]*DiameterCommand)
+		for j, command := range app.Commands {
+			app.CommandByCode[command.Code] = &app.Commands[j]
+			app.CommandByName[command.Name] = &app.Commands[j]
+		}
 	}
 
 	return &dict

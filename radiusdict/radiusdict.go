@@ -18,6 +18,10 @@ const (
 	Integer64   = 9
 )
 
+var UnknownDictItem = AVPDictItem{
+	Name: "UNKNOWN",
+}
+
 // VendorId and code of AVP in a single attribute
 type AVPCode struct {
 	VendorId uint32
@@ -46,32 +50,30 @@ type RadiusDict struct {
 	VendorByName map[string]uint32
 
 	// Map of avp code to name. Name is <vendorName>-<attributeName>
-	AVPByCode map[AVPCode]AVPDictItem
+	AVPByCode map[AVPCode]*AVPDictItem
 
 	// Map of avp name to code
-	AVPByName map[string]AVPDictItem
+	AVPByName map[string]*AVPDictItem
 }
 
 // Returns an empty dictionary item if the code is not found
 // The user may decide to go on with an UNKNOWN dictionary item when the error is returned
-func (rd *RadiusDict) GetFromCode(code AVPCode) (AVPDictItem, error) {
-	di := rd.AVPByCode[code]
-	if di.Name == "" {
-		di.Name = "UNKNOWN"
-		return di, fmt.Errorf("%v not found in dictionary", code)
+func (rd *RadiusDict) GetFromCode(code AVPCode) (*AVPDictItem, error) {
+	if di, found := rd.AVPByCode[code]; !found {
+		return &UnknownDictItem, fmt.Errorf("%v not found in dictionary", code)
+	} else {
+		return di, nil
 	}
-	return di, nil
 }
 
 // Returns an empty dictionary item if the code is not found
 // The user may decide to go on with an UNKNOWN dictionary item when the error is returned
-func (rd *RadiusDict) GetFromName(name string) (AVPDictItem, error) {
-	di, ok := rd.AVPByName[name]
-	if !ok {
-		di.Name = "UNKNOWN"
-		return di, fmt.Errorf("%s not found in dictionary", name)
+func (rd *RadiusDict) GetFromName(name string) (*AVPDictItem, error) {
+	if di, found := rd.AVPByName[name]; !found {
+		return &UnknownDictItem, fmt.Errorf("%v not found in dictionary", name)
+	} else {
+		return di, nil
 	}
-	return di, nil
 }
 
 // Returns a Diameter Dictionary object from its serialized representation
@@ -95,8 +97,8 @@ func NewDictionaryFromJSON(data []byte) *RadiusDict {
 	}
 
 	// Build the AVP maps
-	dict.AVPByCode = make(map[AVPCode]AVPDictItem)
-	dict.AVPByName = make(map[string]AVPDictItem)
+	dict.AVPByCode = make(map[AVPCode]*AVPDictItem)
+	dict.AVPByName = make(map[string]*AVPDictItem)
 	for _, vendorAVPs := range jDict.Avps {
 		vendorId := vendorAVPs.VendorId
 		vendorName := dict.VendorById[vendorId]
@@ -104,8 +106,8 @@ func NewDictionaryFromJSON(data []byte) *RadiusDict {
 		// For a specific vendor
 		for _, attr := range vendorAVPs.Attributes {
 			avpDictItem := attr.toAVPDictItem(vendorId, vendorName)
-			dict.AVPByCode[AVPCode{vendorId, attr.Code}] = avpDictItem
-			dict.AVPByName[avpDictItem.Name] = avpDictItem
+			dict.AVPByCode[AVPCode{vendorId, attr.Code}] = &avpDictItem
+			dict.AVPByName[avpDictItem.Name] = &avpDictItem
 		}
 	}
 

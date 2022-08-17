@@ -40,3 +40,14 @@ func genAnswer(rChan chan interface{}) {
 	rChan <- struct{}{}
 	close(rChan)
 }
+
+func TestSomething(t *testing.T) {
+
+	var variable string = "hello"
+	var itf interface{} = variable
+
+	otherVariable, _ := itf.(string)
+
+	variable = "modifiedhello"
+	fmt.Println(variable, otherVariable)
+}

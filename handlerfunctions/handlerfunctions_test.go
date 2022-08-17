@@ -1,6 +1,8 @@
 package handlerfunctions
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"igor/config"
 	"os"
@@ -25,5 +27,17 @@ func TestRadiusUserFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Printf("%#v\n", entry)
+	jEntry, err := json.Marshal(entry)
+
+	fmt.Println(PrettyPrintJSON(jEntry))
+}
+
+// Helper to show JSON to humans
+func PrettyPrintJSON(j []byte) string {
+	var jBytes bytes.Buffer
+	if err := json.Indent(&jBytes, j, "", "    "); err != nil {
+		return "<bad json>"
+	}
+
+	return jBytes.String()
 }

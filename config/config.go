@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -110,10 +111,29 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	}
 }
 
-// Returns the configuration object as a parsed Json
+// Returns the configuration object as a parsed Json. Returns a copy
 func (c *ConfigurationManager) GetConfigObjectAsJson(objectName string, refresh bool) (interface{}, error) {
 	if co, err := c.GetConfigObject(objectName, refresh); err == nil {
 		return co.Json, nil
+	} else {
+		return nil, err
+	}
+}
+
+// Returns the contents of a specific key in the JSON configuration object
+func (c *ConfigurationManager) GetConfigObjectKeyAsJson(objectName string, key string, refresh bool) (interface{}, error) {
+	if co, err := c.GetConfigObject(objectName, refresh); err == nil {
+		switch co.Json.(type) {
+		case map[string]interface{}:
+			if value, found := co.Json.(map[string]interface{})[key]; found {
+				return value, nil
+			} else {
+				return nil, fmt.Errorf("%s.%s not found", objectName, key)
+			}
+		default:
+			return nil, fmt.Errorf("%s is not a JSON properties object", objectName)
+		}
+
 	} else {
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 package diamdict
 
 import (
+	"fmt"
 	"os"
 	"testing"
 )
@@ -76,6 +77,7 @@ func TestDiamDict(t *testing.T) {
 	if app.Name != "TestApplication" {
 		t.Errorf("Application code 1000 is not named TestApplication")
 	}
+	fmt.Printf("%#v\n", app)
 	if app.CommandByCode[2000].Request["Session-Id"].Mandatory != true {
 		t.Errorf("TestApplication Command 2000 Request Session-Id is not mandatory")
 	}
@@ -93,7 +95,7 @@ func TestUnknownDiameterAVP(t *testing.T) {
 	jsonDict, _ := os.ReadFile("/home/francisco/igor/resources/diameterDictionary.json")
 	diameterDict := NewDictionaryFromJSON(jsonDict)
 
-	avp, err := diameterDict.GetFromName("Igor-Nothing")
+	avp, err := diameterDict.GetAVPFromName("Igor-Nothing")
 	if err == nil {
 		t.Errorf("Igor-Nothing was found")
 	}
