@@ -8,7 +8,7 @@ import (
 
 // Manages the configuration items for policy
 type PolicyConfigurationManager struct {
-	cm ConfigurationManager
+	CM ConfigurationManager
 
 	currentDiameterServerConfig DiameterServerConfig
 	currentRoutingRules         DiameterRoutingRules
@@ -33,19 +33,19 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefau
 
 	// Check not already instantiated
 	for i := range policyConfigs {
-		if policyConfigs[i].cm.instanceName == instanceName {
+		if policyConfigs[i].CM.instanceName == instanceName {
 			panic(instanceName + " already initalized")
 		}
 	}
 
 	// Better to create asap
-	policyConfig := PolicyConfigurationManager{cm: NewConfigurationManager(bootstrapFile, instanceName)}
+	policyConfig := PolicyConfigurationManager{CM: NewConfigurationManager(bootstrapFile, instanceName)}
 	policyConfigs = append(policyConfigs, &policyConfig)
 
 	// Initialize logger and dictionary, if default
 	if isDefault {
-		initLogger(&policyConfig.cm)
-		initDictionaries(&policyConfig.cm)
+		initLogger(&policyConfig.CM)
+		initDictionaries(&policyConfig.CM)
 	}
 
 	// Load diameter configuraton
@@ -86,7 +86,7 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefau
 func GetPolicyConfigInstance(instanceName string) *PolicyConfigurationManager {
 
 	for i := range policyConfigs {
-		if policyConfigs[i].cm.instanceName == instanceName {
+		if policyConfigs[i].CM.instanceName == instanceName {
 			return policyConfigs[i]
 		}
 	}
@@ -117,7 +117,7 @@ type DiameterServerConfig struct {
 // Retrieves the diameter server configuration, forcing a refresh
 func (c *PolicyConfigurationManager) getDiameterServerConfig() (DiameterServerConfig, error) {
 	dsc := DiameterServerConfig{}
-	dc, err := c.cm.GetConfigObject("diameterServer.json", true)
+	dc, err := c.CM.GetConfigObject("diameterServer.json", true)
 	if err != nil {
 		return dsc, err
 	}
@@ -154,7 +154,7 @@ type RadiusServerConfig struct {
 // Retrieves the radius server configuration, corcing a refresh
 func (c *PolicyConfigurationManager) getRadiusServerConfig() (RadiusServerConfig, error) {
 	rsc := RadiusServerConfig{}
-	rc, err := c.cm.GetConfigObject("radiusServer.json", true)
+	rc, err := c.CM.GetConfigObject("radiusServer.json", true)
 	if err != nil {
 		return rsc, err
 	}
@@ -197,7 +197,7 @@ func (c *PolicyConfigurationManager) getRadiusClientsConfig() (RadiusClients, er
 
 	// To be returned
 	radiusClients := make(RadiusClients)
-	rc, err := c.cm.GetConfigObject("radiusClients.json", true)
+	rc, err := c.CM.GetConfigObject("radiusClients.json", true)
 	if err != nil {
 		return radiusClients, err
 	}
@@ -271,7 +271,7 @@ func (c *PolicyConfigurationManager) getRadiusServersConfig() (RadiusServers, er
 		ServerGroups: make(map[string]RadiusServerGroup),
 	}
 
-	rc, err := c.cm.GetConfigObject("radiusServers.json", true)
+	rc, err := c.CM.GetConfigObject("radiusServers.json", true)
 	if err != nil {
 		return radiusServers, err
 	}
@@ -315,7 +315,7 @@ type RadiusHandlers struct {
 // Retrieves the radius handlers configuration, forcing a refresh
 func (c *PolicyConfigurationManager) getRadiusHandlersConfig() (RadiusHandlers, error) {
 	var radiusHandlers RadiusHandlers
-	rc, err := c.cm.GetConfigObject("radiusHandlers.json", true)
+	rc, err := c.CM.GetConfigObject("radiusHandlers.json", true)
 	if err != nil {
 		return radiusHandlers, err
 	}
@@ -373,7 +373,7 @@ func (rr DiameterRoutingRules) FindDiameterRoute(realm string, application strin
 // Retrieves the Routes configuration, forcing a refresh
 func (c *PolicyConfigurationManager) getDiameterRoutingRules() (DiameterRoutingRules, error) {
 	var routingRules []DiameterRoutingRule
-	rr, err := c.cm.GetConfigObject("diameterRoutes.json", true)
+	rr, err := c.CM.GetConfigObject("diameterRoutes.json", true)
 	if err != nil {
 		return routingRules, err
 	}
@@ -443,7 +443,7 @@ func (c *PolicyConfigurationManager) getDiameterPeers() (DiameterPeers, error) {
 	// To be returned
 	peersMap := make(map[string]DiameterPeer)
 
-	dp, err := c.cm.GetConfigObject("diameterPeers.json", true)
+	dp, err := c.CM.GetConfigObject("diameterPeers.json", true)
 	if err != nil {
 		return peersMap, err
 	}
@@ -491,7 +491,7 @@ type HttpRouterConfig struct {
 // Retrieves the http router configuration, forcing a refresh
 func (c *PolicyConfigurationManager) getHttpRouterConfig() (HttpRouterConfig, error) {
 	hrc := HttpRouterConfig{}
-	co, err := c.cm.GetConfigObject("httpRouter.json", true)
+	co, err := c.CM.GetConfigObject("httpRouter.json", true)
 	if err != nil {
 		return hrc, err
 	}

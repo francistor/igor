@@ -140,7 +140,7 @@ func (router *DiameterRouter) eventLoop() {
 
 	// Accepter loop
 	go func() {
-		logger.Info("diameter server accepting connections")
+		logger.Info("diameter server is accepting connections")
 		for {
 			connection, err := router.listener.Accept()
 			if err != nil {
@@ -170,6 +170,7 @@ func (router *DiameterRouter) eventLoop() {
 			// The addition to the peers table will be done later,
 			// after the PeerUp event is received and checking that there is not a duplicate.
 			// Declares, as handler for the Peer, a function that injects here a message to be routed
+			logger.Info("Spawning passive DiameterPeer")
 			diampeer.NewPassiveDiameterPeer(
 				router.instanceName,
 				router.peerControlChannel,

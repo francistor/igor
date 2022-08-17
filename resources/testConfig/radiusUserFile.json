@@ -1,0 +1,13 @@
+{
+    "key1":{
+        "checkItems":{
+            "serviceType": "service-type-1",
+            "clientType": "client-type-1"
+        },
+        "replyItems":[
+            {"Class": "theClassAttribute"},
+            {"Igor-IntegerAttribute": "Zero"},
+            {"Igor-IntegerAttribute": "1"}
+        ]
+    }
+}

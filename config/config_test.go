@@ -37,14 +37,14 @@ func TestObjectRetrieval(t *testing.T) {
 
 	var wg sync.WaitGroup
 
-	var co ConfigObject
+	var co *ConfigObject
 	var err error
 	var objectName = "testFile.json"
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			co, err = GetPolicyConfig().cm.GetConfigObject(objectName, true)
+			co, err = GetPolicyConfig().CM.GetConfigObject(objectName, true)
 			t.Log("Got configuration object")
 			if err != nil {
 				panic(err)

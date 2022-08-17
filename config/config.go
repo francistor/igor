@@ -131,11 +131,11 @@ func (c *ConfigurationManager) GetConfigObjectAsText(objectName string, refresh 
 // Retrieves the object form the cache or tries to get it from the remote
 // and caches it if not found. If refresh is true, ignores the contents of the
 // cache and tries to retrieve a fresh copy
-func (c *ConfigurationManager) GetConfigObject(objectName string, refresh bool) (ConfigObject, error) {
+func (c *ConfigurationManager) GetConfigObject(objectName string, refresh bool) (*ConfigObject, error) {
 	// Try cache
 	if !refresh {
 		if obj, found := c.objectCache.Load(objectName); found {
-			return obj.(ConfigObject), nil
+			return obj.(*ConfigObject), nil
 		}
 	}
 
@@ -153,7 +153,7 @@ func (c *ConfigurationManager) GetConfigObject(objectName string, refresh bool) 
 	// Once function
 	var retriever = func() {
 		if obj, err := c.readConfigObject(objectName); err == nil {
-			c.objectCache.Store(objectName, obj)
+			c.objectCache.Store(objectName, &obj)
 		} else {
 			// Logger may not yet be initialized
 			if logger := GetLogger(); logger != nil {
@@ -168,9 +168,9 @@ func (c *ConfigurationManager) GetConfigObject(objectName string, refresh bool) 
 
 	// Try again
 	if obj, found := c.objectCache.Load(objectName); found {
-		return obj.(ConfigObject), nil
+		return obj.(*ConfigObject), nil
 	} else {
-		return ConfigObject{}, errors.New("could not get configuration object " + objectName)
+		return &ConfigObject{}, errors.New("could not get configuration object " + objectName)
 	}
 }
 

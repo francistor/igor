@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"igor/config"
 	"igor/diamcodec"
+	"igor/instrumentation"
 	"igor/radiuscodec"
 	"igor/router"
 	"net/http"
@@ -114,7 +115,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	}
 	`
 
-	jRadiusAnswer, err := RouteRadius(rrouter, client, "/RouteRadiusRequest", []byte(jRadiusRequest))
+	jRadiusAnswer, err := RouteRadius(rrouter, client, "/routeRadiusRequest", []byte(jRadiusRequest))
 	if err != nil {
 		t.Fatalf("error routing radius: %s", err)
 	}
@@ -166,7 +167,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	}
 
 	`
-	jDiameterAnswer, err := RouteDiameter(drouter, client, "/RouteDiameterRequest", []byte(jDiameterRequest))
+	jDiameterAnswer, err := RouteDiameter(drouter, client, "/routeDiameterRequest", []byte(jDiameterRequest))
 	if err != nil {
 		t.Fatalf("error routing radius: %s", err)
 	}
@@ -178,7 +179,19 @@ func TestHttpRouterHandler(t *testing.T) {
 		t.Fatalf("radius response does not contain expected diameter attribute")
 	}
 
-	// TODO: Check stats
+	rrm := instrumentation.MS.HttpRouterQuery("HttpRouterExchanges", nil, []string{"Path"})
+	if v, ok := rrm[instrumentation.HttpRouterMetricKey{Path: "/routeRadiusRequest"}]; !ok {
+		t.Fatalf("HttpRouterExchanges not found")
+	} else if v != 1 {
+		t.Fatalf("HttpRouterExchanges for radius is not 1")
+	}
+
+	drm := instrumentation.MS.HttpRouterQuery("HttpRouterExchanges", nil, []string{"Path"})
+	if v, ok := drm[instrumentation.HttpRouterMetricKey{Path: "/routeDiameterRequest"}]; !ok {
+		t.Fatalf("HttpRouterExchanges not found")
+	} else if v != 1 {
+		t.Fatalf("HttpRouterExchanges for diameteris not 1")
+	}
 
 	rrouter.SetDown()
 	drouter.SetDown()

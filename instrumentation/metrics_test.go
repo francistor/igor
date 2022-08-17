@@ -117,9 +117,9 @@ func TestHttpMetrics(t *testing.T) {
 	PushHttpHandlerExchange("300", "/DiameterRequest")
 	PushHttpHandlerExchange("300", "/RadiusRequest")
 
-	PushHttpRouterExchange("200", "/RouteRadiusRequest")
-	PushHttpRouterExchange("200", "/RouteDiameterRequest")
-	PushHttpRouterExchange("300", "/RouteDiameterRequest")
+	PushHttpRouterExchange("200", "/routeRadiusRequest")
+	PushHttpRouterExchange("200", "/routeDiameterRequest")
+	PushHttpRouterExchange("300", "/routeDiameterRequest")
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -155,7 +155,7 @@ func TestHttpMetrics(t *testing.T) {
 
 	// Check Http Router Metrics
 	rm1 := MS.HttpRouterQuery("HttpRouterExchanges", nil, []string{"Path"})
-	if v, ok := rm1[HttpRouterMetricKey{Path: "/RouteDiameterRequest"}]; !ok {
+	if v, ok := rm1[HttpRouterMetricKey{Path: "/routeDiameterRequest"}]; !ok {
 		t.Fatalf("HttpRouterExchanges not found")
 	} else if v != 2 {
 		t.Fatalf("HttpRouterExchanges is not 2")

@@ -7,7 +7,7 @@ import (
 
 // Manages the configuration items for the http handlers
 type HandlerConfigurationManager struct {
-	cm                   ConfigurationManager
+	CM                   ConfigurationManager
 	currentHandlerConfig HandlerConfig
 }
 
@@ -21,19 +21,19 @@ func InitHandlerConfigInstance(bootstrapFile string, instanceName string, isDefa
 
 	// Check not already instantiated
 	for i := range handlerConfigs {
-		if handlerConfigs[i].cm.instanceName == instanceName {
+		if handlerConfigs[i].CM.instanceName == instanceName {
 			panic(instanceName + " already initalized")
 		}
 	}
 
 	// Better to create asap
-	handlerConfig := HandlerConfigurationManager{cm: NewConfigurationManager(bootstrapFile, instanceName)}
+	handlerConfig := HandlerConfigurationManager{CM: NewConfigurationManager(bootstrapFile, instanceName)}
 	handlerConfigs = append(handlerConfigs, &handlerConfig)
 
 	// Initialize logger and dictionary, if default
 	if isDefault {
-		initLogger(&handlerConfig.cm)
-		initDictionaries(&handlerConfig.cm)
+		initLogger(&handlerConfig.CM)
+		initDictionaries(&handlerConfig.CM)
 	}
 
 	// Load handler configuraton
@@ -46,7 +46,7 @@ func InitHandlerConfigInstance(bootstrapFile string, instanceName string, isDefa
 func GetHandlerConfigInstance(instanceName string) *HandlerConfigurationManager {
 
 	for i := range handlerConfigs {
-		if handlerConfigs[i].cm.instanceName == instanceName {
+		if handlerConfigs[i].CM.instanceName == instanceName {
 			return handlerConfigs[i]
 		}
 	}
@@ -76,7 +76,7 @@ type HandlerConfig struct {
 // Retrieves the handler configuration, forcing a refresh
 func (c *HandlerConfigurationManager) getHandlerConfig() (HandlerConfig, error) {
 	hc := HandlerConfig{}
-	h, err := c.cm.GetConfigObject("handler.json", true)
+	h, err := c.CM.GetConfigObject("handler.json", true)
 	if err != nil {
 		return hc, err
 	}
