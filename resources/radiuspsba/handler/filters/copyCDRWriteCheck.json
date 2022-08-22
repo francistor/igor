@@ -1,0 +1,5 @@
+{
+  "and": [
+    ["User-Name", "contains", "copy"]
+  ]
+}

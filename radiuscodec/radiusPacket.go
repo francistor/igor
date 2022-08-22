@@ -10,6 +10,8 @@ import (
 	"io"
 	"net"
 	"time"
+
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -395,7 +397,7 @@ func (rp *RadiusPacket) GetDateAVP(avpName string) time.Time {
 }
 
 ///////////////////////////////////////////////////////////////
-// Packet creation
+// Packet creation and manipulation
 ///////////////////////////////////////////////////////////////
 
 // Creates a new radius request with the specified code
@@ -413,6 +415,33 @@ func NewRadiusResponse(request *RadiusPacket, isSuccess bool) *RadiusPacket {
 		code = request.Code + 2
 	}
 	return &RadiusPacket{Code: code, Identifier: request.Identifier, Authenticator: request.Authenticator}
+}
+
+// Creates a copy of the radius packet but having only the AVPs in the positiveFilter argument
+// or removing the attributes in the negativeFilter argument.If nil, no filter is applied.
+func (rp *RadiusPacket) Copy(positiveFilter []string, negativeFilter []string) *RadiusPacket {
+	copiedPacket := RadiusPacket{
+		Code:          rp.Code,
+		Identifier:    rp.Identifier,
+		Authenticator: rp.Authenticator,
+	}
+
+	for i := range rp.AVPs {
+		if positiveFilter != nil {
+			if slices.Contains(positiveFilter, rp.AVPs[i].Name) {
+				copiedPacket.AddAVP(&rp.AVPs[i])
+			}
+		} else if negativeFilter != nil {
+			if !slices.Contains(negativeFilter, rp.AVPs[i].Name) {
+				copiedPacket.AddAVP(&rp.AVPs[i])
+			}
+		} else {
+			// If both are nil, copy all attributes
+			copiedPacket.AddAVP(&rp.AVPs[i])
+		}
+	}
+
+	return &copiedPacket
 }
 
 ///////////////////////////////////////////////////////////////
@@ -448,7 +477,7 @@ func ValidateResponseAuthenticator(packetBytes []byte, requestAuthenticator [16]
 func (rp RadiusPacket) String() string {
 	b, error := json.Marshal(rp)
 	if error != nil {
-		return "<error>"
+		return ""
 	} else {
 		return string(b)
 	}

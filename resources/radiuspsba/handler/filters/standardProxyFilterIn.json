@@ -1,0 +1,3 @@
+{
+  "allow": ["Class", "Framed-IP-Address", "Reply-Message", "User-Password", "Framed-Protocol"]
+}

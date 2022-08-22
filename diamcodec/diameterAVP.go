@@ -984,6 +984,24 @@ func toFloat64(value interface{}) (float64, error) {
 	}
 }
 
+// If grouped, checks that the embedded AVPs are in the dictionary
+func (avp *DiameterAVP) Check() error {
+	if avp.DictItem.DiameterType == diamdict.Grouped {
+		avps := avp.Value.([]DiameterAVP)
+		group := avp.DictItem.Group
+		for i := range avps {
+			if _, found := group[avps[i].Name]; !found {
+				return fmt.Errorf("%s is not allowed in %s", avps[i].Name, avp.Name)
+			}
+			if err := avps[i].Check(); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 ///////////////////////////////////////////////////////////////
 // Grouped
 ///////////////////////////////////////////////////////////////

@@ -1,0 +1,41 @@
+{
+	"sessionCDRDirectories": [
+		{
+			"path": "/var/yaas/cdr/session",
+			"filenamePattern": "cdr_%d{yyyyMMdd}.txt"
+		},
+		{
+			"path": "/var/yaas/cdr/session-hot",
+			"filenamePattern": "cdr_copied.txt",
+			"checkerName": "filters/copyCDRWriteCheck.json"
+		}
+	],
+	"serviceCDRDirectories": [
+		{
+			"path": "/var/yaas/cdr/service",
+			"filenamePattern": "cdr_%d{yyyyMMdd}.txt"
+		}
+	],
+	"writeSessionCDR": true,
+	"writeServiceCDR": true,
+	"cdrFilenamePattern": "cdr_%d{yyyyMMdd}.txt",
+	"provisionType": "database",
+	"authLocal": "provision",
+	"sendReject": "yes",
+	"rejectServiceName": "reject",
+	"blockingServiceName": "pcautiv",
+	"rejectFilter": "portal",
+	"proxyTimeoutMillis": 500,
+	"proxyRetries": 1,
+	"acceptOnProxyError": false,
+	"inlineProxyGroupName": "yaas-superserver-group",
+	"proxySessionAccounting": true,
+	"proxyServiceAccounting": false,
+	"authProxyFilterOut": "filters/standardProxyFilterOut.json",
+	"authProxyFilterIn": "filters/standardProxyFilterIn.json",
+	"acctProxyFilterOut": "filters/standardProxyFilterOut.json",
+	"radiusAttrs":[
+		{"Session-Timeout": 3600}
+	],
+	"nonOverridableRadiusAttrs": []
+}

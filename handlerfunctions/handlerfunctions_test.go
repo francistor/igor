@@ -3,7 +3,6 @@ package handlerfunctions
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"igor/config"
 	"os"
 	"testing"
@@ -27,9 +26,17 @@ func TestRadiusUserFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	jEntry, err := json.Marshal(entry)
+	if entry.CheckItems["clientType"] != "client-type-1" {
+		t.Fatal("bad check item value")
+	}
 
-	fmt.Println(PrettyPrintJSON(jEntry))
+	if entry.ReplyItems[2].GetInt() != 1 {
+		t.Fatalf("bad reply item value %d", entry.ReplyItems[2].GetInt())
+	}
+
+	//jEntry, err := json.Marshal(entry)
+
+	//fmt.Println(PrettyPrintJSON(jEntry))
 }
 
 // Helper to show JSON to humans

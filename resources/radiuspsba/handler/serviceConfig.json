@@ -1,0 +1,147 @@
+{
+	"addon_1":{
+		"radiusAttrs":[
+			{"Session-Timeout": "300"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "Aaddon_1"}
+		]
+	},
+
+	"vala":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Avala"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "Avala"}
+		]
+	},
+
+	"addon_vala":{
+		"radiusAttrs":[
+			{"Session-Timeout": "900"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "Aaddon_vala"}
+		]
+	},
+	
+	"service_0":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Aservice_0"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "Aservice_0"}
+		],
+		"oobRadiusAttrs": [
+			{"Huawei-AVPair": "service:accounting-scheme:telefonica"},
+			{"Huawei-AVPair": "service:radius-server-group:psa"},
+			{"Huawei-Input-Committed-Information-Rate": "3000000"},
+			{"Huawei-Output-Committed-Information-Rate": "1000000"}
+		]
+	},
+	
+	"service_1":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Aservice_1"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "Aservice_1"}
+		],
+		"oobRadiusAttrs": [
+			{"Huawei-AVPair": "service:accounting-scheme:telefonica"},
+			{"Huawei-AVPair": "service:radius-server-group:psa"},
+			{"Huawei-Input-Committed-Information-Rate": "4000000"},
+			{"Huawei-Output-Committed-Information-Rate": "2000000"}
+		]
+	},
+	
+	"service_2":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Aservice_2"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "Aservice_2"}
+		],
+		"oobRadiusAttrs": [
+			{"Huawei-AVPair": "service:accounting-scheme:telefonica"},
+			{"Huawei-AVPair": "service:radius-server-group:psa"},
+			{"Huawei-Input-Committed-Information-Rate": "5000000"},
+			{"Huawei-Output-Committed-Information-Rate": "3000000"}
+		]
+	},
+	
+	"service_3":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Aservice_3"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "Aservice_3"}
+		],
+		"oobRadiusAttrs": [
+			{"Huawei-AVPair": "service:accounting-scheme:telefonica"},
+			{"Huawei-AVPair": "service:radius-server-group:psa"},
+			{"Huawei-Input-Committed-Information-Rate": "8000000"},
+			{"Huawei-Output-Committed-Information-Rate": "9000000"}
+		]
+	},
+	
+	"permissive":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Apermissive"},
+			{"Session-Timeout": 2400}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "Apermissive"}
+		]
+	},
+	
+	"reject":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Areject"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "Areject"}
+		]
+	},
+
+	"rejectOnline":{
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "ArejectOnline"}
+		]
+	},
+	
+	"pcautiv":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Apcautiv"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "Apcautiv"}
+		]
+	},
+
+	"pcautivOnline":{
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "ApcautivOnline"}
+		]
+	},
+	
+	"acs":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Aacs"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "Aacs"}
+		]
+	},
+	
+	"betatester":{
+		"radiusAttrs":[
+			{"Unisphere-Service-Bundle": "Abetatester"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Huawei-Account-Info": "Abetatester"}
+		]
+	}
+	
+}

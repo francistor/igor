@@ -10,6 +10,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"golang.org/x/exp/slices"
 )
 
 // Uses the default configuration instance
@@ -292,9 +294,32 @@ func (dm *DiameterMessage) Len() int {
 // AVP manipulation
 ///////////////////////////////////////////////////////////////
 
+// Checks that the attributes are conforming to the dictionary specification
+func (m *DiameterMessage) CheckAttributes() error {
+	// TODO: Check the mandatory attributes, minoccus, max occurs
+	command, err := config.GetDDict().GetCommand(m.ApplicationId, m.CommandCode)
+	if err != nil {
+		return err
+	}
+
+	for i := range m.AVPs {
+		attrName := m.AVPs[i].Name
+		if _, found := command.Request[attrName]; !found {
+			return fmt.Errorf("%s not valid vor command %s and application %s", attrName, m.ApplicationName, m.CommandName)
+		}
+
+		// Check grouped
+		err := m.AVPs[i].Check()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Adds a new AVP to the message
 func (m *DiameterMessage) AddAVP(avp *DiameterAVP) *DiameterMessage {
-	// TODO: Check dictionary
 	m.AVPs = append(m.AVPs, *avp)
 	return m
 }
@@ -498,17 +523,35 @@ func NewDiameterAnswer(diameterRequest *DiameterMessage) *DiameterMessage {
 	return &diameterMessage
 }
 
-// TODO:
-func CopyDiameterMessage(diameterMessage *DiameterMessage) DiameterMessage {
+// Creates a copy of the diameter message but having only the AVPs in the positiveFilter argument
+// or removing the attributes in the negativeFilter argument.If nil, no filter is applied.
+func (dm *DiameterMessage) Copy(positiveFilter []string, negativeFilter []string) *DiameterMessage {
 
-	copy := DiameterMessage{}
-	return copy
+	copiedMessage := *dm
+	copiedMessage.AVPs = make([]DiameterAVP, 0)
+
+	for i := range dm.AVPs {
+		if positiveFilter != nil {
+			if slices.Contains(positiveFilter, dm.AVPs[i].Name) {
+				copiedMessage.AddAVP(&dm.AVPs[i])
+			}
+		} else if negativeFilter != nil {
+			if !slices.Contains(negativeFilter, dm.AVPs[i].Name) {
+				copiedMessage.AddAVP(&dm.AVPs[i])
+			}
+		} else {
+			// If both are nil, copy all attributes
+			copiedMessage.AddAVP(&dm.AVPs[i])
+		}
+	}
+
+	return &copiedMessage
 }
 
 func (dm DiameterMessage) String() string {
 	b, error := json.Marshal(dm)
 	if error != nil {
-		return "<error>"
+		return ""
 	} else {
 		return string(b)
 	}

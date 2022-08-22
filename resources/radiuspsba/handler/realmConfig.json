@@ -1,0 +1,139 @@
+{
+	"none":{
+		"provisionType": "none",
+		"authLocal": "none"
+	},
+
+	"database":{
+		"blockingIsAddon": true,
+		"blockingServiceName": "pcautivOnline",
+		"radiusAttrs":[
+			{"Service-Type": "Framed"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Cisco-AVPair": "Hello=world"}
+		]
+	},
+	
+	"databasenr":{
+		"sendReject": "no",
+		"radiusAttrs":[
+			{"Service-Type": "Framed"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Cisco-AVPair": "Hello=world"}
+		]
+	},
+	
+	"file":{
+		"provisionType": "file",
+		"authLocal": "none"
+	},
+	
+	"acs":{
+		"provisionType": "database",
+		"authLocal": "none",
+		"overrideServiceName": "acs",
+		"radiusAttrs":[
+			{"Session-Timeout": 2400}
+		]
+	},
+	
+	"betatester":{
+		"provisionType": "database",
+		"authLocal": "file",
+		"overrideServiceName": "betatester",
+		"radiusAttrs":[
+			{"Session-Timeout": 1200}
+		]
+	},
+
+	"DEFAULT": {
+		"__documentation": "Used when domain not found",
+		"radiusAttrs":[
+			{"Service-Type": "Framed"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Cisco-AVPair": "Hello=world"}
+		]
+	},
+
+	"database.provision.p0.r0.bb":{
+		"__documentation": "Initial testing",
+		"radiusAttrs":[
+			{"Service-Type": "Framed"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Cisco-AVPair": "Hello=world"}
+		]
+	},
+
+	"file.provision.p0.r0.bb":{
+		"__documentation": "Provision in file",
+		"provisionType": "file",
+		"radiusAttrs":[
+			{"Service-Type": "Framed"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Cisco-AVPair": "Hello=world"}
+		]
+	},
+
+	"database.provision.p0.r0.ba": {
+		"__documentation": "Blocked user with addon",
+		"blockingIsAddon": true,
+		"blockingServiceName": "pcautivOnline",
+		"radiusAttrs":[
+			{"Service-Type": "Framed"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Cisco-AVPair": "Hello=world"}
+		]
+	},
+
+	"database.provision.p0.r1b.bb.reject":{
+		"__documentation": "Rejected with basic service",
+		"sendReject": "no",
+		"radiusAttrs":[
+			{"Service-Type": "Framed"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Cisco-AVPair": "Hello=world"}
+		]
+	},
+
+	"database.provision.p0.r1a.bb.reject":{
+		"__documentation": "Rejected with addon service",
+		"sendReject": "no",
+		"rejectIsAddon": true,
+		"rejectServiceName": "rejectOnline",
+		"radiusAttrs":[
+			{"Service-Type": "Framed"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Cisco-AVPair": "Hello=world"}
+		]
+	},
+
+	"database.provision.p0.r1bfilter.bb.reject":{
+		"__documentation": "Rejected with basic service and filter. Use <<portal>> as username to use reject service",
+		"sendReject": "filter",
+		"radiusAttrs":[
+			{"Service-Type": "Framed"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Cisco-AVPair": "Hello=world"}
+		]
+	},
+
+	"database.provision.p1.r0.bb": {
+		"__documentation": "Not found with permissive service",
+		"permissiveServiceName": "permissive",
+		"radiusAttrs":[
+			{"Service-Type": "Framed"}
+		],
+		"nonOverridableRadiusAttrs":[
+			{"Cisco-AVPair": "Hello=world"}
+		]
+	}
+}

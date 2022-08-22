@@ -869,3 +869,60 @@ func TestDiameterMessageJSON(t *testing.T) {
 	// Uncoment this to see the result
 	// fmt.Println(jBytes.String())
 }
+
+func TestCopyDiameterMessage(t *testing.T) {
+	/*
+			jDiameterMessage := `
+			{
+				"IsRequest": true,
+				"IsProxyable": false,
+				"IsError": false,
+				"IsRetransmission": false,
+				"CommandCode": 2000,
+				"ApplicationId": 1000,
+				"avps":[
+					{
+					  "franciscocardosogil-myTestAllGrouped": [
+		  				{"franciscocardosogil-myOctetString": "0102030405060708090a0b"},
+		  				{"franciscocardosogil-myInteger32": -99},
+		  				{"franciscocardosogil-myInteger64": -99},
+		  				{"franciscocardosogil-myUnsigned32": 99},
+		  				{"franciscocardosogil-myUnsigned64": 99},
+		  				{"franciscocardosogil-myFloat32": 99.9},
+		  				{"franciscocardosogil-myFloat64": 99.9},
+		  				{"franciscocardosogil-myAddress": "1.2.3.4"},
+		  				{"franciscocardosogil-myTime": "1966-11-26T03:34:08 UTC"},
+		  				{"franciscocardosogil-myString": "Hello, world!"},
+		  				{"franciscocardosogil-myDiameterIdentity": "Diameter@identity"},
+		  				{"franciscocardosogil-myDiameterURI": "Diameter@URI"},
+		  				{"franciscocardosogil-myIPFilterRule": "allow all"},
+		  				{"franciscocardosogil-myIPv4Address": "4.5.6.7"},
+		  				{"franciscocardosogil-myIPv6Address": "bebe:cafe::0"},
+		  				{"franciscocardosogil-myIPv6Prefix": "bebe:cafe::0/128"},
+		  				{"franciscocardosogil-myEnumerated": "two"}
+					  ]
+					}
+				]
+			}
+			`
+	*/
+
+	/*
+		"request":
+			{
+				"Session-Id":{"mandatory": true, "minOccurs": 1, "maxOccurs": 1},
+				"Origin-Host": {"mandatory": true, "minOccurs": 1, "maxOccurs": 1},
+				"Origin-Realm":{"mandatory": true, "minOccurs": 1, "maxOccurs": 1},
+				"Destination-Realm":{"mandatory": true, "minOccurs": 1, "maxOccurs": 1},
+				"Destination-Host":{"mandatory": true, "minOccurs": 1, "maxOccurs": 1},
+				"Auth-Application-Id":{"mandatory": true, "minOccurs": 1, "maxOccurs": 1},
+				"Vendor-Id":{},
+				"Subscription-Id":{},
+				"User-Name":{},
+				"Framed-IP-Address":{},
+				"franciscocardosogil-Command":{},
+				"franciscocardosogil-myGroupedInGrouped": {}
+			}
+	*/
+
+}

@@ -403,7 +403,7 @@ func TestJSONAVP(t *testing.T) {
 	}
 }
 
-func TestJSONPacket(t *testing.T) {
+func TestJSONAndCopyPacket(t *testing.T) {
 
 	jsonPacket := `{
 				"Code": 1,
@@ -425,24 +425,42 @@ func TestJSONPacket(t *testing.T) {
 			}`
 
 	// Read JSON to Radius Packet
-	radiusPacket := RadiusPacket{}
-	if err := json.Unmarshal([]byte(jsonPacket), &radiusPacket); err != nil {
+	rp := RadiusPacket{}
+	if err := json.Unmarshal([]byte(jsonPacket), &rp); err != nil {
 		t.Fatalf("unmarshal error for radius packet: %s", err)
 	}
 
 	// Check attributes
-	taggedIPAddress := radiusPacket.GetTaggedStringAVP("Igor-AddressAttribute")
+	taggedIPAddress := rp.GetTaggedStringAVP("Igor-AddressAttribute")
 	if taggedIPAddress != "127.0.0.1:1" {
 		t.Fatalf("bad tagged IPAddress attribute %s", taggedIPAddress)
 	}
-	timeAttribute := radiusPacket.GetDateAVP("Igor-TimeAttribute")
+	timeAttribute := rp.GetDateAVP("Igor-TimeAttribute")
 	if timeAttribute.Hour() != 3 {
 		t.Fatalf("bad time attribute %v", timeAttribute)
 	}
 
 	// Write RadiusPacket message as JSON
-	jsonPacketNew, _ := json.Marshal(&radiusPacket)
+	jsonPacketNew, _ := json.Marshal(&rp)
 	if !strings.Contains(string(jsonPacketNew), "1966-11-26T03:34:08 UTC") || !strings.Contains(string(jsonPacketNew), "Zero") {
-		t.Errorf("marshalled json does not contain the expected attributes: %s", string(jsonPacketNew))
+		t.Fatalf("marshalled json does not contain the expected attributes: %s", string(jsonPacketNew))
+	}
+
+	// Copy with positive filter
+	positivePacket := rp.Copy([]string{"User-Name", "Igor-SaltedOctetsAttribute"}, nil)
+	if positivePacket.GetStringAVP("Igor-OctetsAttribute") != "" {
+		t.Fatalf("unexpected attribute after positive filtering")
+	}
+	if positivePacket.GetStringAVP("Igor-SaltedOctetsAttribute") != "1122aabbccdd" {
+		t.Fatalf("missing attribute after positive filtering")
+	}
+
+	// Copy with negative filter
+	negativePacket := rp.Copy(nil, []string{"Igor-StringAttribute"})
+	if negativePacket.GetStringAVP("Igor-StringAttribute") != "" {
+		t.Fatalf("unexpected attribute after negative filtering")
+	}
+	if negativePacket.GetStringAVP("Igor-SaltedOctetsAttribute") != "1122aabbccdd" {
+		t.Fatalf("missing attribute after positive filtering")
 	}
 }
