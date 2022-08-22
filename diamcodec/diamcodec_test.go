@@ -1020,7 +1020,7 @@ func TestCheckDiameterMessage(t *testing.T) {
 		t.Fatal("missing attribute not detected afther CheckAttributes()")
 	}
 
-	// Check error in grouped attribute
+	// Check error in grouped attribute. the Subscription-Id-Type will be missing
 	diameterMessage.DeleteAllAVP("Subscription-Id")
 	sidData, _ := NewAVP("Subscription-Id-Data", "the subscriptionId")
 	savp, _ := NewAVP("Subscription-Id", []DiameterAVP{*sidData})
@@ -1053,5 +1053,4 @@ func TestCheckDiameterMessage(t *testing.T) {
 	if err == nil {
 		t.Fatal("undetected duplicate Session-Id")
 	}
-
 }
