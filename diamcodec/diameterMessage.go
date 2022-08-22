@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"igor/config"
+	"igor/diamdict"
 	"io"
 	"net"
 	"strings"
@@ -294,21 +295,39 @@ func (dm *DiameterMessage) Len() int {
 // AVP manipulation
 ///////////////////////////////////////////////////////////////
 
-// Checks that the attributes are conforming to the dictionary specification
+// Checks that the attributes for this command are conforming to the dictionary specification
 func (m *DiameterMessage) CheckAttributes() error {
-	// TODO: Check the mandatory attributes, minoccus, max occurs
+
 	command, err := config.GetDDict().GetCommand(m.ApplicationId, m.CommandCode)
 	if err != nil {
 		return err
 	}
 
+	var attrSpec map[string]diamdict.GroupedProperties
+	if m.IsRequest {
+		attrSpec = command.Request
+	} else {
+		attrSpec = command.Response
+	}
+
+	// Check that the number of instaces of each atribute conforms to the specification
+	for attrName, groupSpec := range attrSpec {
+		nOfInstances := len(m.GetAllAVP(attrName))
+		if groupSpec.MinOccurs > 0 && nOfInstances < groupSpec.MinOccurs {
+			return fmt.Errorf("%s has %d instances which is less than the minimum %d", attrName, nOfInstances, groupSpec.MinOccurs)
+		} else if groupSpec.MaxOccurs > 0 && nOfInstances > groupSpec.MaxOccurs {
+			return fmt.Errorf("%s has %d instances which is more than the maximum %d", attrName, nOfInstances, groupSpec.MaxOccurs)
+		}
+	}
+
+	// Check that all attributes in the message are valid
 	for i := range m.AVPs {
 		attrName := m.AVPs[i].Name
-		if _, found := command.Request[attrName]; !found {
-			return fmt.Errorf("%s not valid vor command %s and application %s", attrName, m.ApplicationName, m.CommandName)
+		if _, found := attrSpec[attrName]; !found {
+			return fmt.Errorf("%s not valid for command %s and application %s", attrName, m.ApplicationName, m.CommandName)
 		}
 
-		// Check grouped
+		// Check the AVP itself (useful for grouped attributes)
 		err := m.AVPs[i].Check()
 		if err != nil {
 			return err

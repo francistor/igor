@@ -26,24 +26,24 @@ var jDiameterMessage = `
 		"ApplicationId": 1000,
 		"avps":[
 			{
-			  "franciscocardosogil-myTestAllGrouped": [
-  				{"franciscocardosogil-myOctetString": "0102030405060708090a0b"},
-  				{"franciscocardosogil-myInteger32": -99},
-  				{"franciscocardosogil-myInteger64": -99},
-  				{"franciscocardosogil-myUnsigned32": 99},
-  				{"franciscocardosogil-myUnsigned64": 99},
-  				{"franciscocardosogil-myFloat32": 99.9},
-  				{"franciscocardosogil-myFloat64": 99.9},
-  				{"franciscocardosogil-myAddress": "1.2.3.4"},
-  				{"franciscocardosogil-myTime": "1966-11-26T03:34:08 UTC"},
-  				{"franciscocardosogil-myString": "Hello, world!"},
-  				{"franciscocardosogil-myDiameterIdentity": "Diameter@identity"},
-  				{"franciscocardosogil-myDiameterURI": "Diameter@URI"},
-  				{"franciscocardosogil-myIPFilterRule": "allow all"},
-  				{"franciscocardosogil-myIPv4Address": "4.5.6.7"},
-  				{"franciscocardosogil-myIPv6Address": "bebe:cafe::0"},
-  				{"franciscocardosogil-myIPv6Prefix": "bebe:cafe::0/128"},
-  				{"franciscocardosogil-myEnumerated": "two"}
+			  "Igor-myTestAllGrouped": [
+  				{"Igor-myOctetString": "0102030405060708090a0b"},
+  				{"Igor-myInteger32": -99},
+  				{"Igor-myInteger64": -99},
+  				{"Igor-myUnsigned32": 99},
+  				{"Igor-myUnsigned64": 99},
+  				{"Igor-myFloat32": 99.9},
+  				{"Igor-myFloat64": 99.9},
+  				{"Igor-myAddress": "1.2.3.4"},
+  				{"Igor-myTime": "1966-11-26T03:34:08 UTC"},
+  				{"Igor-myString": "Hello, world!"},
+  				{"Igor-myDiameterIdentity": "Diameter@identity"},
+  				{"Igor-myDiameterURI": "Diameter@URI"},
+  				{"Igor-myIPFilterRule": "allow all"},
+  				{"Igor-myIPv4Address": "4.5.6.7"},
+  				{"Igor-myIPv6Address": "bebe:cafe::0"},
+  				{"Igor-myIPv6Prefix": "bebe:cafe::0/128"},
+  				{"Igor-myEnumerated": "two"}
 			  ]
 			}
 		]

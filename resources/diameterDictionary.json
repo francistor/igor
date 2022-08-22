@@ -2,7 +2,7 @@
 	"version": 1001,
 	"vendors":
     [
-        {"vendorId": 1001, "vendorName": "franciscocardosogil"},
+        {"vendorId": 1001, "vendorName": "Igor"},
         {"vendorId": 9, "vendorName": "Cisco"},
         {"vendorId": 10415, "vendorName": "3GPP"}
     ],
@@ -1659,8 +1659,8 @@
                     "type": "Grouped",
                     "group":
                     {
-                        "franciscocardosogil-myInteger32":{"minOccurs": 1, "maxOccurs": 1},
-                        "franciscocardosogil-myString":{"maxOccurs": 1}
+                        "Igor-myInteger32":{"minOccurs": 1, "maxOccurs": 1},
+                        "Igor-myString":{"maxOccurs": 1}
                     }
                 },
                 {
@@ -1669,9 +1669,9 @@
                     "type": "Grouped",
                     "group":
                     {
-                        "franciscocardosogil-myInteger32":{"minOccurs": 1, "maxOccurs": 1},
-                        "franciscocardosogil-myString":{"maxOccurs": 1},
-                        "franciscocardosogil-myGrouped":{"maxOccurs": 1}
+                        "Igor-myInteger32":{"minOccurs": 1, "maxOccurs": 1},
+                        "Igor-myString":{"maxOccurs": 1},
+                        "Igor-myGrouped":{"maxOccurs": 1}
                     }
                 },
                 {
@@ -1680,23 +1680,23 @@
                     "type": "Grouped",
                     "group":
                     {
-                        "franciscocardosogil-myOctetString": {},
-                        "franciscocardosogil-myInteger32": {},
-                        "franciscocardosogil-myInteger64": {},
-                        "franciscocardosogil-myUnsigned32": {},
-                        "franciscocardosogil-myUnsigned64": {},
-                        "franciscocardosogil-myFloat32": {},
-                        "franciscocardosogil-myFloat64": {},
-                        "franciscocardosogil-myAddress": {},
-                        "franciscocardosogil-myTime": {},
-                        "franciscocardosogil-myString": {},
-                        "franciscocardosogil-myDiameterIdentity": {},
-                        "franciscocardosogil-myDiameterURI": {},
-                        "franciscocardosogil-myIPFilterRule": {},
-                        "franciscocardosogil-myIPv4Address": {},
-                        "franciscocardosogil-myIPv6Address": {},
-                        "franciscocardosogil-myIPv6Prefix": {},
-                        "franciscocardosogil-myEnumerated": {}
+                        "Igor-myOctetString": {},
+                        "Igor-myInteger32": {},
+                        "Igor-myInteger64": {},
+                        "Igor-myUnsigned32": {},
+                        "Igor-myUnsigned64": {},
+                        "Igor-myFloat32": {},
+                        "Igor-myFloat64": {},
+                        "Igor-myAddress": {},
+                        "Igor-myTime": {},
+                        "Igor-myString": {},
+                        "Igor-myDiameterIdentity": {},
+                        "Igor-myDiameterURI": {},
+                        "Igor-myIPFilterRule": {},
+                        "Igor-myIPv4Address": {},
+                        "Igor-myIPv6Address": {},
+                        "Igor-myIPv6Prefix": {},
+                        "Igor-myEnumerated": {}
                     }
                 },
                 {
@@ -2150,17 +2150,15 @@
                     "request":
                     {
                         "Session-Id":{"mandatory": true, "minOccurs": 1, "maxOccurs": 1},
-                        "Origin-Host": {"mandatory": true, "minOccurs": 1, "maxOccurs": 1},
+                        "Origin-Host": {"mandatory": true, "maxOccurs": 1},
                         "Origin-Realm":{"mandatory": true, "minOccurs": 1, "maxOccurs": 1},
                         "Destination-Realm":{"mandatory": true, "minOccurs": 1, "maxOccurs": 1},
-                        "Destination-Host":{"mandatory": true, "minOccurs": 1, "maxOccurs": 1},
                         "Auth-Application-Id":{"mandatory": true, "minOccurs": 1, "maxOccurs": 1},
-                        "Vendor-Id":{},
-                        "Subscription-Id":{},
-                        "User-Name":{},
+                        "Vendor-Id":{"minOccurs": 1, "maxOccurs": 1},
+                        "Subscription-Id":{"minOccurs": 1, "maxOccurs": 1},
                         "Framed-IP-Address":{},
-                        "franciscocardosogil-Command":{},
-                        "franciscocardosogil-myGroupedInGrouped": {}
+                        "Igor-Command":{},
+                        "Igor-myTestAllGrouped": {}
                     },
                     "response":
                     {

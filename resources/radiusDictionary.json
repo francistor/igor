@@ -2,7 +2,7 @@
 	"version": 1001,
 	"vendors":
     [
-        {"vendorId": 1001, "vendorName": "franciscocardosogil"},
+        {"vendorId": 1001, "vendorName": "Igor"},
         {"vendorId": 9, "vendorName": "Cisco"},
         {"vendorId": 2011, "vendorName": "Huawei"},
         {"vendorId": 2352, "vendorName": "Redback"}, 

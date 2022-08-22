@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// This message handler parses the franciscocardosogil1-Command, which may specify
+// This message handler parses the Igor1-Command, which may specify
 // whether to introduce a small delay (value "Slow") or a big one (value "VerySlow")
 // A User-Name attribute with the value "TestUserNameEcho" is added to the answer
 func localDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
@@ -22,7 +22,7 @@ func localDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.Diamet
 	answer.Add("User-Name", "EchoLocal")
 	answer.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
 
-	command := request.GetStringAVP("franciscocardosogil-Command")
+	command := request.GetStringAVP("Igor-Command")
 	switch command {
 	case "Slow":
 		// Simulate the answer takes some time
@@ -303,7 +303,7 @@ func TestDiameterRequestCancellation(t *testing.T) {
 	}
 	request.AddOriginAVPs(config.GetPolicyConfig())
 	request.Add("Destination-Realm", "igorsuperserver")
-	request.Add("franciscocardosogil-Command", "VerySlow")
+	request.Add("Igor-Command", "VerySlow")
 
 	var handlerCalled int32
 	server.RouteDiameterRequestAsync(request, 200*time.Second, func(m *diamcodec.DiameterMessage, err error) {

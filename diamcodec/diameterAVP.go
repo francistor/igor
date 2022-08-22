@@ -801,7 +801,7 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 		if !ok {
 			var stringValue, ok = value.(string)
 			if !ok {
-				return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+				return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 			}
 			var err error
 			avp.Value, err = hex.DecodeString(stringValue)
@@ -816,14 +816,14 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 		var value, error = toInt64(value)
 
 		if error != nil {
-			return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 		}
 		avp.Value = value
 
 	case diamdict.Float32, diamdict.Float64:
 		var value, error = toFloat64(value)
 		if error != nil {
-			return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 		}
 		avp.Value = value
 
@@ -833,7 +833,7 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 		} else {
 			var groupedValue, ok = value.([]DiameterAVP)
 			if !ok {
-				return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+				return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 			}
 			avp.Value = groupedValue
 		}
@@ -845,11 +845,11 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 			// Try with string
 			var stringValue, ok = value.(string)
 			if !ok {
-				return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+				return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 			}
 			avp.Value = net.ParseIP(stringValue)
 			if avp.Value == nil {
-				return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+				return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 			}
 		} else {
 			// Type address
@@ -862,12 +862,12 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 		if !ok {
 			var stringValue, ok = value.(string)
 			if !ok {
-				return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+				return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 			}
 			var err error
 			avp.Value, err = time.Parse(timeFormatString, stringValue)
 			if err != nil {
-				return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T %s: %s", avp.DictItem.DiameterType, value, value, err)
+				return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T %s: %s", name, avp.DictItem.DiameterType, value, value, err)
 			}
 		} else {
 			avp.Value = timeValue
@@ -876,21 +876,21 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 	case diamdict.UTF8String:
 		var stringValue, ok = value.(string)
 		if !ok {
-			return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 		}
 		avp.Value = stringValue
 
 	case diamdict.DiamIdent:
 		var stringValue, ok = value.(string)
 		if !ok {
-			return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 		}
 		avp.Value = stringValue
 
 	case diamdict.DiameterURI:
 		var stringValue, ok = value.(string)
 		if !ok {
-			return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 		}
 		avp.Value = stringValue
 
@@ -901,7 +901,7 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 			var stringValue, ok = value.(string)
 			if !ok {
 				// Not an int or string
-				return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+				return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 			}
 			var intValue int
 			intValue, ok = avp.DictItem.EnumValues[stringValue]
@@ -917,14 +917,14 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 	case diamdict.IPFilterRule:
 		var stringValue, ok = value.(string)
 		if !ok {
-			return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 		}
 		avp.Value = stringValue
 
 	case diamdict.IPv6Prefix:
 		var stringValue, ok = value.(string)
 		if !ok {
-			return &avp, fmt.Errorf("error creating diameter avp with type %d and value of type %T", avp.DictItem.DiameterType, value)
+			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 		}
 		if !ipv6PrefixRegex.Match([]byte(stringValue)) {
 			return &avp, fmt.Errorf("ipv6 prefix %s does not match expected format", stringValue)
@@ -986,9 +986,23 @@ func toFloat64(value interface{}) (float64, error) {
 
 // If grouped, checks that the embedded AVPs are in the dictionary
 func (avp *DiameterAVP) Check() error {
+
+	// Do something only if grouped
 	if avp.DictItem.DiameterType == diamdict.Grouped {
 		avps := avp.Value.([]DiameterAVP)
 		group := avp.DictItem.Group
+
+		// Check number of occurences as specified in the group
+		for attrName, groupSpec := range group {
+			nOfInstances := len(avp.GetAllAVP(attrName))
+			if groupSpec.MinOccurs > 0 && nOfInstances < groupSpec.MinOccurs {
+				return fmt.Errorf("%s has %d instances which is less than the minimum %d", attrName, nOfInstances, groupSpec.MinOccurs)
+			} else if groupSpec.MaxOccurs > 0 && nOfInstances > groupSpec.MaxOccurs {
+				return fmt.Errorf("%s has %d instances which is more than the maximum %d", attrName, nOfInstances, groupSpec.MaxOccurs)
+			}
+		}
+
+		// Check that all attribues are allowed
 		for i := range avps {
 			if _, found := group[avps[i].Name]; !found {
 				return fmt.Errorf("%s is not allowed in %s", avps[i].Name, avp.Name)
@@ -1076,11 +1090,6 @@ func (avp *DiameterAVP) GetAllAVP(name string) []DiameterAVP {
 		}
 	}
 	return avpList
-}
-
-// Check that minoccurs and maxoccurs are as specified
-func (avp *DiameterAVP) Validate() error {
-	return nil
 }
 
 ///////////////////////////////////////////////////////////////

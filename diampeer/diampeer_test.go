@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// This message handler parses the franciscocardosogil1-Command, which may specify
+// This message handler parses the Igor1-Command, which may specify
 // whether to introduce a small delay (value "Slow") or a big one (value "VerySlow")
 // A User-Name attribute with the value "TestUserNameEcho" is added to the answer
 func MyMessageHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
@@ -21,7 +21,7 @@ func MyMessageHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMe
 	answer.AddOriginAVPs(config.GetPolicyConfig())
 	answer.Add("User-Name", "TestUserNameEcho")
 
-	command := request.GetStringAVP("franciscocardosogil-Command")
+	command := request.GetStringAVP("Igor-Command")
 	switch command {
 	case "Slow":
 		// Simulate the answer takes some time
@@ -124,7 +124,7 @@ func TestDiameterPeerOK(t *testing.T) {
 	}
 
 	// Simulate a timeout. The handler takes more time than this
-	request.Add("franciscocardosogil-Command", "Slow")
+	request.Add("Igor-Command", "Slow")
 	var rc2 = make(chan interface{}, 1)
 	activePeer.DiameterExchange(request, 10*time.Millisecond, rc2)
 
@@ -413,10 +413,10 @@ func TestRequestsCancellation(t *testing.T) {
 	// Simulate two long requests
 	request1, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
 	request1.AddOriginAVPs(config.GetPolicyConfigInstance("testClient"))
-	request1.Add("franciscocardosogil-Command", "Slow")
+	request1.Add("Igor-Command", "Slow")
 	request2, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
 	request2.AddOriginAVPs(config.GetPolicyConfigInstance("testClient"))
-	request2.Add("franciscocardosogil-Command", "Slow")
+	request2.Add("Igor-Command", "Slow")
 
 	rc1 := make(chan interface{}, 1)
 	rc2 := make(chan interface{}, 1)
