@@ -264,9 +264,9 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 
 	} else {
 		// Read from file
-		configBase := os.Getenv("IGOR_CONFIG_BASE")
+		configBase := os.Getenv("IGOR_BASE")
 		if configBase == "" {
-			panic("environment variable IGOR_CONFIG_BASE undefined")
+			panic("environment variable IGOR_BASE undefined")
 		}
 		if resp, err := ioutil.ReadFile(configBase + location); err != nil {
 			return nil, err

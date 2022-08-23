@@ -28,13 +28,21 @@ func NewCSVWriter(fields []string, fieldSeparator string, attributeSeparator str
 	return &lw
 }
 
-func (w *CSVWriter) WriteCDRString(rp *radiuscodec.RadiusPacket) string {
+// Write CDR as list with separators
+// Ints are not tried to write as strings, even if an enum is defined
+func (w *CSVWriter) GetCDRString(rp *radiuscodec.RadiusPacket) string {
 	var builder strings.Builder
 
+	// Iterate through the fields in the spec
 	for i, field := range w.fields {
 
+		// Get all the attributes for that name
 		avps := rp.GetAllAVP(field)
+
+		// Do not write quotes if no attributes found
 		if len(avps) > 0 {
+
+			// Those are written as strings
 			switch avps[0].DictItem.RadiusType {
 			case radiusdict.None, radiusdict.Octets, radiusdict.String, radiusdict.InterfaceId, radiusdict.Address, radiusdict.IPv6Address, radiusdict.IPv6Prefix, radiusdict.Time:
 				if w.quoteStrings {
@@ -50,6 +58,7 @@ func (w *CSVWriter) WriteCDRString(rp *radiuscodec.RadiusPacket) string {
 					builder.WriteString("\"")
 				}
 
+				// Those are written as numbers. In this writer, no attempt is done to convert to string
 			case radiusdict.Integer:
 				for j := range avps {
 					builder.WriteString(fmt.Sprintf("%d", avps[j].GetInt()))

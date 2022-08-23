@@ -29,7 +29,7 @@ func NewLivingstoneWriter(positiveFilter []string, negativeFilter []string, head
 	return &lw
 }
 
-func (w *LivingstoneWriter) WriteCDRString(rp *radiuscodec.RadiusPacket) string {
+func (w *LivingstoneWriter) GetCDRString(rp *radiuscodec.RadiusPacket) string {
 	var builder strings.Builder
 
 	// Write header

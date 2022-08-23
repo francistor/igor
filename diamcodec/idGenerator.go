@@ -42,9 +42,9 @@ func getE2EId() uint32 {
 func GetStateId(clean bool, next bool) int {
 
 	// Get the contents of the file
-	configBase := os.Getenv("IGOR_CONFIG_BASE")
+	configBase := os.Getenv("IGOR_BASE")
 	if configBase == "" {
-		panic("environment variable IGOR_CONFIG_BASE undefined")
+		panic("environment variable IGOR_BASE undefined")
 	}
 	stateIdFileName := configBase + "state-id"
 
@@ -72,9 +72,9 @@ func GetStateId(clean bool, next bool) int {
 func writeStateId(stateId int) int {
 
 	// Get the contents of the file
-	configBase := os.Getenv("IGOR_CONFIG_BASE")
+	configBase := os.Getenv("IGOR_BASE")
 	if configBase == "" {
-		panic("environment variable IGOR_CONFIG_BASE undefined")
+		panic("environment variable IGOR_BASE undefined")
 	}
 	stateIdFileName := configBase + "state-id"
 
