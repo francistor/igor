@@ -110,8 +110,6 @@ type DiameterServerConfig struct {
 	ProductName          string
 	FirmwareRevision     int
 	PeerCheckTimeSeconds int
-	HttpBindAddress      string
-	HttpBindPort         int
 }
 
 // Retrieves the diameter server configuration, forcing a refresh

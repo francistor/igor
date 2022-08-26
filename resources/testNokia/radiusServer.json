@@ -1,0 +1,7 @@
+{
+	"bindAddress": "0.0.0.0",
+	"authPort": 1812,
+	"acctPort": 1813,
+	"coaPort": 3799,
+	"originPorts": [9000, 9001]
+}

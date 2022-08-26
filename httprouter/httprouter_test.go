@@ -99,13 +99,14 @@ func TestHttpRouterHandler(t *testing.T) {
 				{"Igor-IntegerAttribute": "Zero"},
 				{"Igor-IntegerAttribute": "1"},
 				{"Igor-IntegerAttribute": 1},
-				{"Igor-AddressAttribute": "127.0.0.1:1"},
+				{"Igor-AddressAttribute": "127.0.0.1"},
 				{"Igor-TimeAttribute": "1966-11-26T03:34:08 UTC"},
 				{"Igor-IPv6AddressAttribute": "bebe:cafe::0"},
 				{"Igor-IPv6PrefixAttribute": "bebe:cafe:cccc::0/64"},
 				{"Igor-InterfaceIdAttribute": "00aabbccddeeff11"},
 				{"Igor-Integer64Attribute": 999999999999},
-				{"Igor-SaltedOctetsAttribute": "1122aabbccdd"},
+				{"Igor-TaggedStringAttribute": "myString:1"},
+				{"Igor-SaltedOctetsAttribute": "0"},
 				{"User-Name":"MyUserName"}
 			]
 		},

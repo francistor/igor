@@ -93,6 +93,7 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string) (n int64, er
 	rp.AVPs = make([]RadiusAVP, 0)
 	for currentIndex < int64(packetLen) {
 		nextAVP := RadiusAVP{}
+
 		bytesRead, err := nextAVP.FromReader(reader, rp.Authenticator, secret)
 		if err != nil {
 			return currentIndex, err
@@ -102,7 +103,7 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string) (n int64, er
 	}
 
 	if int64(packetLen) != currentIndex {
-		panic("assert failed. Bad header size in diameter message")
+		panic("assert failed. Bad radius packet")
 	}
 
 	return int64(packetLen), nil
@@ -272,7 +273,7 @@ func (rp *RadiusPacket) AddAVP(avp *RadiusAVP) *RadiusPacket {
 	return rp
 }
 
-// Adds a new AVP specified by name to the diameter message
+// Adds a new AVP specified by name to the packet
 func (rp *RadiusPacket) Add(name string, value interface{}) *RadiusPacket {
 
 	// If avp to add is nil, do nothing

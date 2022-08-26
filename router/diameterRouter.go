@@ -131,16 +131,18 @@ func (router *DiameterRouter) eventLoop() {
 
 	// Server socket
 	serverConf := router.ci.DiameterServerConf()
-	listener, err := net.Listen("tcp4", fmt.Sprintf("%s:%d", serverConf.BindAddress, serverConf.BindPort))
+	listenAddrAndPort := fmt.Sprintf("%s:%d", serverConf.BindAddress, serverConf.BindPort)
+	listener, err := net.Listen("tcp4", listenAddrAndPort)
 	if err != nil {
 		panic(err)
 	}
 	// Assign to instance variable
 	router.listener = listener
 
+	logger.Infof("Diameter server listening in %s", listenAddrAndPort)
+
 	// Accepter loop
 	go func() {
-		logger.Info("diameter server is accepting connections")
 		for {
 			connection, err := router.listener.Accept()
 			if err != nil {

@@ -7,10 +7,11 @@
         {"vendorId": 2011, "vendorName": "Huawei"},
         {"vendorId": 2352, "vendorName": "Redback"}, 
         {"vendorId": 4874, "vendorName": "Unisphere"},  
+        {"VendorId": 5535, "vendorName": "3GPP2"}, 
         {"vendorId": 6527, "vendorName": "Alc"},   
         {"vendorId": 10415, "vendorName": "3GPP"},    
-        {"vendorId": 21100, "vendorName": "PSA"},   
-        {"vendorId": 90001, "vendorName": "Igor"}  
+        {"vendorId": 21100, "vendorName": "PSA"},  
+        {"vendorId": 30001, "vendorName": "Igor"}  
     ],
 	"avps":
 	[
@@ -220,6 +221,40 @@
                     "code": 60,
                     "name": "CHAP-Challenge",
                     "type": "Octets"
+                },
+                {
+                    "code": 64,
+                    "name": "Tunnel-Type",
+                    "type": "Integer",
+                    "enumValues":{
+                        "PPTP": 1,
+                        "L2F": 2,
+                        "L2TP": 3,
+                        "ATMP": 4,
+                        "VTP": 5,
+                        "AH": 6,
+                        "IP-IP": 7,
+                        "MIN-IP-IP": 8,
+                        "ESP": 9,
+                        "GRE" :10,
+                        "DVS": 11,
+                        "IP-in-IP": 12,
+                        "VLAN": 13
+                    },
+                    "tagged": true
+                },
+                {
+                    "code": 66,
+                    "name": "Tunnel-Client-Endpoint",
+                    "type": "String",
+                    "tagged": true
+                },
+                {
+                    "code": 69,
+                    "name": "Tunnel-Password",
+                    "type": "Octets",
+                    "tagged": true,
+                    "salted": true
                 },
                 {
                     "code": 95,
@@ -437,7 +472,25 @@
             ]
         },
         {
-            "vendorId": 90001,
+            "vendorId": 5535,
+            "attributes":
+            [
+                {
+                    "code": 3,
+                    "name": "Pre-Shared-Secret",
+                    "type": "Octets",
+                    "salted": true
+                },
+                {
+                    "code": 58,
+                    "name": "MN-HA-Key",
+                    "type": "Octets",
+                    "salted": true
+                }
+            ]
+        },
+        {
+            "vendorId": 30001,
             "attributes":
             [
                 {
@@ -459,14 +512,13 @@
                         "Zero": 0,
                         "One": 1,
                         "Two": 2,
-                        "three": 3
+                        "Three": 3
                     }
                 },
                 {
                     "code": 4,
                     "name": "AddressAttribute",
-                    "type": "Address",
-                    "tagged": true
+                    "type": "Address"
                 },
                 {
                     "code": 5,

@@ -6,7 +6,5 @@
 	"vendorId": 1101,
 	"productName": "Igor",
 	"firmwareRevision": 1,
-	"peerCheckTimeSeconds": 120,
-	"httpBindAddress": "0.0.0.0",
-	"httpBindPort": 23868
+	"peerCheckTimeSeconds": 120
 }

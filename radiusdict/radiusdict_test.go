@@ -76,12 +76,12 @@ func TestRadiusDict(t *testing.T) {
 		if avp.Code != 1 {
 			t.Errorf("Igor-OctetsAttribute id code is not 1")
 		}
-		if avp.VendorId != 90001 {
+		if avp.VendorId != 30001 {
 			t.Errorf("Igor-OctetsAttribute has not vendorId code 90001")
 		}
 	}
 
-	avp, err = radiusDict.GetFromCode(AVPCode{90001, 10})
+	avp, err = radiusDict.GetFromCode(AVPCode{30001, 10})
 	if err != nil {
 		t.Errorf("Igor code 10 not found")
 	} else {

@@ -502,6 +502,12 @@ func (dp *DiameterPeer) eventLoop() {
 
 				if dp.status == StatusConnected || dp.status == StatusEngaged {
 
+					// If message was a disconnect peer, set to disconnect now
+					if !v.message.IsRequest && v.message.ApplicationId == 0 && v.message.CommandCode == 282 {
+						dp.eventLoopChannel <- PeerSetDownCommandMsg{err: fmt.Errorf("received disconnect-peer")}
+						dp.status = StatusTerminating
+					}
+
 					// Check not duplicate
 					hbhId := v.message.HopByHopId
 					if _, ok := dp.requestsMap[hbhId]; ok && v.rchan != nil {
@@ -595,8 +601,6 @@ func (dp *DiameterPeer) eventLoop() {
 							dpa := diamcodec.NewDiameterAnswer(v.message)
 							dpa.AddOriginAVPs(dp.ci)
 							dp.eventLoopChannel <- EgressDiameterMsg{message: dpa}
-							dp.eventLoopChannel <- PeerSetDownCommandMsg{err: fmt.Errorf("received disconnect-peer")}
-							dp.status = StatusTerminating
 
 						default:
 							config.GetLogger().Warnf("command %d for base applicaton not found in dictionary", v.message.CommandCode)
@@ -864,7 +868,7 @@ func (dp *DiameterPeer) pushCEAttributes(cer *diamcodec.DiameterMessage) {
 	cer.Add("Vendor-Id", serverConf.VendorId)
 	cer.Add("Product-Name", "igor")
 	cer.Add("Firmware-Revision", serverConf.FirmwareRevision)
-	// TODO: This number should increase on every restart
+
 	cer.Add("Origin-State-Id", diamcodec.GetStateId(false, true))
 	// Add supported applications
 	routingRules := dp.ci.RoutingRulesConf()

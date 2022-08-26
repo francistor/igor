@@ -3,6 +3,9 @@ package main
 import (
 	"flag"
 	"igor/config"
+	"igor/handlerfunctions"
+	"igor/router"
+	"time"
 )
 
 func main() {
@@ -17,5 +20,16 @@ func main() {
 	config.InitPolicyConfigInstance(*bootPtr, *instancePtr, true)
 
 	// Get logger
-	// logger := config.GetConfigInstance(*instancePtr).IgorLogger
+	logger := config.GetLogger()
+
+	// Start Diameter
+	_ = router.NewDiameterRouter(*instancePtr, handlerfunctions.EmptyDiameterHandler)
+	logger.Info("Diameter router started")
+
+	// Start Radius
+	_ = router.NewRadiusRouter(*instancePtr, handlerfunctions.TestRadiusAttributesHandler)
+	logger.Info("Radius router started")
+
+	time.Sleep(1000 * time.Minute)
+
 }

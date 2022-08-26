@@ -37,9 +37,9 @@ func TestAVPNotFound(t *testing.T) {
 
 func TestPasswordAVP(t *testing.T) {
 
-	//var password = "'my-password! and a very long one indeed %&$"
+	var password = "'my-password! and a very long one indeed %&$"
 	//var password = "1234567890123456"
-	var password = "0"
+	//var password = "0"
 
 	// Create avp
 	avp, err := NewAVP("User-Password", []byte(password))
@@ -134,12 +134,12 @@ func TestVendorIntegerAVP(t *testing.T) {
 	}
 }
 
-func TestVendorAddressTaggedAVP(t *testing.T) {
+func TestVendorTaggedAVP(t *testing.T) {
 
-	var theValue = "1.2.3.4"
+	var theValue = "myStriing"
 
 	// Create avp
-	avp, err := NewAVP("Igor-AddressAttribute", theValue+":1")
+	avp, err := NewAVP("Igor-TaggedStringAttribute", theValue+":1")
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return
@@ -413,12 +413,13 @@ func TestJSONAndCopyPacket(t *testing.T) {
 					{"Igor-IntegerAttribute": "Zero"},
 					{"Igor-IntegerAttribute": "1"},
 					{"Igor-IntegerAttribute": 1},
-					{"Igor-AddressAttribute": "127.0.0.1:1"},
+					{"Igor-AddressAttribute": "127.0.0.1"},
 					{"Igor-TimeAttribute": "1966-11-26T03:34:08 UTC"},
 					{"Igor-IPv6AddressAttribute": "bebe:cafe::0"},
 					{"Igor-IPv6PrefixAttribute": "bebe:cafe:cccc::0/64"},
 					{"Igor-InterfaceIdAttribute": "00aabbccddeeff11"},
 					{"Igor-Integer64Attribute": 999999999999},
+					{"Igor-TaggedStringAttribute": "myString:1"},
 					{"Igor-SaltedOctetsAttribute": "1122aabbccdd"},
 					{"User-Name":"MyUserName"}
 				]
@@ -431,9 +432,9 @@ func TestJSONAndCopyPacket(t *testing.T) {
 	}
 
 	// Check attributes
-	taggedIPAddress := rp.GetTaggedStringAVP("Igor-AddressAttribute")
-	if taggedIPAddress != "127.0.0.1:1" {
-		t.Fatalf("bad tagged IPAddress attribute %s", taggedIPAddress)
+	taggedString := rp.GetTaggedStringAVP("Igor-TaggedStringAttribute")
+	if taggedString != "myString:1" {
+		t.Fatalf("bad tagged stringattribute %s", taggedString)
 	}
 	timeAttribute := rp.GetDateAVP("Igor-TimeAttribute")
 	if timeAttribute.Hour() != 3 {
