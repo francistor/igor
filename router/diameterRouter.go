@@ -6,7 +6,6 @@ import (
 	"igor/config"
 	"igor/diamcodec"
 	"igor/diampeer"
-	"igor/httphandler"
 	"igor/instrumentation"
 	"math/rand"
 	"net"
@@ -386,7 +385,7 @@ func (router *DiameterRouter) eventLoop() {
 						// Make sure the response channel is closed
 						defer close(rchan)
 
-						answer, err := httphandler.HttpDiameterRequest(router.http2Client, url, diameterRequest)
+						answer, err := HttpDiameterRequest(router.http2Client, url, diameterRequest)
 						if err != nil {
 							logger.Errorf("http handler %s returned error: %s", url, err.Error())
 							rchan <- err

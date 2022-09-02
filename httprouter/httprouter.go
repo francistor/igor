@@ -59,9 +59,11 @@ func NewHttpRouter(instanceName string, diameterRouter *router.DiameterRouter, r
 // in a goroutine.
 func (dh *HttpRouter) Run() {
 
-	dh.httpServer.ListenAndServeTLS(
+	err := dh.httpServer.ListenAndServeTLS(
 		"/home/francisco/cert.pem",
 		"/home/francisco/key.pem")
+
+	fmt.Println(err, err.Error())
 
 	close(dh.doneChannel)
 }
@@ -81,7 +83,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 		jRequest, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			logger.Error("error reading request: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			instrumentation.PushHttpRouterExchange(NETWORK_ERROR, req.RequestURI)
 			return
@@ -89,7 +91,16 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 		var request router.RoutableDiameterRequest
 		if err = json.Unmarshal(jRequest, &request); err != nil {
 			logger.Error("error unmarshalling request: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			instrumentation.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+			return
+		}
+
+		// Fill the timeout
+		if err = request.ParseTimeout(); err != nil {
+			logger.Error("error parsing Timeoutspec: %s", err)
+			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			instrumentation.PushHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
 			return
@@ -99,7 +110,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 		answer, err := diameterRouter.RouteDiameterRequest(request.Message, request.Timeout)
 		if err != nil {
 			logger.Errorf("error handling request: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusGatewayTimeout)
 			w.Write([]byte(err.Error()))
 			instrumentation.PushHttpRouterExchange(HANDLER_FUNCTION_ERROR, req.RequestURI)
 			return
@@ -109,7 +120,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 			logger.Errorf("error marshaling response: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+			instrumentation.PushHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -127,15 +138,25 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 		jRequest, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			logger.Error("error reading request: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			instrumentation.PushHttpRouterExchange(NETWORK_ERROR, req.RequestURI)
 			return
 		}
+
 		var request router.RoutableRadiusRequest
 		if err = json.Unmarshal(jRequest, &request); err != nil {
 			logger.Error("error unmarshalling request: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			instrumentation.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+			return
+		}
+
+		// Fill the timeout
+		if err = request.ParseTimeout(); err != nil {
+			logger.Error("error parsing Timeoutspec: %s", err)
+			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			instrumentation.PushHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
 			return
@@ -145,7 +166,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 		answer, err := radiusRouter.RouteRadiusRequest(request.Destination, request.Packet, request.PerRequestTimeout, request.Tries, request.ServerTries, request.Secret)
 		if err != nil {
 			logger.Errorf("error handling request: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusGatewayTimeout)
 			w.Write([]byte(err.Error()))
 			instrumentation.PushHttpRouterExchange(HANDLER_FUNCTION_ERROR, req.RequestURI)
 			return
@@ -155,7 +176,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 			logger.Errorf("error marshaling response: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+			instrumentation.PushHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
 			return
 		}
 		w.WriteHeader(http.StatusOK)

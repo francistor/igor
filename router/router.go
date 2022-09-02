@@ -1,9 +1,15 @@
 package router
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"igor/constants"
 	"igor/diamcodec"
+	"igor/instrumentation"
 	"igor/radiuscodec"
+	"io/ioutil"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -43,16 +49,16 @@ type RoutableDiameterRequest struct {
 	// Pointer to the actual Diameter message
 	Message *diamcodec.DiameterMessage
 
+	// Timeout in string format, for JSON encoding
+	// Format is <number><units> where
+	// <units> may be "s" for seconds and "ms" for milliseconds
+	TimeoutSpec string
+
 	// The channel to send the answer or error
 	RChan chan interface{} `json:"-"`
 
 	// Timeout
 	Timeout time.Duration `json:"-"`
-
-	// Timeout in string format, for JSON encoding
-	// Format is <number><units> where
-	// <units> may be "s" for seconds and "ms" for milliseconds
-	TimeoutSpec string
 }
 
 // Represents a Radius Packet to be handled or proxyed
@@ -68,12 +74,6 @@ type RoutableRadiusRequest struct {
 	// Pointer to the actual RadiusPacket
 	Packet *radiuscodec.RadiusPacket
 
-	// The channel to send the answer or error
-	RChan chan interface{} `json:"-"`
-
-	// Timeout
-	PerRequestTimeout time.Duration `json:"-"`
-
 	// Timeout in string format, for JSON encoding
 	// Format is <number><units> where
 	// <units> may be "s" for seconds and "ms" for milliseconds
@@ -84,12 +84,21 @@ type RoutableRadiusRequest struct {
 
 	// Tries per single server. Should be higher than 0
 	ServerTries int
+
+	// The channel to send the answer or error
+	RChan chan interface{} `json:"-"`
+
+	// Timeout
+	PerRequestTimeout time.Duration `json:"-"`
 }
 
 /*
 Functions to parse the timeout from JSON
 */
 
+// Gets a string as a number followed by "s" or "ms" and
+// returns a duration value, as found in a serialized
+// Radius or Diameter Routable request
 func parseTimeout(timeoutSpec string) (time.Duration, error) {
 
 	if before, _, found := strings.Cut(timeoutSpec, "s"); found {
@@ -139,4 +148,84 @@ type RouterSetDownCommand struct {
 
 // Mesaage to stop the eventloop of the routers
 type RouterCloseCommand struct {
+}
+
+// Helper function to serialize, send request, get response and unserialize Diameter Request
+func HttpDiameterRequest(client http.Client, endpoint string, diameterRequest *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
+	// Serialize the message
+	jsonRequest, err := json.Marshal(diameterRequest)
+	if err != nil {
+		instrumentation.PushHttpClientExchange(endpoint, constants.SERIALIZATION_ERROR)
+		return nil, fmt.Errorf("unable to marshal message to json %s", err)
+	}
+
+	// Send the request to the Handler
+	httpResp, err := client.Post(endpoint, "application/json", bytes.NewReader(jsonRequest))
+	if err != nil {
+		instrumentation.PushHttpClientExchange(endpoint, constants.NETWORK_ERROR)
+		return nil, fmt.Errorf("handler %s error %s", endpoint, err)
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != 200 {
+		instrumentation.PushHttpClientExchange(endpoint, constants.HTTP_RESPONSE_ERROR)
+		return nil, fmt.Errorf("handler %s returned status code %d", endpoint, httpResp.StatusCode)
+	}
+
+	jsonAnswer, err := ioutil.ReadAll(httpResp.Body)
+	if err != nil {
+		instrumentation.PushHttpClientExchange(endpoint, constants.NETWORK_ERROR)
+		return nil, fmt.Errorf("error reading response from %s: %s", endpoint, err)
+	}
+
+	// Unserialize to Diameter Message
+	var diameterAnswer diamcodec.DiameterMessage
+	err = json.Unmarshal(jsonAnswer, &diameterAnswer)
+	if err != nil {
+		instrumentation.PushHttpClientExchange(endpoint, constants.UNSERIALIZATION_ERROR)
+		return nil, fmt.Errorf("error unmarshaling response from %s: %s", endpoint, err)
+	}
+
+	instrumentation.PushHttpClientExchange(endpoint, constants.SUCCESS)
+	return &diameterAnswer, nil
+}
+
+// Helper function to serialize, send request, get response and unserialize Radius Request
+func HttpRadiusRequest(client http.Client, endpoint string, packet *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+	// Serialize the message
+	jsonRequest, err := json.Marshal(packet)
+	if err != nil {
+		instrumentation.PushHttpClientExchange(endpoint, constants.SERIALIZATION_ERROR)
+		return nil, fmt.Errorf("unable to marshal message to json %s", err)
+	}
+
+	// Send the request to the Handler
+	httpResp, err := client.Post(endpoint, "application/json", bytes.NewReader(jsonRequest))
+	if err != nil {
+		instrumentation.PushHttpClientExchange(endpoint, constants.NETWORK_ERROR)
+		return nil, fmt.Errorf("handler %s error %s", endpoint, err)
+	}
+	defer httpResp.Body.Close()
+
+	if httpResp.StatusCode != 200 {
+		instrumentation.PushHttpClientExchange(endpoint, constants.HTTP_RESPONSE_ERROR)
+		return nil, fmt.Errorf("handler %s returned status code %d", endpoint, httpResp.StatusCode)
+	}
+
+	jsonResponse, err := ioutil.ReadAll(httpResp.Body)
+	if err != nil {
+		instrumentation.PushHttpClientExchange(endpoint, constants.NETWORK_ERROR)
+		return nil, fmt.Errorf("error reading response from %s: %s", endpoint, err)
+	}
+
+	// Unserialize to Radius Packet
+	var radiusResponse radiuscodec.RadiusPacket
+	err = json.Unmarshal(jsonResponse, &radiusResponse)
+	if err != nil {
+		instrumentation.PushHttpClientExchange(endpoint, constants.UNSERIALIZATION_ERROR)
+		return nil, fmt.Errorf("error unmarshaling response from %s: %s", endpoint, err)
+	}
+
+	instrumentation.PushHttpClientExchange(endpoint, constants.SUCCESS)
+	return &radiusResponse, nil
 }

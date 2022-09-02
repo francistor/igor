@@ -37,8 +37,7 @@ func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscode
 	}
 
 	// Reply with one attribute of each type
-	/*
-		jAVPs := `
+	jAVPs := `
 		[
 			{"Igor-OctetsAttribute": "0102030405060708090a0b"},
 			{"Igor-StringAttribute": "stringvalue"},
@@ -56,12 +55,6 @@ func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscode
 			{"User-Name":"MyUserName"}
 		]
 		`
-	*/
-	jAVPs := `
-	[
-		{"Igor-SaltedOctetsAttribute": "00"}
-	]
-	`
 
 	resp := radiuscodec.NewRadiusResponse(request, true)
 

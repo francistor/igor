@@ -3,6 +3,7 @@ package httprouter
 import (
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"igor/config"
 	"igor/diamcodec"
 	"igor/instrumentation"
@@ -77,9 +78,10 @@ func TestHttpRouterHandler(t *testing.T) {
 
 	httpRouter := NewHttpRouter("testServer", drouter, rrouter)
 
-	time.Sleep(200 * time.Millisecond)
+	// Get the base url for requests
+	httpRouterURL := fmt.Sprintf("https://localhost:%d", config.GetPolicyConfigInstance("testServer").HttpRouterConf().BindPort)
 
-	httpRouter.Close()
+	time.Sleep(200 * time.Millisecond)
 
 	transCfg := &http2.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
@@ -106,7 +108,7 @@ func TestHttpRouterHandler(t *testing.T) {
 				{"Igor-InterfaceIdAttribute": "00aabbccddeeff11"},
 				{"Igor-Integer64Attribute": 999999999999},
 				{"Igor-TaggedStringAttribute": "myString:1"},
-				{"Igor-SaltedOctetsAttribute": "0"},
+				{"Igor-SaltedOctetsAttribute": "00"},
 				{"User-Name":"MyUserName"}
 			]
 		},
@@ -116,7 +118,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	}
 	`
 
-	jRadiusAnswer, err := RouteRadius(rrouter, client, "/routeRadiusRequest", []byte(jRadiusRequest))
+	jRadiusAnswer, err := RouteHTTP(client, httpRouterURL+"/routeRadiusRequest", []byte(jRadiusRequest))
 	if err != nil {
 		t.Fatalf("error routing radius: %s", err)
 	}
@@ -168,7 +170,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	}
 
 	`
-	jDiameterAnswer, err := RouteDiameter(drouter, client, "/routeDiameterRequest", []byte(jDiameterRequest))
+	jDiameterAnswer, err := RouteHTTP(client, httpRouterURL+"/routeDiameterRequest", []byte(jDiameterRequest))
 	if err != nil {
 		t.Fatalf("error routing radius: %s", err)
 	}

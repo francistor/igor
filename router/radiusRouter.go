@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"igor/config"
-	"igor/httphandler"
 	"igor/instrumentation"
 	"igor/radiusclient"
 	"igor/radiuscodec"
@@ -334,7 +333,7 @@ func (router *RadiusRouter) eventLoop() {
 							close(rchan)
 						}()
 
-						response, err := httphandler.HttpRadiusRequest(router.http2Client, destinationURLs[0], radiusPacket)
+						response, err := HttpRadiusRequest(router.http2Client, destinationURLs[0], radiusPacket)
 						if err != nil {
 							config.GetLogger().Error(fmt.Sprintf("http handler error: %s", err.Error()))
 							rchan <- err

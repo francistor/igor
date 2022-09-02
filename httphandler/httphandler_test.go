@@ -6,6 +6,7 @@ import (
 	"igor/config"
 	"igor/diamcodec"
 	"igor/handlerfunctions"
+	"igor/radiuscodec"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -50,6 +51,28 @@ var jDiameterMessage = `
 	}
 	`
 
+var jRadiusRequest = `
+	{
+		"Code": 1,
+		"AVPs":[
+			{"Igor-OctetsAttribute": "0102030405060708090a0b"},
+			{"Igor-StringAttribute": "stringvalue"},
+			{"Igor-IntegerAttribute": "Zero"},
+			{"Igor-IntegerAttribute": "1"},
+			{"Igor-IntegerAttribute": 1},
+			{"Igor-AddressAttribute": "127.0.0.1"},
+			{"Igor-TimeAttribute": "1966-11-26T03:34:08 UTC"},
+			{"Igor-IPv6AddressAttribute": "bebe:cafe::0"},
+			{"Igor-IPv6PrefixAttribute": "bebe:cafe:cccc::0/64"},
+			{"Igor-InterfaceIdAttribute": "00aabbccddeeff11"},
+			{"Igor-Integer64Attribute": 999999999999},
+			{"Igor-TaggedStringAttribute": "myString:1"},
+			{"Igor-SaltedOctetsAttribute": "00"},
+			{"User-Name":"MyUserName"}
+		]
+	}
+	`
+
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Object as done in main.go
@@ -64,7 +87,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestBasicHandler(t *testing.T) {
+func TestBasicHandlers(t *testing.T) {
 
 	handler := NewHttpHandler("testServer", handlerfunctions.EmptyDiameterHandler, handlerfunctions.EmptyRadiusHandler)
 	go handler.Run()
@@ -78,28 +101,54 @@ func TestBasicHandler(t *testing.T) {
 	// Create an http client with timeout and http2 transport
 	client := http.Client{Timeout: 2 * time.Second, Transport: transCfg}
 
-	// TODO: Replace this by the helper function
-
-	// resp, err := client.Get("https://127.0.0.1:8080/diameterRequest")
+	// Diameter request
 	httpResp, err := client.Post("https://127.0.0.1:8080/diameterRequest", "application/json", strings.NewReader(jDiameterMessage))
 	if err != nil {
-		t.Fatalf("Error posting request %s", err)
+		t.Fatalf("Error posting diameter request %s", err)
 	}
 	defer httpResp.Body.Close()
 
 	jsonAnswer, err := ioutil.ReadAll(httpResp.Body)
 	if err != nil {
-		t.Fatalf("error reading response %s", err)
+		t.Fatalf("error reading diameter response %s", err)
 	}
 
 	if httpResp.StatusCode != http.StatusOK {
 		t.Fatalf("got status code %d", httpResp.StatusCode)
 	}
 
-	// Unserialize to Diameter Message
 	var diameterAnswer diamcodec.DiameterMessage
 	err = json.Unmarshal(jsonAnswer, &diameterAnswer)
 	if err != nil {
-		t.Errorf("unmarshal error for diameter message: %s", err)
+		t.Fatalf("unmarshal error for diameter message: %s", err)
+	}
+	if diameterAnswer.GetIntAVP("Result-Code") != diamcodec.DIAMETER_SUCCESS {
+		t.Fatalf("answer was not DIAMETER_SUCCESS")
+	}
+
+	// Radius Request
+	httpResp, err = client.Post("https://127.0.0.1:8080/radiusRequest", "application/json", strings.NewReader(jRadiusRequest))
+	if err != nil {
+		t.Fatalf("Error posting radius request %s", err)
+	}
+	defer httpResp.Body.Close()
+
+	jsonAnswer, err = ioutil.ReadAll(httpResp.Body)
+	if err != nil {
+		t.Fatalf("error reading radius response %s", err)
+	}
+
+	if httpResp.StatusCode != http.StatusOK {
+		t.Fatalf("got status code %d", httpResp.StatusCode)
+	}
+
+	var radiusResponse radiuscodec.RadiusPacket
+	err = json.Unmarshal(jsonAnswer, &radiusResponse)
+	if err != nil {
+		t.Fatalf("unmarshal error for radius message: %s", err)
+	}
+	if radiusResponse.Code != radiuscodec.ACCESS_ACCEPT {
+		t.Log(radiusResponse)
+		t.Fatalf("response code was not ACCESS_ACCEPT")
 	}
 }
