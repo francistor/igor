@@ -1,9 +1,10 @@
+#!/bin/bash
 
 # -------------------------------------------------------------
 # Simple diameter send command using NokiaAAA
 # --------------------------------------------------------------
 export _THIS_FILE_DIRNAME=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-source _THIS_FILE_DIRNAME/env.rc
+source $_THIS_FILE_DIRNAME/env.rc
 
 ORIGIN_HOST=nokiaaaa.nokia
 ORIGIN_REALM=nokia
@@ -16,7 +17,9 @@ DESTINATION_ADDRESS=127.0.0.1:3868
 # Test parameters
 REQUESTFILE=$_THIS_FILE_DIRNAME/CCRequest.txt
 
+# May be overriden by command line using -count <x>
 COUNT=1
+LOGLEVEL=info
 
 # Delete Garbage
 rm $_THIS_FILE_DIRNAME/out/*
@@ -30,8 +33,9 @@ echo Session-Id = \"session-id-1\" > $REQUESTFILE
 echo Auth-Application-Id = 4 >> $REQUESTFILE
 echo CC-Request-Type = 1 >> $REQUESTFILE
 echo CC-Request-Number = 1 >> $REQUESTFILE
-echo Subscription-Id = "Subscription-Id-Type=1, Subscription-Id-Data=913374871" >> $REQUESTFILE
+echo Subscription-Id = \"Subscription-Id-Type=1, Subscription-Id-Data=913374871\" >> $REQUESTFILE
 
 
 # Send the packet
-$DIAMETER -debug verbose -count $COUNT -oh $ORIGIN_HOST -or $ORIGIN_REALM -dh $DESTINATION_HOST -dr $DESTINATION_REALM -destinationAddress $DESTINATION_ADDRESS -Application $APPLICATION_ID -command $COMMAND -request "@$REQUESTFILE"
+# -overlap <number of simultaneous requests>
+$DIAMETER -debug $LOGLEVEL -count $COUNT -oh $ORIGIN_HOST -or $ORIGIN_REALM -dh $DESTINATION_HOST -dr $DESTINATION_REALM -destinationAddress $DESTINATION_ADDRESS -Application $APPLICATION_ID -command $COMMAND -request "@$REQUESTFILE" $*

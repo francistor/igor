@@ -337,6 +337,8 @@ func (avp *RadiusAVP) ToWriter(buffer io.Writer, authenticator [16]byte, secret 
 
 	// Write salt
 	if avp.DictItem.Salted {
+		// Generate random value for salt
+		salt = GetSalt()
 		if err = binary.Write(buffer, binary.BigEndian, salt); err != nil {
 			return int64(bytesWritten), err
 		}

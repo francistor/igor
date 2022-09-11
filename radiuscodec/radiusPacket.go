@@ -194,7 +194,8 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 
 	// Saninty check
 	if currentIndex != int64(packetLen) {
-		panic("assert failed. Bad message size")
+		panicString := fmt.Sprintf("assert failed. Bad message size. Current index: %d - Packetlen: %d", currentIndex, packetLen)
+		panic(panicString)
 	}
 
 	// Calculate final authenticator and write to stream
@@ -255,12 +256,12 @@ func (rp *RadiusPacket) ToBytes(secret string, id byte) (data []byte, err error)
 
 // Returns the size of the Radius packet
 func (dm *RadiusPacket) Len() uint16 {
-	var avpLen byte = 0
+	var avpLen uint16 = 0
 	for i := range dm.AVPs {
-		avpLen += dm.AVPs[i].Len()
+		avpLen += uint16(dm.AVPs[i].Len())
 	}
 
-	return uint16(20 + avpLen)
+	return 20 + avpLen
 }
 
 ///////////////////////////////////////////////////////////////

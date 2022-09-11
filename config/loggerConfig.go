@@ -17,7 +17,7 @@ var ilogger *zap.SugaredLogger
 func initLogger(cm *ConfigurationManager) {
 
 	defaultLogConfig := `{
-		"level": "debug",
+		"level": "info",
 		"development": true,
 		"encoding": "console",
 		"outputPaths": ["stdout"],

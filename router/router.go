@@ -23,11 +23,11 @@ const (
 
 // Size of the channel for getting messages to route
 // TODO: Anything other than 0 or 1 should be explained
-const RADIUS_REQUESTS_QUEUE_SIZE = 16
+const RADIUS_REQUESTS_QUEUE_SIZE = 64
 
 // Size of the channel for getting messages to route
 // TODO: Anything other than 0 or 1 should be explained
-const DIAMETER_REQUESTS_QUEUE_SIZE = 16
+const DIAMETER_REQUESTS_QUEUE_SIZE = 64
 
 // Size of the channel for getting peer control messages
 // TODO: Anything other than 0 or 1 should be explained

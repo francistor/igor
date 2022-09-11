@@ -561,6 +561,13 @@
                     "code": 12,
                     "name": "Command",
                     "type": "String"
+                },
+                {
+                    "code": 13,
+                    "name": "TaggedSaltedOctetsAttribute",
+                    "type": "Octets",
+                    "salted": true,
+                    "tagged": true
                 }
             ]
         }

@@ -12,9 +12,9 @@ func GetAuthenticator() [16]byte {
 	return authenticator
 }
 
-func GetSalt() []byte {
+func GetSalt() [2]byte {
 	salt := make([]byte, 2)
 	rand.Seed(time.Now().UnixNano())
 	rand.Read(salt)
-	return salt
+	return [2]byte{salt[0], salt[1]}
 }

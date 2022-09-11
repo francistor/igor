@@ -37,24 +37,27 @@ func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscode
 	}
 
 	// Reply with one attribute of each type
+	// The Igor-SaltedOctetsAttribute contains the length as the first byte, since
+	// in Nokia AAA this VSA is "salted-password" type
 	jAVPs := `
-		[
-			{"Igor-OctetsAttribute": "0102030405060708090a0b"},
-			{"Igor-StringAttribute": "stringvalue"},
-			{"Igor-IntegerAttribute": "Zero"},
-			{"Igor-IntegerAttribute": "1"},
-			{"Igor-IntegerAttribute": 1},
-			{"Igor-AddressAttribute": "127.0.0.1"},
-			{"Igor-TimeAttribute": "1966-11-26T03:34:08 UTC"},
-			{"Igor-IPv6AddressAttribute": "bebe:cafe::0"},
-			{"Igor-IPv6PrefixAttribute": "bebe:cafe:cccc::0/64"},
-			{"Igor-InterfaceIdAttribute": "00aabbccddeeff11"},
-			{"Igor-TaggedStringAttribute": "mystring:1"},
-			{"Igor-Integer64Attribute": 999999999999},
-			{"Igor-SaltedOctetsAttribute": "1122aabbccdd"},
-			{"User-Name":"MyUserName"}
-		]
-		`
+				[
+					{"Igor-OctetsAttribute": "0102030405060708090a0b"},
+					{"Igor-StringAttribute": "stringvalue"},
+					{"Igor-IntegerAttribute": "Zero"},
+					{"Igor-IntegerAttribute": "1"},
+					{"Igor-IntegerAttribute": 1},
+					{"Igor-AddressAttribute": "127.0.0.1"},
+					{"Igor-TimeAttribute": "1966-11-26T03:34:08 UTC"},
+					{"Igor-IPv6AddressAttribute": "bebe:cafe::0"},
+					{"Igor-IPv6PrefixAttribute": "bebe:cafe:cccc::0/64"},
+					{"Igor-InterfaceIdAttribute": "00aabbccddeeff11"},
+					{"Igor-TaggedStringAttribute": "mystring:1"},
+					{"Igor-Integer64Attribute": 999999999999},
+					{"Igor-SaltedOctetsAttribute": "0F313233343536373839616263646566"},
+					{"Igor-TaggedSaltedOctetsAttribute": "0F313233343536373839616263646566:1"},
+					{"User-Name":"MyUserName"}
+				]
+				`
 
 	resp := radiuscodec.NewRadiusResponse(request, true)
 

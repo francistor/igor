@@ -10,6 +10,8 @@ import (
 
 func main() {
 
+	// defer profile.Start(profile.BlockProfile).Stop()
+
 	// Get the command line arguments
 	bootPtr := flag.String("boot", "resources/searchRules.json", "File or http URL with Configuration Search Rules")
 	instancePtr := flag.String("instance", "", "Name of instance")

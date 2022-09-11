@@ -187,7 +187,6 @@ func (router *DiameterRouter) eventLoop() {
 	// First pass
 	router.updatePeersTable()
 
-	// FRG routerEventLoop:
 	for {
 	messageHandler:
 		select {
