@@ -516,7 +516,7 @@ func (dp *DiameterPeer) eventLoop() {
 					} else {
 						// Not duplicate. Proceed.
 						config.GetLogger().Debugf("-> Sending Message %s\n", v.message)
-						if _, err := v.message.WriteTo(dp.connection); err != nil {
+						if _, err := v.message.WriteTo(dp.connWriter); err != nil {
 							// There was an error writing. Will close the connection
 							if dp.status < StatusTerminating {
 								dp.eventLoopChannel <- WriteErrorMsg{err}
@@ -532,6 +532,8 @@ func (dp *DiameterPeer) eventLoop() {
 
 							// No statistics, because the Peer will die
 						} else {
+							// Since it is a buffered writer, we must flush
+							dp.connWriter.Flush()
 							// All good.
 							// If it was a Request, store in the outstanding request map
 							// RChan may be nil if it is a base application message
@@ -609,6 +611,7 @@ func (dp *DiameterPeer) eventLoop() {
 					} else {
 						// Reveived a non base request. Invoke handler
 						// Make sure the eventLoopChannel is not closed until the response is received
+
 						dp.wg.Add(1)
 						go func() {
 							defer dp.wg.Done()
@@ -760,7 +763,8 @@ func (dp *DiameterPeer) readLoop(ch chan bool) {
 	for {
 		// Read a Diameter message from the connection
 		dm := diamcodec.DiameterMessage{}
-		if _, err := dm.ReadFrom(dp.connection); err != nil {
+		// if _, err := dm.ReadFrom(dp.connection); err != nil {
+		if _, err := dm.ReadFrom(dp.connReader); err != nil {
 			if err == io.EOF {
 				// The remote peer closed
 				dp.eventLoopChannel <- ReadEOFMsg{}

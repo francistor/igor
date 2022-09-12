@@ -423,6 +423,7 @@ func (router *DiameterRouter) eventLoop() {
 
 			// Corresponding to RouteDiameterRequest
 			router.wg.Done()
+
 		}
 	}
 }
