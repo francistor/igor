@@ -5,15 +5,29 @@ import (
 	"fmt"
 	"igor/config"
 	"igor/diamcodec"
+	"igor/instrumentation"
 	"igor/radiuscodec"
+
+	"go.uber.org/zap/zapcore"
 )
 
 // The most basic handler ever. Returns an empty response to the received message
 func EmptyDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-	resp := diamcodec.NewDiameterAnswer(request)
-	resp.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
+	logLines := make(instrumentation.LogLines, 0)
 
-	return resp, nil
+	defer func(lines []instrumentation.LogLine) {
+		logLines.WriteWLog()
+	}(logLines)
+
+	logLines.WLogEntry(zapcore.InfoLevel, "%s", "Starting EmptyDiameterHandler")
+	logLines.WLogEntry(zapcore.InfoLevel, "%s %s", "request", request)
+
+	response := diamcodec.NewDiameterAnswer(request)
+	response.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
+
+	logLines.WLogEntry(zapcore.InfoLevel, "%s %s", "response", request)
+
+	return response, nil
 }
 
 // The most basic handler ever. Returns an empty response to the received message
@@ -29,6 +43,7 @@ func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscode
 
 	// Print the password
 	pwd := request.GetPasswordStringAVP("User-Password")
+
 	logger.Infof("Password: <%s>", pwd)
 
 	// Print all received attributes

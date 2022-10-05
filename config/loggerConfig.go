@@ -5,12 +5,16 @@ import (
 	"fmt"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // Must be initialized with a call to initLogger, which is done
 // during the initialization of a default policyConfigurationManager or
 // handlerConfigurationManager
 var ilogger *zap.SugaredLogger
+
+// The configured logLevel
+var ilogLevel zapcore.Level
 
 // https://pkg.go.dev/go.uber.org/zap
 // Returns a configured instance of zap logger
@@ -54,10 +58,32 @@ func initLogger(cm *ConfigurationManager) {
 		panic("bad log configuration " + err.Error())
 	}
 
+	ilogLevel = cfg.Level.Level()
+
 	ilogger = logger.Sugar()
 }
 
 // Used globally to get access to the logger
 func GetLogger() *zap.SugaredLogger {
 	return ilogger
+}
+
+func IsDebugEnabled() bool {
+	return ilogLevel.Enabled(zapcore.DebugLevel)
+}
+
+func IsInfoEnabled() bool {
+	return ilogLevel.Enabled(zapcore.InfoLevel)
+}
+
+func IsWarnEnabled() bool {
+	return ilogLevel.Enabled(zapcore.WarnLevel)
+}
+
+func IsErrorEnabled() bool {
+	return ilogLevel.Enabled(zapcore.ErrorLevel)
+}
+
+func IsLevelEnabled(level zapcore.Level) bool {
+	return ilogLevel.Enabled(level)
 }
