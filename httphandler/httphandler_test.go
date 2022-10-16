@@ -7,7 +7,7 @@ import (
 	"igor/diamcodec"
 	"igor/handlerfunctions"
 	"igor/radiuscodec"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -90,7 +90,6 @@ func TestMain(m *testing.M) {
 func TestBasicHandlers(t *testing.T) {
 
 	handler := NewHttpHandler("testServer", handlerfunctions.EmptyDiameterHandler, handlerfunctions.EmptyRadiusHandler)
-	go handler.Run()
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -108,7 +107,7 @@ func TestBasicHandlers(t *testing.T) {
 	}
 	defer httpResp.Body.Close()
 
-	jsonAnswer, err := ioutil.ReadAll(httpResp.Body)
+	jsonAnswer, err := io.ReadAll(httpResp.Body)
 	if err != nil {
 		t.Fatalf("error reading diameter response %s", err)
 	}
@@ -133,7 +132,7 @@ func TestBasicHandlers(t *testing.T) {
 	}
 	defer httpResp.Body.Close()
 
-	jsonAnswer, err = ioutil.ReadAll(httpResp.Body)
+	jsonAnswer, err = io.ReadAll(httpResp.Body)
 	if err != nil {
 		t.Fatalf("error reading radius response %s", err)
 	}
@@ -151,4 +150,6 @@ func TestBasicHandlers(t *testing.T) {
 		t.Log(radiusResponse)
 		t.Fatalf("response code was not ACCESS_ACCEPT")
 	}
+
+	handler.Close()
 }

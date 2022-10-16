@@ -6,5 +6,5 @@
 	"vendorId": 1101,
 	"productName": "Igor",
 	"firmwareRevision": 1,
-	"peerCheckTimeSeconds": 120
+	"peerCheckTimeSeconds": 1
 }

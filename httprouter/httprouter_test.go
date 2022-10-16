@@ -90,7 +90,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	// Create an http client with timeout and http2 transport
 	client := http.Client{Timeout: 2 * time.Second, Transport: transCfg}
 
-	jRadiusRequest := `
+	jRRadiusRequest := `
 	{
 		"destination": "igor-superserver-group",
 		"packet": {
@@ -118,7 +118,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	}
 	`
 
-	jRadiusAnswer, err := RouteHTTP(client, httpRouterURL+"/routeRadiusRequest", []byte(jRadiusRequest))
+	jRadiusAnswer, err := RouteHttp(client, httpRouterURL+"/routeRadiusRequest", []byte(jRRadiusRequest))
 	if err != nil {
 		t.Fatalf("error routing radius: %s", err)
 	}
@@ -130,7 +130,7 @@ func TestHttpRouterHandler(t *testing.T) {
 		t.Fatalf("radius response does not contain expected radius attribute")
 	}
 
-	jDiameterRequest := `
+	jRDiameterRequest := `
 	{
 		"Message": {
 			"IsRequest": true,
@@ -170,7 +170,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	}
 
 	`
-	jDiameterAnswer, err := RouteHTTP(client, httpRouterURL+"/routeDiameterRequest", []byte(jDiameterRequest))
+	jDiameterAnswer, err := RouteHttp(client, httpRouterURL+"/routeDiameterRequest", []byte(jRDiameterRequest))
 	if err != nil {
 		t.Fatalf("error routing radius: %s", err)
 	}

@@ -37,7 +37,7 @@ const CONTROL_QUEUE_SIZE = 16
 const HTTP_TIMEOUT_SECONDS = 10
 
 // TIcker for Diameter Peer checking
-const PEER_CHECK_INTERVAL_SECONDS = 60
+const DEFAULT_PEER_CHECK_INTERVAL_SECONDS = 120
 
 // Default timeout for requests, when not specified in the origin of the request
 // (e.g. diameter request that is routed to another peer instead of being handled)

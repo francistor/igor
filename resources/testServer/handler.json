@@ -2,5 +2,5 @@
     "bindAddress": "0.0.0.0",
     "bindPort": 8080,
     "routerAddress": "127.0.0.1",
-	"routerPort": 23868
+	"routerPort": 20001
 }

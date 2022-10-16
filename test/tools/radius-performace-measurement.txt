@@ -1,0 +1,14 @@
+./testAccessAccept.sh -count 300000 -overlap 64
+Statistic        Value
+---------------  ------------------
+initialRequests  300000
+totalRequests    300000
+finalReplies     300000
+totalReplies     300000
+elapsedTime      9333
+transPerSec      32144.005143040824
+secPerTrans      3.111E-5
+active           0
+Access-Request   300000
+Access-Accept    300000
+System.exit( 0 )

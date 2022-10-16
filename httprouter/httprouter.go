@@ -3,12 +3,14 @@ package httprouter
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"igor/config"
 	"igor/instrumentation"
 	"igor/router"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 const (
@@ -35,21 +37,24 @@ type HttpRouter struct {
 // Creates a new DiameterHandler object
 func NewHttpRouter(instanceName string, diameterRouter *router.DiameterRouter, radiusRouter *router.RadiusRouter) HttpRouter {
 
-	// 	https://stackoverflow.com/questions/40786526/resetting-http-handlers-in-golang-for-unit-testing
-	http.DefaultServeMux = new(http.ServeMux)
+	mux := new(http.ServeMux)
+	mux.HandleFunc("/routeDiameterRequest", getDiameterRouteHandler(diameterRouter))
+	mux.HandleFunc("/routeRadiusRequest", getRadiusRouteHandler(radiusRouter))
 
 	ci := config.GetPolicyConfigInstance(instanceName)
 	bindAddrPort := fmt.Sprintf("%s:%d", ci.HttpRouterConf().BindAddress, ci.HttpRouterConf().BindPort)
 	config.GetLogger().Infof("HTTP Router listening in %s", bindAddrPort)
 
 	h := HttpRouter{
-		ci:          ci,
-		httpServer:  &http.Server{Addr: bindAddrPort},
+		ci: ci,
+		httpServer: &http.Server{
+			Addr:              bindAddrPort,
+			Handler:           mux,
+			IdleTimeout:       1 * time.Minute,
+			ReadHeaderTimeout: 5 * time.Second,
+		},
 		doneChannel: make(chan interface{}, 1),
 	}
-
-	http.HandleFunc("/routeDiameterRequest", getDiameterRouteHandler(diameterRouter))
-	http.HandleFunc("/routeRadiusRequest", getRadiusRouteHandler(radiusRouter))
 
 	go h.Run()
 	return h
@@ -63,7 +68,10 @@ func (dh *HttpRouter) Run() {
 		"/home/francisco/cert.pem",
 		"/home/francisco/key.pem")
 
-	fmt.Println(err, err.Error())
+	if !errors.Is(err, http.ErrServerClosed) {
+		fmt.Println(err)
+		panic("error starting http handler")
+	}
 
 	close(dh.doneChannel)
 }

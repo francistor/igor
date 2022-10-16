@@ -1,0 +1,18 @@
+{
+    "level": "info",
+    "development": true,
+    "encoding": "console",
+    "outputPaths": ["stdout"],
+    "errorOutputPaths": ["stderr"],
+    "disableCaller": false,
+    "disableStackTrace": false,
+    "encoderConfig": {
+        "messageKey": "message",
+        "levelKey": "level",
+        "levelEncoder": "lowercase",
+        "callerKey": "caller",
+        "callerEncoder": "",
+        "timeKey": "ts",
+        "timeEncoder": "ISO8601"
+    }
+}

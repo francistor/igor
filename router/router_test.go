@@ -102,11 +102,17 @@ func TestDiameterBasicSetup(t *testing.T) {
 
 	*/
 
+	// First start client, that will not be able to connect to the server (not instantiated).
+	// Will retry the connection every second as per diameterServer.json configuration
+	clientRouter := NewDiameterRouter("testClient", localDiameterHandler)
+	// Force some errors not being able to connect to server. Should recover later
+	time.Sleep(2000 * time.Millisecond)
+
 	superServerRouter := NewDiameterRouter("testSuperServer", localDiameterHandler)
 	time.Sleep(150 * time.Millisecond)
 	serverRouter := NewDiameterRouter("testServer", localDiameterHandler)
-	time.Sleep(150 * time.Millisecond)
-	clientRouter := NewDiameterRouter("testClient", localDiameterHandler)
+
+	time.Sleep(1100 * time.Millisecond)
 
 	// Bad peers
 	// This sleep time is important. Otherwise another client presenting himself

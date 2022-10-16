@@ -34,6 +34,9 @@ const (
 	DIAMETER_UNABLE_TO_COMPLY   = 5012
 )
 
+// Type for functions that handle the diameter requests received
+type MessageHandler func(request *DiameterMessage) (*DiameterMessage, error)
+
 type DiameterMessage struct {
 	// Diameter Message is
 	// 1 byte version

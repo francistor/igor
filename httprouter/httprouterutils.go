@@ -7,8 +7,8 @@ import (
 	"net/http"
 )
 
-// Helper function to invoke an http router operation for diameter
-func RouteHTTP(client http.Client, url string, jsonRoutableRequest []byte) ([]byte, error) {
+// Helper function to invoke an http router operation for radius and diameter
+func RouteHttp(client http.Client, url string, jsonRoutableRequest []byte) ([]byte, error) {
 
 	// Send the request to the HTTP router
 	httpResp, err := client.Post(url, "application/json", bytes.NewReader(jsonRoutableRequest))
@@ -18,7 +18,7 @@ func RouteHTTP(client http.Client, url string, jsonRoutableRequest []byte) ([]by
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != 200 {
-		return nil, fmt.Errorf("route diameter got status code %d", httpResp.StatusCode)
+		return nil, fmt.Errorf("route request got status code %d", httpResp.StatusCode)
 	}
 
 	jsonAnswer, err := ioutil.ReadAll(httpResp.Body)

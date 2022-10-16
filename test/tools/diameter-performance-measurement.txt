@@ -1,0 +1,12 @@
+./testCreditControl.sh -count 300000 -overlap 64
+Statistic         Value
+----------------  -----------------
+initialRequests   300000
+totalRequests     300000
+terminalAnswers   300000
+totalAnswers      300000
+DIAMETER_SUCCESS  300000
+elapsedTime       4080
+transPerSec       73529.41176470589
+secPerTrans       1.36E-5
+active            0

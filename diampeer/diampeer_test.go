@@ -13,13 +13,14 @@ import (
 	"time"
 )
 
-// This message handler parses the Igor1-Command, which may specify
+// This message handler parses the Igor-Command, which may specify
 // whether to introduce a small delay (value "Slow") or a big one (value "VerySlow")
-// A User-Name attribute with the value "TestUserNameEcho" is added to the answer
+// A Class attribute with the value "TestUserNameEcho" is added to the answer
 func MyMessageHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-	answer := diamcodec.NewDiameterAnswer(request)
-	answer.AddOriginAVPs(config.GetPolicyConfig())
-	answer.Add("User-Name", "TestUserNameEcho")
+
+	answer := diamcodec.NewDiameterAnswer(request).
+		AddOriginAVPs(config.GetPolicyConfig()).
+		Add("Class", "TestUserNameEcho")
 
 	command := request.GetStringAVP("Igor-Command")
 	switch command {
@@ -114,32 +115,31 @@ func TestDiameterPeerOK(t *testing.T) {
 	case error:
 		t.Fatal("bad response", err)
 	case *diamcodec.DiameterMessage:
-		userNameAVP, error := v.GetAVP("User-Name")
+		classAVP, error := v.GetAVP("Class")
 		if error != nil {
 			t.Fatal("bad AVP", err)
 		}
-		if userNameAVP.GetString() != "TestUserNameEcho" {
-			t.Fatal("bad AVP content", userNameAVP.GetString())
+		if classAVP.GetString() != "TestUserNameEcho" {
+			t.Fatal("bad AVP content", classAVP.GetString())
 		}
 	}
 
 	// Simulate a timeout. The handler takes more time than this
 	request.Add("Igor-Command", "Slow")
 	var rc2 = make(chan interface{}, 1)
-	activePeer.DiameterExchange(request, 10*time.Millisecond, rc2)
+	activePeer.DiameterExchange(request, 50*time.Millisecond, rc2)
 
 	a2 := <-rc2
 	switch v := a2.(type) {
 	case error:
 	default:
-		t.Fatalf("should have got a timeout and got %v", v)
+		t.Fatalf("should have got a timeout but got %v", v)
 	}
 
-	// Check metrics
+	// Check metrics. Getting the metrics aggregating by application and command
 	metrics := instrumentation.MS.DiameterQuery("DiameterRequestsReceived", nil, []string{"AP", "CM"})
 	// Should have received two TestApplication / TestRequest messages
-	k1 := instrumentation.PeerDiameterMetricKey{AP: "TestApplication", CM: "TestRequest"}
-	if metric, ok := metrics[k1]; !ok {
+	if metric, ok := metrics[instrumentation.PeerDiameterMetricKey{AP: "TestApplication", CM: "TestRequest"}]; !ok {
 		t.Fatal("bad metrics for TestApplication and TestRequest")
 	} else {
 		if metric != 2 {
@@ -147,8 +147,7 @@ func TestDiameterPeerOK(t *testing.T) {
 		}
 	}
 	// Should have received several Base / Device-Watchdog
-	k2 := instrumentation.PeerDiameterMetricKey{AP: "Base", CM: "Device-Watchdog"}
-	if metric, ok := metrics[k2]; !ok {
+	if metric, ok := metrics[instrumentation.PeerDiameterMetricKey{AP: "Base", CM: "Device-Watchdog"}]; !ok {
 		t.Fatal("bad metrics for Base and Device-Watchdog")
 	} else {
 		if metric < 2 {
@@ -156,10 +155,9 @@ func TestDiameterPeerOK(t *testing.T) {
 		}
 	}
 
-	// Aggregate timeouts per Peer
+	// Aggregate timeouts per Peer. Getting the metrics aggregated by Peer
 	metrics = instrumentation.MS.DiameterQuery("DiameterRequestsTimeout", nil, []string{"Peer"})
-	k3 := instrumentation.PeerDiameterMetricKey{Peer: "server.igorserver"}
-	if metric, ok := metrics[k3]; !ok {
+	if metric, ok := metrics[instrumentation.PeerDiameterMetricKey{Peer: "server.igorserver"}]; !ok {
 		t.Fatal("bad timeout metrics")
 	} else {
 		if metric != 1 {
@@ -193,7 +191,7 @@ func TestDiameterPeerBadServerName(t *testing.T) {
 	var activePeer *DiameterPeer
 
 	// The passive peer will receive a connection from client.igor that will succeed
-	// The active peer will establish a connection with unkserver.igor but the CEA will report server.igor
+	// The active peer will establish a connection with unkserver.igorserver but the CEA will report server.igor
 	activePeerConfig := config.DiameterPeer{
 		DiameterHost:            "unkserver.igorserver",
 		IPAddress:               "127.0.0.1",
@@ -248,7 +246,6 @@ func TestDiameterPeerBadClientName(t *testing.T) {
 
 	// The active client reports itself as unkclient.igor, which is not recongized by the server
 	// The passive peer reports an error (unkclient.igor not known),
-
 	activePeerConfig := config.DiameterPeer{
 		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
