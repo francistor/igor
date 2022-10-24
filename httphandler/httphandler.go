@@ -10,7 +10,6 @@ import (
 	"igor/diamcodec"
 	"igor/instrumentation"
 	"igor/radiuscodec"
-	"igor/radiusserver"
 	"io"
 	"net/http"
 	"time"
@@ -33,7 +32,7 @@ type HttpHandler struct {
 }
 
 // Creates a new DiameterHandler object
-func NewHttpHandler(instanceName string, diameterHandler diamcodec.MessageHandler, radiusHandler radiusserver.RadiusPacketHandler) HttpHandler {
+func NewHttpHandler(instanceName string, diameterHandler diamcodec.MessageHandler, radiusHandler radiuscodec.RadiusPacketHandler) HttpHandler {
 
 	// If using the default mux (not done here. Just in case...)
 	// https://stackoverflow.com/questions/40786526/resetting-http-handlers-in-golang-for-unit-testing
@@ -132,7 +131,7 @@ func getDiameterRequestHandler(handlerFunc diamcodec.MessageHandler) func(w http
 }
 
 // Given a Diameter Handler function, builds an http handler that unserializes, executes the handler and serializes the response
-func getRadiusRequestHandler(handlerFunc radiusserver.RadiusPacketHandler) func(w http.ResponseWriter, req *http.Request) {
+func getRadiusRequestHandler(handlerFunc radiuscodec.RadiusPacketHandler) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		logger := config.GetLogger()

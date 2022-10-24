@@ -8,7 +8,7 @@ import (
 	"igor/diamcodec"
 	"igor/instrumentation"
 	"igor/radiuscodec"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -172,7 +172,7 @@ func HttpDiameterRequest(client http.Client, endpoint string, diameterRequest *d
 		return nil, fmt.Errorf("handler %s returned status code %d", endpoint, httpResp.StatusCode)
 	}
 
-	jsonAnswer, err := ioutil.ReadAll(httpResp.Body)
+	jsonAnswer, err := io.ReadAll(httpResp.Body)
 	if err != nil {
 		instrumentation.PushHttpClientExchange(endpoint, constants.NETWORK_ERROR)
 		return nil, fmt.Errorf("error reading response from %s: %s", endpoint, err)
@@ -212,7 +212,7 @@ func HttpRadiusRequest(client http.Client, endpoint string, packet *radiuscodec.
 		return nil, fmt.Errorf("handler %s returned status code %d", endpoint, httpResp.StatusCode)
 	}
 
-	jsonResponse, err := ioutil.ReadAll(httpResp.Body)
+	jsonResponse, err := io.ReadAll(httpResp.Body)
 	if err != nil {
 		instrumentation.PushHttpClientExchange(endpoint, constants.NETWORK_ERROR)
 		return nil, fmt.Errorf("error reading response from %s: %s", endpoint, err)

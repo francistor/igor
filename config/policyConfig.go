@@ -140,13 +140,14 @@ func (c *PolicyConfigurationManager) DiameterServerConf() DiameterServerConfig {
 	return c.currentDiameterServerConfig
 }
 
-///////////////////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////////////////
 type RadiusServerConfig struct {
-	BindAddress string
-	AuthPort    int
-	AcctPort    int
-	CoAPort     int
-	OriginPorts []int
+	BindAddress               string
+	AuthPort                  int
+	AcctPort                  int
+	CoAPort                   int
+	OriginPorts               []int
+	HttpHandlerTimeoutSeconds int
 }
 
 // Retrieves the radius server configuration, corcing a refresh

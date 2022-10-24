@@ -47,7 +47,7 @@ type ClientRadiusRequestMsg struct {
 	// The secret shared with the endpoint
 	secret string
 
-	// The response channel
+	// The channel on which the response to this request must be sent
 	rchan chan interface{}
 }
 
@@ -73,7 +73,7 @@ type RadiusClient struct {
 	// Map of created RadiusClientSockets by origin port
 	clientSockets map[int]*RadiusClientSocket
 
-	// Status may be StatusClosing
+	// Status may be StatusTerminated
 	status int32
 
 	// To make sure we don't close too soon
@@ -106,6 +106,7 @@ func (r *RadiusClient) SetDown() {
 // Wait until everything is closed
 func (r *RadiusClient) Close() {
 	// Wait until we have cleaned up our resources
+	// TODO: Do this in the radius router
 	<-r.doneChannel
 
 	// And all outstanding messages have been processed

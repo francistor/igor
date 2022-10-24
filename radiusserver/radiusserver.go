@@ -14,9 +14,6 @@ const (
 	StatusTerminated = 1
 )
 
-// Type for functions that handle the radius requests received
-type RadiusPacketHandler func(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error)
-
 // Implements a radius server socket
 // Validates incoming messages, sends them to the router for processing and replies back
 // with the responses
@@ -26,17 +23,18 @@ type RadiusServer struct {
 	ci *config.PolicyConfigurationManager
 
 	// Handler function for incoming packets
-	handler RadiusPacketHandler
+	// handler RadiusPacketHandler
+	handler radiuscodec.RadiusPacketHandler
 
 	// The UDP socket
 	socket net.PacketConn
 
-	// Status. Initially 0 and 1 (StatusClosing) if we are shutting down
+	// Status. Initially 0 and 1 (StatusTerminated) if we are shutting down
 	status int32
 }
 
 // Creates a Radius Server
-func NewRadiusServer(ci *config.PolicyConfigurationManager, bindAddress string, bindPort int, handler RadiusPacketHandler) *RadiusServer {
+func NewRadiusServer(ci *config.PolicyConfigurationManager, bindAddress string, bindPort int, handler radiuscodec.RadiusPacketHandler) *RadiusServer {
 
 	// Create the server socket
 	socket, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", bindAddress, bindPort))
@@ -92,7 +90,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 		radiusClient, found := rs.ci.RadiusClientsConf()[clientIPAddr]
 
 		if !found {
-			config.GetLogger().Debugf("message from unknown client %s", clientIPAddr)
+			config.GetLogger().Warnf("message from unknown client %s", clientIPAddr)
 			continue
 		}
 
@@ -116,7 +114,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 
 			if err != nil {
 				config.GetLogger().Errorf("discarding packet for %s with code %d: %s", addr.String(), radiusPacket.Code, err)
-				instrumentation.PushRadiusServerDrop(clientIPAddr, string(radiusPacket.Code))
+				instrumentation.PushRadiusServerDrop(clientIPAddr, string(code))
 				return
 			}
 

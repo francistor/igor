@@ -3,5 +3,6 @@
 	"authPort": 1812,
 	"acctPort": 1813,
 	"coaPort": 3799,
-	"originPorts": [9000, 9001]
+	"originPorts": [9000, 9001],
+	"httpHandlerTimeoutSeconds": 3
 }

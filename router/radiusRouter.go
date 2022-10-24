@@ -18,19 +18,6 @@ import (
 	"golang.org/x/net/http2"
 )
 
-// RadiusRouter
-// Starts an UDP server socket
-//
-// Receives RoutableRadiusPacket messages, which contain a radius packet plus the specification of the server where
-// to send it or, if empty, If empty, handles it.
-// Handling can be done with the registered http handler or with the specified handler function
-//
-// When sending packets to other radius servers, the router obtains the final radius enpoint by analyzing the radius group,
-// and sends the packet to the RadiusClient. It also manages the request-level retries.
-//
-// The status of the radius servers is kept on a table. Radius Server are marked as "down" when the number of timeouts in a row
-// exceeds the configured value
-
 // Keeps the status of the Radius Server
 // Only declared servers have status
 type RadiusServerWithStatus struct {
@@ -38,7 +25,7 @@ type RadiusServerWithStatus struct {
 	conf config.RadiusServer
 
 	// True when the Server may admit requests
-	// In order to make a more efficient comparison sometimes than looking at the unavailableUntil date
+	// Used in order to make a more efficient comparison than looking at the unavailableUntil date
 	isAvailable bool
 
 	// Current errors in a row
@@ -50,15 +37,18 @@ type RadiusServerWithStatus struct {
 
 // Encapsulates the data passed to the RadiusClient, once the routing has been
 // performed
-type RadiusRouteParam struct {
+type RadiusRequestParamsSet struct {
 	endpoint   string
 	originPort int
 	secret     string
 	serverName string
+	// For optimization. Store here if the server has numErrors > 0, because if this is the case,
+	// and the requests successd, it should be reset to zero.
+	hasErrors bool
 }
 
 // Message to signal that we should send the RadiusServer Metrics
-type UpdateRadiusMetrics struct {
+type SendRadiusTable struct {
 }
 
 // To signal the result of each operation and update the radius server status
@@ -67,6 +57,21 @@ type RadiusRequestResult struct {
 	ok         bool
 }
 
+// Starts an UDP server socket
+//
+// Receives RoutableRadiusPacket messages, which contain a radius packet plus the specification of the server where
+// to send it or, if empty, handles it.
+//
+// # Handling can be done with the registered http handler or with the specified handler function
+//
+// When sending packets to other radius servers, the router obtains the final radius enpoint by analyzing the radius group,
+// and sends the packet to the RadiusClient. It also manages the request-level retries.
+//
+// The status of the radius servers is kept on a table. Radius Server are marked as "down" when the number of timeouts in a row
+// exceeds the configured value.
+//
+// Requests may be sent to configured radius groups or to stand-alone servers using just destination IP address and secret. The
+// status of those is not tracked.
 type RadiusRouter struct {
 	// Configuration instance
 	instanceName string
@@ -83,7 +88,7 @@ type RadiusRouter struct {
 	// Control channel
 	routerControlChan chan interface{}
 
-	// HTTP2 client
+	// HTTP2 client. For sending requests to http handlers
 	http2Client http.Client
 
 	// Radius Client
@@ -95,9 +100,9 @@ type RadiusRouter struct {
 	coaServer  *radiusserver.RadiusServer
 
 	// Function to handle messages not sent to http handlers
-	localHandler radiusserver.RadiusPacketHandler
+	localHandler radiuscodec.RadiusPacketHandler
 
-	// Status
+	// Status of this Router
 	status int32
 
 	// To make sure we wait for the goroutines to end
@@ -105,7 +110,7 @@ type RadiusRouter struct {
 }
 
 // Creates and runs a Router
-func NewRadiusRouter(instanceName string, localHandler radiusserver.RadiusPacketHandler) *RadiusRouter {
+func NewRadiusRouter(instanceName string, localHandler radiuscodec.RadiusPacketHandler) *RadiusRouter {
 
 	radiusServerConf := config.GetPolicyConfigInstance(instanceName).RadiusServerConf()
 
@@ -119,7 +124,8 @@ func NewRadiusRouter(instanceName string, localHandler radiusserver.RadiusPacket
 		localHandler:       localHandler,
 	}
 
-	// The handler function sends the request to this router, signailling that it must not be sent to
+	// Function to be used for the RadiusServers.
+	// This handler function sends the request to this router, signailling that it must not be sent to
 	// an upstream server (destination = "")
 	handler := func(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
 		return router.RouteRadiusRequest("", request, 0, 0, 0, "")
@@ -136,16 +142,20 @@ func NewRadiusRouter(instanceName string, localHandler radiusserver.RadiusPacket
 	}
 
 	// Create an http client with timeout and http2 transport
+	to := router.ci.RadiusServerConf().HttpHandlerTimeoutSeconds
+	if to == 0 {
+		to = HTTP_TIMEOUT_SECONDS
+	}
 	router.http2Client = http.Client{
-		Timeout: HTTP_TIMEOUT_SECONDS * time.Second,
+		Timeout: time.Duration(to) * time.Second,
 		Transport: &http2.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
 
 		},
 	}
 
-	router.updateRadiusServersTable()
-	router.routerControlChan <- UpdateRadiusMetrics{}
+	router.buildRadiusServersTable()
+	router.routerControlChan <- SendRadiusTable{}
 
 	go router.eventLoop()
 
@@ -153,7 +163,8 @@ func NewRadiusRouter(instanceName string, localHandler radiusserver.RadiusPacket
 }
 
 // Starts the closing process. It will set in StatusTerminated stauts and send the down signal for the
-// client socket
+// client socket.
+// Notice that no notification is sent
 func (router *RadiusRouter) SetDown() {
 	router.routerControlChan <- RouterSetDownCommand{}
 }
@@ -172,7 +183,7 @@ func (router *RadiusRouter) Close() {
 		router.coaServer.Close()
 	}
 
-	// Client
+	// close the client
 	router.radiusClient.Close()
 
 	// Wait until all goroutines exit, including timers in outstanding requests
@@ -203,18 +214,17 @@ func (router *RadiusRouter) eventLoop() {
 
 				router.status = StatusTerminated
 
-				// Close the client. This will cancel all requests
+				// Close the radius client. This will cancel all requests
 				router.radiusClient.SetDown()
 
-				// Terminate the event loop
-				// FRG return
+			case SendRadiusTable:
 
-			case UpdateRadiusMetrics:
-
-				instrumentation.PushRadiusServersTable(router.instanceName, router.buildRadiusServersTable())
+				instrumentation.PushRadiusServersTable(router.instanceName, router.parseRadiusServersTable())
 
 				// Sent after each radius request, to keep track of the status of the servers
 			case RadiusRequestResult:
+
+				// TODO: Do this inline, instead of sending myself a message?
 
 				// Update errors and set unavailable if necessary
 				// Moving from unavailable to available will be done only by quarantine expiration
@@ -228,7 +238,7 @@ func (router *RadiusRouter) eventLoop() {
 								rsws.isAvailable = false
 								now := time.Now()
 								rsws.unavailableUntil = now.Add(time.Duration(rsws.conf.QuarantineTimeSeconds) * time.Second)
-								router.routerControlChan <- UpdateRadiusMetrics{}
+								router.routerControlChan <- SendRadiusTable{}
 							}
 						} else {
 							// Reset the counter when a success comes
@@ -245,48 +255,67 @@ func (router *RadiusRouter) eventLoop() {
 
 		case rrr := <-router.radiusRequestsChan:
 
-			// If closing, do not serve more requests
+			// TODO: Make sure I call close(rrr.RChan) and wg.Done in all the branches
+
+			// If terminated, do not serve more requests
 			if router.status == StatusTerminated {
 				rrr.RChan <- fmt.Errorf("router terminated")
 				close(rrr.RChan)
+
 				// Corresponding to RouteRadiusRequest
 				router.wg.Done()
 				continue
 			}
 
+			// If the message is for another server, we'll act as Radius Client
 			if rrr.Destination != "" {
 				// Route the message to upstream server
-				routeParams := router.getRouteParams(rrr)
-				if len(routeParams) == 0 {
-					rrr.RChan <- fmt.Errorf("no server available to send request")
+				// requestParams will contain the set of attributes to use of each of the tries
+				requestParams := router.getRouteParams(rrr)
+				if len(requestParams) == 0 {
+					rrr.RChan <- fmt.Errorf("no server available to send request or destination not found")
 					close(rrr.RChan)
 				} else {
-					// Retry loop
+					// Will go over all the RequestParamsSet, that has been generate taking into account the currently
+					// available servers and the configured retries.
 					router.wg.Add(1)
-					go func(rps []RadiusRouteParam, req RoutableRadiusRequest) {
+					go func(rps []RadiusRequestParamsSet, req RoutableRadiusRequest) {
 						defer router.wg.Done()
-						for _, routeParam := range rps {
+						for _, requestParamsSet := range rps {
+							// Channel to get the answer
 							rchan := make(chan interface{}, 1)
-							router.radiusClient.RadiusExchange(routeParam.endpoint, routeParam.originPort, req.Packet, req.PerRequestTimeout, req.ServerTries, routeParam.secret, rchan)
+							router.radiusClient.RadiusExchange(
+								requestParamsSet.endpoint,
+								requestParamsSet.originPort,
+								req.Packet,
+								req.PerRequestTimeout,
+								req.ServerTries,
+								requestParamsSet.secret,
+								rchan)
+
+							// Block here until response or error
 							response := <-rchan
+
 							// rchan closed in RadiusExchange
 							switch v := response.(type) {
 							case *radiuscodec.RadiusPacket:
 								req.RChan <- response
 								close(req.RChan)
-								router.routerControlChan <- RadiusRequestResult{serverName: routeParam.serverName, ok: true}
+								if requestParamsSet.hasErrors {
+									router.routerControlChan <- RadiusRequestResult{serverName: requestParamsSet.serverName, ok: true}
+								}
 								return
 							case error:
-								router.routerControlChan <- RadiusRequestResult{serverName: routeParam.serverName, ok: false}
-								config.GetLogger().Warnf("error in answer from %s %s: %s", routeParam.serverName, routeParam.endpoint, v.Error())
+								router.routerControlChan <- RadiusRequestResult{serverName: requestParamsSet.serverName, ok: false}
+								config.GetLogger().Warnf("error in answer from %s %s: %s", requestParamsSet.serverName, requestParamsSet.endpoint, v.Error())
 							}
 						}
 						req.RChan <- fmt.Errorf("answer not received after %d tries", len(rps))
 						close(req.RChan)
 
-					}(routeParams, rrr)
+					}(requestParams, rrr)
 				}
-
+				// If message is for this server
 			} else {
 				// Handle the message
 				rh := router.ci.RadiusHandlersConf()
@@ -299,7 +328,7 @@ func (router *RadiusRouter) eventLoop() {
 				case radiuscodec.COA_REQUEST:
 					destinationURLs = rh.COAHandlers
 				default:
-					rrr.RChan <- fmt.Errorf("server received a not request packet")
+					rrr.RChan <- fmt.Errorf("server received a non-request packet")
 					close(rrr.RChan)
 					// Corresponding to the one in RouteRadiusRequest
 					router.wg.Done()
@@ -309,9 +338,12 @@ func (router *RadiusRouter) eventLoop() {
 				// Handle locally
 				if len(destinationURLs) == 0 {
 					// Send to local handler asyncronously
+					router.wg.Add(1)
 					go func(rc chan interface{}, radiusPacket *radiuscodec.RadiusPacket) {
+						defer router.wg.Done()
 						resp, err := router.localHandler(radiusPacket)
 						if err != nil {
+							config.GetLogger().Error(fmt.Sprintf("local handler error: %s", err.Error()))
 							rc <- err
 						} else {
 							rc <- resp
@@ -320,16 +352,16 @@ func (router *RadiusRouter) eventLoop() {
 					}(rrr.RChan, rrr.Packet)
 
 				} else {
-					// Send to http handler
-
 					// Select one destination randomly
 					rand.Shuffle(len(destinationURLs), func(i, j int) { destinationURLs[i], destinationURLs[j] = destinationURLs[j], destinationURLs[i] })
 
 					// Send to the handler asynchronously
+					router.wg.Add(1)
 					go func(rchan chan interface{}, radiusPacket *radiuscodec.RadiusPacket) {
 
 						// Make sure the response channel is closed
 						defer func() {
+							router.wg.Done()
 							close(rchan)
 						}()
 
@@ -352,7 +384,7 @@ func (router *RadiusRouter) eventLoop() {
 	}
 }
 
-// Handles or routes a radius request, depending on the contents of "endpoint". If empty, the request is handled;
+// Handles or routes a radius request, depending on the contents of "destination". If empty, the request is handled;
 // if pointing to an ipaddress:port, sent to that specific, possibly undeclared upstream server; if pointing to
 // a server group, it is routed according to the availability of the servers in the group
 // The total timeout wil be perRequestTimeout*tries*serverTries
@@ -375,6 +407,7 @@ func (router *RadiusRouter) RouteRadiusRequest(destination string, packet *radiu
 
 	router.radiusRequestsChan <- req
 
+	// Blocking wait for answer or error
 	r := <-rchan
 	switch v := r.(type) {
 	case error:
@@ -421,18 +454,21 @@ func (router *RadiusRouter) RouteRadiusRequestAsync(destination string, packet *
 
 // Obtains the parameters to use when sending the request to the radius client, taking into
 // account all the retries. If no servers available or group not found will return an empty slice
-func (router *RadiusRouter) getRouteParams(req RoutableRadiusRequest) []RadiusRouteParam {
+// To be executed in the event loop
+func (router *RadiusRouter) getRouteParams(req RoutableRadiusRequest) []RadiusRequestParamsSet {
 
 	// The slice of routing parameters to be returned
-	params := make([]RadiusRouteParam, 0)
+	params := make([]RadiusRequestParamsSet, 0)
 
 	if strings.Contains(req.Destination, ":") {
 		// Specific server
 		// params will have a single entry
 		// tries will not be used. Only serverTries
 		originPorts := router.ci.RadiusServerConf().OriginPorts
-		routeParam := RadiusRouteParam{
-			endpoint:   normalizeEndpoint(req.Destination),
+		routeParam := RadiusRequestParamsSet{
+			// Get ip if a name was specified as destination
+			endpoint: normalizeEndpoint(req.Destination),
+			// Choose one of the origin ports at random
 			originPort: originPorts[rand.Intn(len(originPorts))],
 			secret:     req.Secret,
 		}
@@ -455,7 +491,7 @@ func (router *RadiusRouter) getRouteParams(req RoutableRadiusRequest) []RadiusRo
 					if server.unavailableUntil.Before(time.Now()) {
 						server.isAvailable = true
 						availableServerNames = append(availableServerNames, serverName)
-						router.routerControlChan <- UpdateRadiusMetrics{}
+						router.routerControlChan <- SendRadiusTable{}
 					}
 				}
 			}
@@ -475,6 +511,7 @@ func (router *RadiusRouter) getRouteParams(req RoutableRadiusRequest) []RadiusRo
 				server := router.radiusServersTable[serverName]
 
 				// Select one client port randomly
+				// Origin ports may be specified per destination server or globally in the server
 				var originPorts []int
 				if len(server.conf.OriginPorts) == 0 {
 					originPorts = append(originPorts, router.ci.RadiusServerConf().OriginPorts...)
@@ -496,11 +533,12 @@ func (router *RadiusRouter) getRouteParams(req RoutableRadiusRequest) []RadiusRo
 
 				// Build route param
 				sName := normalizeIPAddress(server.conf.IPAddress)
-				routeParam := RadiusRouteParam{
+				routeParam := RadiusRequestParamsSet{
 					endpoint:   fmt.Sprintf("%s:%d", sName, destPort),
 					originPort: clientPort,
 					serverName: serverName,
 					secret:     server.conf.Secret,
+					hasErrors:  server.numErrors > 0,
 				}
 				params = append(params, routeParam)
 			}
@@ -514,7 +552,7 @@ func (router *RadiusRouter) getRouteParams(req RoutableRadiusRequest) []RadiusRo
 
 // Builds the RadiusServerTable. Any previous information such as server status
 // will be lost
-func (router *RadiusRouter) updateRadiusServersTable() {
+func (router *RadiusRouter) buildRadiusServersTable() {
 
 	// Get the current configuration
 	serversConf := router.ci.RadiusServersConf().Servers
@@ -536,7 +574,7 @@ func (router *RadiusRouter) updateRadiusServersTable() {
 }
 
 // For instrumentation
-func (router *RadiusRouter) buildRadiusServersTable() instrumentation.RadiusServersTable {
+func (router *RadiusRouter) parseRadiusServersTable() instrumentation.RadiusServersTable {
 	radiusServersTable := make([]instrumentation.RadiusServerTableEntry, 0)
 
 	for serverName, rsws := range router.radiusServersTable {

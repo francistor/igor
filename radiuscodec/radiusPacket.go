@@ -34,6 +34,9 @@ const (
 
 var zero_authenticator = [16]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
+// Type for functions that handle the diameter requests received
+type RadiusPacketHandler func(request *RadiusPacket) (*RadiusPacket, error)
+
 // code: 1 byte
 // identifier: 1 byte
 // length: 2: 2 byte
@@ -127,11 +130,17 @@ func RadiusPacketFromBytes(inputBytes []byte, secret string) (*RadiusPacket, err
 //
 // Writes the radius message to the specified writer
 // ACCESS_REQUEST
-//   Authenticator is created from scratch
+//
+//	Authenticator is created from scratch
+//
 // OTHER REQUEST
-//   Authenticator is md5(code+identifier+zeroed_authenticator+request_attributes+secret)
+//
+//	Authenticator is md5(code+identifier+zeroed_authenticator+request_attributes+secret)
+//
 // RESPONSE
-//   Authenticator is md5(Code+ID+Length+RequestAuth+Attributes+Secret)
+//
+//	Authenticator is md5(Code+ID+Length+RequestAuth+Attributes+Secret)
+//
 // id is ignored in responses, where the id from the request and stored in the avp will be used
 func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (int64, error) {
 

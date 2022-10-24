@@ -337,7 +337,7 @@ func TestDiameterRequestCancellation(t *testing.T) {
 func TestRouteParamRadiusPacket(t *testing.T) {
 	rrouter := NewRadiusRouter("testServer", httpRadiusHandler)
 
-	rrouter.updateRadiusServersTable()
+	rrouter.buildRadiusServersTable()
 
 	rchan := make(chan interface{}, 1)
 	req := RoutableRadiusRequest{
