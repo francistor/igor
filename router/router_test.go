@@ -186,22 +186,17 @@ func TestDiameterBasicSetup(t *testing.T) {
 	}
 
 	// Close Routers
-	serverRouter.SetDown()
 	serverRouter.Close()
 	t.Log("Server Router terminated")
 
-	superServerRouter.SetDown()
 	superServerRouter.Close()
 	t.Log("SuperServer Router terminated")
 
-	clientRouter.SetDown()
 	clientRouter.Close()
 	t.Log("Client Router terminated")
 
-	b1.SetDown()
 	b1.Close()
 
-	b2.SetDown()
 	b2.Close()
 
 }
@@ -249,9 +244,7 @@ func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 		t.Fatalf("Handler Exchanges was not 1")
 	}
 
-	client.SetDown()
 	client.Close()
-	server.SetDown()
 	server.Close()
 
 	httpHandler.Close()
@@ -285,10 +278,6 @@ func TestDiameterRouteMessagetoLocal(t *testing.T) {
 		t.Fatalf("Echoed User-Name incorrect %s", response.GetStringAVP("User-Name"))
 	}
 
-	superServer.SetDown()
-	server.SetDown()
-	client.SetDown()
-
 	superServer.Close()
 	server.Close()
 	client.Close()
@@ -320,7 +309,6 @@ func TestDiameterRequestCancellation(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	server.SetDown()
 	server.Close()
 
 	// Give sometime for the async handler to execute
@@ -330,7 +318,6 @@ func TestDiameterRequestCancellation(t *testing.T) {
 		t.Fatalf("async handler was not called on router cancellation %d", atomic.LoadInt32(&handlerCalled))
 	}
 
-	superserver.SetDown()
 	superserver.Close()
 }
 
@@ -352,7 +339,6 @@ func TestRouteParamRadiusPacket(t *testing.T) {
 		t.Errorf("third try has wrong endpoint")
 	}
 
-	rrouter.SetDown()
 	rrouter.Close()
 }
 
@@ -390,9 +376,6 @@ func TestRadiusRouteToHTTP(t *testing.T) {
 		t.Fatalf("bad response from server 127.0.0.1:1812. Got %s", resp.GetStringAVP("User-Name"))
 	}
 
-	client.SetDown()
-	server.SetDown()
-
 	client.Close()
 	server.Close()
 
@@ -417,7 +400,6 @@ func TestRadiusHandleLocal(t *testing.T) {
 		t.Fatalf("bad response from server testClient. Got %s", resp.GetStringAVP("User-Name"))
 	}
 
-	client.SetDown()
 	client.Close()
 }
 
@@ -519,9 +501,6 @@ func TestRadiusTimeout(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	superserver.SetDown()
-	server.SetDown()
-
 	superserver.Close()
 	server.Close()
 
@@ -547,7 +526,6 @@ func TestRadiusRequestCancellation(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	client.SetDown()
 	client.Close()
 
 	// Give some time for the async handler to execute

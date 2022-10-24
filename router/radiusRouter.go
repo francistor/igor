@@ -88,6 +88,9 @@ type RadiusRouter struct {
 	// Control channel
 	routerControlChan chan interface{}
 
+	// To signal that we have set the terminated status
+	doneChan chan interface{}
+
 	// HTTP2 client. For sending requests to http handlers
 	http2Client http.Client
 
@@ -120,6 +123,7 @@ func NewRadiusRouter(instanceName string, localHandler radiuscodec.RadiusPacketH
 		radiusServersTable: make(map[string]*RadiusServerWithStatus),
 		radiusRequestsChan: make(chan RoutableRadiusRequest, RADIUS_REQUESTS_QUEUE_SIZE),
 		routerControlChan:  make(chan interface{}, CONTROL_QUEUE_SIZE),
+		doneChan:           make(chan interface{}, 1),
 		radiusClient:       radiusclient.NewRadiusClient(config.GetPolicyConfigInstance(instanceName)),
 		localHandler:       localHandler,
 	}
@@ -162,15 +166,14 @@ func NewRadiusRouter(instanceName string, localHandler radiuscodec.RadiusPacketH
 	return &router
 }
 
-// Starts the closing process. It will set in StatusTerminated stauts and send the down signal for the
-// client socket.
-// Notice that no notification is sent
-func (router *RadiusRouter) SetDown() {
-	router.routerControlChan <- RouterSetDownCommand{}
-}
-
 // Waits until the Router is finished
 func (router *RadiusRouter) Close() {
+
+	// Start closing procedure
+	router.routerControlChan <- RouterSetDownCommand{}
+
+	// Wait for confirmation that status is terminating
+	<-router.doneChan
 
 	// Servers
 	if router.authServer != nil {
@@ -217,14 +220,14 @@ func (router *RadiusRouter) eventLoop() {
 				// Close the radius client. This will cancel all requests
 				router.radiusClient.SetDown()
 
+				close(router.doneChan)
+
 			case SendRadiusTable:
 
 				instrumentation.PushRadiusServersTable(router.instanceName, router.parseRadiusServersTable())
 
 				// Sent after each radius request, to keep track of the status of the servers
 			case RadiusRequestResult:
-
-				// TODO: Do this inline, instead of sending myself a message?
 
 				// Update errors and set unavailable if necessary
 				// Moving from unavailable to available will be done only by quarantine expiration
@@ -254,8 +257,6 @@ func (router *RadiusRouter) eventLoop() {
 			}
 
 		case rrr := <-router.radiusRequestsChan:
-
-			// TODO: Make sure I call close(rrr.RChan) and wg.Done in all the branches
 
 			// If terminated, do not serve more requests
 			if router.status == StatusTerminated {

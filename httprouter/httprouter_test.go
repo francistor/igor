@@ -196,11 +196,6 @@ func TestHttpRouterHandler(t *testing.T) {
 		t.Fatalf("HttpRouterExchanges for diameteris not 1")
 	}
 
-	rrouter.SetDown()
-	drouter.SetDown()
-	rsserver.SetDown()
-	dsserver.SetDown()
-
 	rrouter.Close()
 	drouter.Close()
 	rsserver.Close()

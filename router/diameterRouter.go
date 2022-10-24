@@ -108,14 +108,13 @@ func NewDiameterRouter(instanceName string, handler diamcodec.MessageHandler) *D
 	return &router
 }
 
-// Starts the closing process. It will set in StatusTerminated stauts and wait for the peers to finish
-// before sending the Done message to the RouterDoneChannel
-func (router *DiameterRouter) SetDown() {
-	router.routerControlChannel <- RouterSetDownCommand{}
-}
-
 // Waits until the Router is finished and closes all resources
 func (router *DiameterRouter) Close() {
+
+	// Starts the closing process. It will set in StatusTerminated stauts and wait for the peers to finish
+	// before sending the Done message to the RouterDoneChannel
+	router.routerControlChannel <- RouterSetDownCommand{}
+
 	<-router.routerDoneChannel
 
 	router.wg.Wait()
