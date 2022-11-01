@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"igor/config"
+	"igor/radiuscodec"
 	"os"
 	"testing"
 )
@@ -21,22 +22,117 @@ func TestMain(m *testing.M) {
 
 func TestRadiusUserFile(t *testing.T) {
 
-	entry, err := NewRadiusUserFileEntry("key1", "radiusUserFile.json", config.GetPolicyConfigInstance("testConfig"))
+	ruf, err := NewRadiusUserFile("radiusUserFile.json", config.GetPolicyConfigInstance("testConfig"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if entry.CheckItems["clientType"] != "client-type-1" {
+	if ruf["key1"].CheckItems["clientType"] != "client-type-1" {
 		t.Fatal("bad check item value")
 	}
 
-	if entry.ReplyItems[2].GetInt() != 1 {
-		t.Fatalf("bad reply item value %d", entry.ReplyItems[2].GetInt())
+	if ruf["key1"].ReplyItems[2].GetInt() != 1 {
+		t.Fatalf("bad reply item value %d", ruf["key1"].ReplyItems[2].GetInt())
+	}
+
+	if ruf["key1"].NonOverridableReplyItems[0].GetString() != "a=b" {
+		t.Fatalf("bad non overridable item value %s", ruf["key1"].NonOverridableReplyItems[0].GetString())
+	}
+
+	if ruf["key1"].OOBReplyItems[0].GetString() != "service-info-value" {
+		t.Fatalf("bad non overridable item value %s", ruf["key1"].OOBReplyItems[0].GetString())
 	}
 
 	//jEntry, err := json.Marshal(entry)
 
 	//fmt.Println(PrettyPrintJSON(jEntry))
+}
+
+func TestRadiusCheckSpec(t *testing.T) {
+
+	jsonPacket := `{
+		"Code": 1,
+		"AVPs":[
+			{"Igor-OctetsAttribute": "0102030405060708090a0b"},
+			{"Igor-StringAttribute": "stringvalue"},
+			{"Igor-IntegerAttribute": "Zero"},
+			{"Igor-IntegerAttribute": "1"},
+			{"Igor-IntegerAttribute": 1},
+			{"Igor-AddressAttribute": "127.0.0.1"},
+			{"Igor-TimeAttribute": "1966-11-26T03:34:08 UTC"},
+			{"Igor-IPv6AddressAttribute": "bebe:cafe::0"},
+			{"Igor-IPv6PrefixAttribute": "bebe:cafe:cccc::0/64"},
+			{"Igor-InterfaceIdAttribute": "00aabbccddeeff11"},
+			{"Igor-Integer64Attribute": 999999999999},
+			{"Igor-TaggedStringAttribute": "myString:1"},
+			{"Igor-SaltedOctetsAttribute": "1122aabbccdd"},
+			{"User-Name":"MyUserName"}
+		]
+	}`
+
+	// Read JSON to Radius Packet
+	rp := radiuscodec.RadiusPacket{}
+	if err := json.Unmarshal([]byte(jsonPacket), &rp); err != nil {
+		t.Fatalf("unmarshal error for radius packet: %s", err)
+	}
+
+	radiusCheck, err := NewRadiusCheck("radiusCheck.json", config.GetPolicyConfigInstance("testConfig"))
+	if err != nil {
+		t.Fatalf("error parsing radiusCheck.json: %s", err.Error())
+	}
+
+	// Valid check
+	if !radiusCheck.CheckPacket(&rp) {
+		t.Fatalf("wrongly discarded packet")
+	}
+
+	// Remove one attribute, so that the check is not valid anymore
+	rp.DeleteAllAVP("Igor-SaltedOctetsAttribute")
+	if radiusCheck.CheckPacket(&rp) {
+		t.Fatalf("wrongly accepted packet")
+	}
+}
+
+func TestRadiusFilterSpec(t *testing.T) {
+
+	jsonPacket := `{
+		"Code": 1,
+		"AVPs":[
+			{"Igor-OctetsAttribute": "0102030405060708090a0b"},
+			{"Igor-StringAttribute": "stringvalue"},
+			{"Igor-IntegerAttribute": "Zero"},
+			{"Igor-IntegerAttribute": "1"},
+			{"Igor-IntegerAttribute": 1},
+			{"Igor-AddressAttribute": "127.0.0.1"},
+			{"Igor-TimeAttribute": "1966-11-26T03:34:08 UTC"},
+			{"Igor-IPv6AddressAttribute": "bebe:cafe::0"},
+			{"Igor-IPv6PrefixAttribute": "bebe:cafe:cccc::0/64"},
+			{"Igor-InterfaceIdAttribute": "00aabbccddeeff11"},
+			{"Igor-Integer64Attribute": 999999999999},
+			{"Igor-TaggedStringAttribute": "myString:1"},
+			{"Igor-SaltedOctetsAttribute": "1122aabbccdd"},
+			{"User-Name":"MyUserName"}
+		]
+	}`
+
+	// Read JSON to Radius Packet
+	rp := radiuscodec.RadiusPacket{}
+	if err := json.Unmarshal([]byte(jsonPacket), &rp); err != nil {
+		t.Fatalf("unmarshal error for radius packet: %s", err)
+	}
+
+	filter, err := NewAVPFilter("avpFilter.json", nil)
+	if err != nil {
+		t.Fatalf("error reading avpFilter.json")
+	}
+
+	frp := filter.FilterPacket(&rp)
+	if frp.GetStringAVP("Igor-OctetsAttibute") != "" {
+		t.Fatalf("attribute not removed")
+	}
+	if frp.GetStringAVP("User-Name") != "Modified-User-Name" {
+		t.Fatalf("attribute not modified")
+	}
 }
 
 // Helper to show JSON to humans

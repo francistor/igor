@@ -1,0 +1,12 @@
+{
+    "and": [
+        {
+            "or":[
+                ["Igor-OctetsAttribute", "equals", "0102030405060708090a0b"],
+                ["User-Name", "matches", "special.*"]
+            ]
+        },
+        ["Igor-SaltedOctetsAttribute", "matches", "1122.*"]
+    ]
+}
+

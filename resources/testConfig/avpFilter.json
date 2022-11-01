@@ -1,0 +1,6 @@
+{
+  "remove": ["Igor-StringAttribute", "Igor-OctetsAttribute"],
+  "force": [
+    ["User-Name", "Modified-User-Name"]
+  ]
+}

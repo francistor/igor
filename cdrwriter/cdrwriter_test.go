@@ -49,6 +49,8 @@ func TestCSVFormat(t *testing.T) {
 	// Read JSON to Radius Packet
 	rp := buildSimpleRadiusPacket(t)
 
+	result := `"0102030405060708090a0b";;"stringvalue,anotherStringvalue";0,1,1;"127.0.0.1";"1966-11-26T03:34:08 UTC";"bebe:cafe::";"bebe:cafe:cccc::0/64";"00aabbccddeeff11";999999999999;"myString:1";"1122aabbccdd"`
+
 	csvw := NewCSVWriter([]string{
 		"Igor-OctetsAttribute",
 		"Non-existing",
@@ -60,8 +62,9 @@ func TestCSVFormat(t *testing.T) {
 		"Igor-IPv6PrefixAttribute",
 		"Igor-InterfaceIdAttribute",
 		"Igor-Integer64Attribute",
+		"Igor-TaggedStringAttribute",
 		"Igor-SaltedOctetsAttribute"},
-		";", ",", time.RFC3339, true)
+		";", ",", time.RFC3339, true, false)
 	cdrString := csvw.GetRadiusCDRString(&rp)
 	if strings.Contains(cdrString, "MyUserName") {
 		t.Fatalf("Written CDR contains filtered attribute User-Name")
@@ -71,6 +74,45 @@ func TestCSVFormat(t *testing.T) {
 	}
 	if !strings.Contains(cdrString, ";;") {
 		t.Fatalf("pattern for non existing attribute not found")
+	}
+	if cdrString != result+"\n" {
+		t.Fatalf("bad csv string <%s>", cdrString)
+	}
+}
+
+func TestCSVParsedIntsFormat(t *testing.T) {
+
+	// Read JSON to Radius Packet
+	rp := buildSimpleRadiusPacket(t)
+
+	result := `"0102030405060708090a0b";;"stringvalue,anotherStringvalue";"Zero,One,One";"127.0.0.1";"1966-11-26T03:34:08 UTC";"bebe:cafe::";"bebe:cafe:cccc::0/64";"00aabbccddeeff11";"999999999999";"myString:1";"1122aabbccdd"`
+
+	csvw := NewCSVWriter([]string{
+		"Igor-OctetsAttribute",
+		"Non-existing",
+		"Igor-StringAttribute",
+		"Igor-IntegerAttribute",
+		"Igor-AddressAttribute",
+		"Igor-TimeAttribute",
+		"Igor-IPv6AddressAttribute",
+		"Igor-IPv6PrefixAttribute",
+		"Igor-InterfaceIdAttribute",
+		"Igor-Integer64Attribute",
+		"Igor-TaggedStringAttribute",
+		"Igor-SaltedOctetsAttribute"},
+		";", ",", time.RFC3339, true, true)
+	cdrString := csvw.GetRadiusCDRString(&rp)
+	if strings.Contains(cdrString, "MyUserName") {
+		t.Fatalf("Written CDR contains filtered attribute User-Name")
+	}
+	if !strings.Contains(cdrString, "\"00aabbccddeeff11\"") {
+		t.Fatalf("missing attribute in written string")
+	}
+	if !strings.Contains(cdrString, ";;") {
+		t.Fatalf("pattern for non existing attribute not found")
+	}
+	if cdrString != result+"\n" {
+		t.Fatalf("bad csv string <%s>", cdrString)
 	}
 }
 

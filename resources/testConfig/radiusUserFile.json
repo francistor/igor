@@ -9,6 +9,28 @@
             {"Igor-IntegerAttribute": "Zero"},
             {"Igor-IntegerAttribute": "1"},
             {"Igor-IntegerAttribute": 2}
+        ],
+        "nonOverridableReplyItems":[
+            {"Cisco-AVPair": "a=b"}
+        ],
+        "oobReplyItems":[
+            {"HW-Service-Info": "service-info-value"}
+        ]
+    },
+
+    "key2":{
+        "checkItems":{
+            "serviceType": "service-type-1",
+            "clientType": "client-type-1"
+        }
+    },
+
+    "key3":{
+        "replyItems":[
+            {"Class": "theClassAttribute"},
+            {"Igor-IntegerAttribute": "Zero"},
+            {"Igor-IntegerAttribute": "1"},
+            {"Igor-IntegerAttribute": 2}
         ]
     }
 }

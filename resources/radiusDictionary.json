@@ -4,7 +4,7 @@
     [
         {"vendorId": 1001, "vendorName": "Igor"},
         {"vendorId": 9, "vendorName": "Cisco"},
-        {"vendorId": 2011, "vendorName": "Huawei"},
+        {"vendorId": 2011, "vendorName": "HW"},
         {"vendorId": 2352, "vendorName": "Redback"}, 
         {"vendorId": 4874, "vendorName": "Unisphere"},  
         {"VendorId": 5535, "vendorName": "3GPP2"}, 

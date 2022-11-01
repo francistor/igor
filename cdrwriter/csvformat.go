@@ -9,21 +9,29 @@ import (
 )
 
 type CSVWriter struct {
-	fields              []string
-	fieldSeparator      string
-	attributeSeparator  string
+	// The attribute names of the fields to write
+	fields []string
+	// Separator for the fields
+	fieldSeparator string
+	// If multiple instances are found, separator to use
+	attributeSeparator string
+	// To format dates
 	attributeDateFormat string
-	quoteStrings        bool
+	// Whether to surround strings by quotes
+	quoteStrings bool
+	// Whether to parse ints as strings
+	parseInts bool
 }
 
 // Creates a new instance of a Livinstone Writer
-func NewCSVWriter(fields []string, fieldSeparator string, attributeSeparator string, attributeDateFormat string, quoteStrings bool) *CSVWriter {
+func NewCSVWriter(fields []string, fieldSeparator string, attributeSeparator string, attributeDateFormat string, quoteStrings bool, parseInts bool) *CSVWriter {
 	lw := CSVWriter{
 		fields:              fields,
 		fieldSeparator:      fieldSeparator,
 		attributeSeparator:  attributeSeparator,
 		attributeDateFormat: attributeDateFormat,
 		quoteStrings:        quoteStrings,
+		parseInts:           parseInts,
 	}
 
 	return &lw
@@ -35,7 +43,6 @@ func (w *CSVWriter) GetDiameterCDRString(dm *diamcodec.DiameterMessage) string {
 }
 
 // Write CDR as list with separators
-// Ints are not tried to write as strings, even if an enum is defined
 func (w *CSVWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) string {
 	var builder strings.Builder
 
@@ -48,9 +55,17 @@ func (w *CSVWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) string {
 		// Do not write quotes if no attributes found
 		if len(avps) > 0 {
 
-			// Those are written as strings
-			switch avps[0].DictItem.RadiusType {
-			case radiusdict.None, radiusdict.Octets, radiusdict.String, radiusdict.InterfaceId, radiusdict.Address, radiusdict.IPv6Address, radiusdict.IPv6Prefix, radiusdict.Time:
+			radiusType := avps[0].DictItem.RadiusType
+			if (radiusType == radiusdict.Integer || radiusType == radiusdict.Integer64) && !w.parseInts {
+				// Write as integer
+				for j := range avps {
+					builder.WriteString(fmt.Sprintf("%d", avps[j].GetInt()))
+					if j < len(avps)-1 {
+						builder.WriteString(w.attributeSeparator)
+					}
+				}
+			} else {
+				// Write as string
 				if w.quoteStrings {
 					builder.WriteString("\"")
 				}
@@ -63,18 +78,10 @@ func (w *CSVWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) string {
 				if w.quoteStrings {
 					builder.WriteString("\"")
 				}
-
-				// Those are written as numbers. In this writer, no attempt is done to convert to string
-			case radiusdict.Integer:
-				for j := range avps {
-					builder.WriteString(fmt.Sprintf("%d", avps[j].GetInt()))
-					if j < len(avps)-1 {
-						builder.WriteString(w.attributeSeparator)
-					}
-				}
 			}
 		}
 
+		// If not the last, write separator
 		if i < len(w.fields)-1 {
 			builder.WriteString(w.fieldSeparator)
 		}
