@@ -1,0 +1,4 @@
+{
+    "copyCDRWrite":
+        ["User-Name", "contains", "copy"]
+}

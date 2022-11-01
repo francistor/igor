@@ -67,6 +67,15 @@ type RadiusPacketCheck struct {
 type RadiusPacketChecks map[string]RadiusPacketCheck
 
 // Check whether the radius packet is conformant to the RadiusAVPCheck specification
+func (cs RadiusPacketChecks) CheckPacket(key string, packet *radiuscodec.RadiusPacket) bool {
+	if check, ok := cs[key]; !ok {
+		return false
+	} else {
+		return check.CheckPacket(packet)
+	}
+}
+
+// Check whether the radius packet is conformant to the RadiusAVPCheck specification
 func (c *RadiusPacketCheck) CheckPacket(packet *radiuscodec.RadiusPacket) bool {
 	if len(c.Leaf) > 0 {
 		// Check is a Leaf
@@ -112,8 +121,8 @@ func (c *RadiusPacketCheck) CheckPacket(packet *radiuscodec.RadiusPacket) bool {
 	}
 }
 
-// Loads an entry from an existing check object
-// A Chekck object has the form
+// Loads the Radius Checks object
+// A Check object entry has the form
 // "condition":[
 //
 //	<check objects>
@@ -123,7 +132,9 @@ func (c *RadiusPacketCheck) CheckPacket(packet *radiuscodec.RadiusPacket) bool {
 // ["attribute", "check-type", "value to check (optional)"]
 //
 // that is, it can be a two or three element array, or an object containing a condition and nested check objects
-func NewRadiusCheck(configObjectName string, ci *config.PolicyConfigurationManager) (RadiusPacketCheck, error) {
+func NewRadiusChecks(configObjectName string, ci *config.PolicyConfigurationManager) (RadiusPacketChecks, error) {
+
+	checks := make(RadiusPacketChecks)
 
 	// If we pass nil as last parameter, use the default
 	var myCi *config.PolicyConfigurationManager
@@ -136,11 +147,24 @@ func NewRadiusCheck(configObjectName string, ci *config.PolicyConfigurationManag
 	// Read the configuration object
 	c, err := myCi.CM.GetConfigObjectAsJson(configObjectName, false)
 	if err != nil {
-		return RadiusPacketCheck{}, err
+		return checks, err
 	}
 
 	// Parse recursively
-	return parseRadiusCheck(c)
+	entries, ok := c.(map[string]interface{})
+	if !ok {
+		return checks, err
+	}
+	for key, entry := range entries {
+		if parsedEntry, err := parseRadiusCheck(entry); err != nil {
+			return checks, err
+		} else {
+			checks[key] = parsedEntry
+		}
+
+	}
+
+	return checks, nil
 }
 
 // Parses the, possibly nested, check specification
@@ -211,16 +235,30 @@ func parseRadiusCheck(radiusCheck interface{}) (RadiusPacketCheck, error) {
 	}
 }
 
-// ///////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 // Radius Packet Attribute Filter
-// ///////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
+// Entry in AVPFilter file
 type AVPFilter struct {
 	Allow  []string
 	Remove []string
 	Force  [][]string
 }
 
-// Copy the radius packet with the attributes filtered
+// Contents of the AVPFilters file. Set of AVPFilters by key
+type AVPFilters map[string]AVPFilter
+
+// Creates a copy of the radius packet with the attributes filtered as specified in the filter for the passed key
+func (fs AVPFilters) FilterPacket(key string, packet *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+	if filter, ok := fs[key]; !ok {
+		return &radiuscodec.RadiusPacket{}, fmt.Errorf("%s filter not found", key)
+	} else {
+		return filter.FilterPacket(packet), nil
+	}
+}
+
+// Copy the radius packet with the attributes modified as defined in the specified filter
 func (f *AVPFilter) FilterPacket(packet *radiuscodec.RadiusPacket) *radiuscodec.RadiusPacket {
 	fmt.Printf("%#v\n", f)
 	var rp *radiuscodec.RadiusPacket
@@ -242,7 +280,10 @@ func (f *AVPFilter) FilterPacket(packet *radiuscodec.RadiusPacket) *radiuscodec.
 	return rp
 }
 
-func NewAVPFilter(configObjectName string, ci *config.PolicyConfigurationManager) (AVPFilter, error) {
+// Returns an object representing the configured AVPFilters
+func NewAVPFilters(configObjectName string, ci *config.PolicyConfigurationManager) (AVPFilters, error) {
+
+	filters := make(AVPFilters)
 
 	// If we pass nil as last parameter, use the default
 	var myCi *config.PolicyConfigurationManager
@@ -253,15 +294,14 @@ func NewAVPFilter(configObjectName string, ci *config.PolicyConfigurationManager
 	}
 
 	// Read the configuration object
-	f, err := myCi.CM.GetConfigObjectAsText(configObjectName, false)
+	fs, err := myCi.CM.GetConfigObjectAsText(configObjectName, false)
 	if err != nil {
-		return AVPFilter{}, err
+		return filters, err
 	}
 
-	var filter = AVPFilter{}
-	if err = json.Unmarshal(f, &filter); err != nil {
-		return AVPFilter{}, fmt.Errorf(err.Error())
+	if err = json.Unmarshal(fs, &filters); err != nil {
+		return filters, fmt.Errorf(err.Error())
 	}
 
-	return filter, nil
+	return filters, nil
 }

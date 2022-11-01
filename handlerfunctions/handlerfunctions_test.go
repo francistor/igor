@@ -48,7 +48,7 @@ func TestRadiusUserFile(t *testing.T) {
 	//fmt.Println(PrettyPrintJSON(jEntry))
 }
 
-func TestRadiusCheckSpec(t *testing.T) {
+func TestRadiusChecks(t *testing.T) {
 
 	jsonPacket := `{
 		"Code": 1,
@@ -76,24 +76,32 @@ func TestRadiusCheckSpec(t *testing.T) {
 		t.Fatalf("unmarshal error for radius packet: %s", err)
 	}
 
-	radiusCheck, err := NewRadiusCheck("radiusCheck.json", config.GetPolicyConfigInstance("testConfig"))
+	radiusChecks, err := NewRadiusChecks("radiusChecks.json", config.GetPolicyConfigInstance("testConfig"))
 	if err != nil {
 		t.Fatalf("error parsing radiusCheck.json: %s", err.Error())
 	}
 
 	// Valid check
-	if !radiusCheck.CheckPacket(&rp) {
+	if !radiusChecks.CheckPacket("myCheck", &rp) {
 		t.Fatalf("wrongly discarded packet")
 	}
 
 	// Remove one attribute, so that the check is not valid anymore
 	rp.DeleteAllAVP("Igor-SaltedOctetsAttribute")
-	if radiusCheck.CheckPacket(&rp) {
+	if radiusChecks.CheckPacket("myCheck", &rp) {
+		t.Fatalf("wrongly accepted packet")
+	}
+
+	// Check with branch only
+	if !radiusChecks.CheckPacket("leafOnlyCheck1", &rp) {
+		t.Fatalf("wrongly discarded packet")
+	}
+	if radiusChecks.CheckPacket("leafOnlyCheck2", &rp) {
 		t.Fatalf("wrongly accepted packet")
 	}
 }
 
-func TestRadiusFilterSpec(t *testing.T) {
+func TestRadiusFilters(t *testing.T) {
 
 	jsonPacket := `{
 		"Code": 1,
@@ -121,12 +129,15 @@ func TestRadiusFilterSpec(t *testing.T) {
 		t.Fatalf("unmarshal error for radius packet: %s", err)
 	}
 
-	filter, err := NewAVPFilter("avpFilter.json", nil)
+	filters, err := NewAVPFilters("avpFilters.json", nil)
 	if err != nil {
-		t.Fatalf("error reading avpFilter.json")
+		t.Fatalf("error reading avpFilters.json")
 	}
 
-	frp := filter.FilterPacket(&rp)
+	frp, err := filters.FilterPacket("myFilter", &rp)
+	if err != nil {
+		t.Fatalf("error reading filters file")
+	}
 	if frp.GetStringAVP("Igor-OctetsAttibute") != "" {
 		t.Fatalf("attribute not removed")
 	}

@@ -1,0 +1,17 @@
+{
+    "copyProxy":{
+        "remove": ["NAS-Port-Id", "NAS-Identifier"],
+        "force": [
+          ["Service-Type", "Call-Check"]
+        ]
+    },
+    "standardProxyIn":{
+        "allow": ["Class", "Framed-IP-Address", "Reply-Message", "User-Password", "Framed-Protocol"]
+    },
+    "standardProxyOut":{
+        "remove": ["NAS-Port-Id", "NAS-Identifier"],
+        "force": [
+          ["Service-Type", "Framed"]
+        ]
+    }
+}
