@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
@@ -256,7 +256,7 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 			return nil, err
 		}
 		defer resp.Body.Close()
-		if body, err := ioutil.ReadAll(resp.Body); err != nil {
+		if body, err := io.ReadAll(resp.Body); err != nil {
 			return nil, err
 		} else {
 			return body, nil
@@ -268,7 +268,7 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 		if configBase == "" {
 			panic("environment variable IGOR_BASE undefined")
 		}
-		if resp, err := ioutil.ReadFile(configBase + location); err != nil {
+		if resp, err := os.ReadFile(configBase + location); err != nil {
 			return nil, err
 		} else {
 			return resp, nil

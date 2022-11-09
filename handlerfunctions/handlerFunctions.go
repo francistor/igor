@@ -2,8 +2,6 @@ package handlerfunctions
 
 import (
 	"encoding/json"
-	"fmt"
-	"igor/config"
 	"igor/diamcodec"
 	"igor/instrumentation"
 	"igor/radiuscodec"
@@ -32,23 +30,32 @@ func EmptyDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.Diamet
 
 // The most basic handler ever. Returns an empty response to the received message
 func EmptyRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+	logLines := make(instrumentation.LogLines, 0)
+
+	defer func(lines []instrumentation.LogLine) {
+		logLines.WriteWLog()
+	}(logLines)
+
 	resp := radiuscodec.NewRadiusResponse(request, true)
 
 	return resp, nil
 }
 
+// Used to test all possible attribute types
 func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+	logLines := make(instrumentation.LogLines, 0)
 
-	logger := config.GetLogger()
+	defer func(lines []instrumentation.LogLine) {
+		logLines.WriteWLog()
+	}(logLines)
 
 	// Print the password
 	pwd := request.GetPasswordStringAVP("User-Password")
-
-	logger.Infof("Password: <%s>", pwd)
+	logLines.WLogEntry(zapcore.InfoLevel, "Password: <%s>", pwd)
 
 	// Print all received attributes
 	for _, avp := range request.AVPs {
-		logger.Infof("%s -> %s", avp.Name, avp.GetTaggedString())
+		logLines.WLogEntry(zapcore.InfoLevel, avp.Name, avp.GetTaggedString())
 	}
 
 	// Reply with one attribute of each type
@@ -79,8 +86,7 @@ func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscode
 	var responseAVPs []radiuscodec.RadiusAVP
 	err := json.Unmarshal([]byte(jAVPs), &responseAVPs)
 	if err != nil {
-		logger.Errorf("%s", err)
-		return nil, fmt.Errorf(err.Error())
+		logLines.WLogEntry(zapcore.ErrorLevel, "%s", err.Error())
 	}
 
 	for _, avp := range responseAVPs {

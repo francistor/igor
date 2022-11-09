@@ -48,6 +48,47 @@ func TestRadiusUserFile(t *testing.T) {
 	//fmt.Println(PrettyPrintJSON(jEntry))
 }
 
+func TestMergeUserFileEntry(t *testing.T) {
+	ruf1, err := NewRadiusUserFile("radiusUserFile.json", config.GetPolicyConfigInstance("testConfig"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ruf2, err := NewRadiusUserFile("radiusUserFileToMerge.json", config.GetPolicyConfigInstance("testConfig"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mergedEntry := ruf1["key1"].Merge(ruf2["key1"])
+	if v := mergedEntry.CheckItems["serviceType"]; v != "service-type-1" {
+		t.Fatal("bad merged entry for serviceType")
+	}
+	if v := mergedEntry.CheckItems["additionalItem"]; v != "additional" {
+		t.Fatal("bad merged entry for additionalItem")
+	}
+	classAttrs := findAttributes(mergedEntry.ReplyItems, "Class")
+	if len(classAttrs) != 1 {
+		t.Fatal("number of class attributes is not 1")
+	}
+	if classAttrs[0].GetString() != "theClassAttribute" {
+		t.Fatal("bad merged entry for Class")
+	}
+	stringAttribute := findAttributes(mergedEntry.ReplyItems, "Igor-StringAttribute")
+	if len(stringAttribute) != 1 {
+		t.Fatal("number of class stringAttribute is not 1")
+	}
+	if stringAttribute[0].GetString() != "additional" {
+		t.Fatal("bad merged entry for StringAttribute")
+	}
+	ciscoAVPAttributes := findAttributes(mergedEntry.NonOverridableReplyItems, "Cisco-AVPair")
+	if len(ciscoAVPAttributes) != 2 {
+		t.Fatalf("number of class ciscoAVPAttributes is not 2 but %d", len(ciscoAVPAttributes))
+	}
+	if ciscoAVPAttributes[1].GetString() != "c=d" {
+		t.Fatal("bad merged entry for Cisco-AVPair")
+	}
+}
+
 func TestRadiusChecks(t *testing.T) {
 
 	jsonPacket := `{
@@ -154,4 +195,16 @@ func PrettyPrintJSON(j []byte) string {
 	}
 
 	return jBytes.String()
+}
+
+// Helper to look for AVP in an slice
+func findAttributes(v []radiuscodec.RadiusAVP, name string) []radiuscodec.RadiusAVP {
+	avps := make([]radiuscodec.RadiusAVP, 0)
+	for _, avp := range v {
+		if avp.Name == name {
+			avps = append(avps, avp)
+		}
+	}
+
+	return avps
 }

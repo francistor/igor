@@ -283,6 +283,61 @@ func (rp *RadiusPacket) AddAVP(avp *RadiusAVP) *RadiusPacket {
 	return rp
 }
 
+// Adds a new AVP to the message if does not already exist
+func (rp *RadiusPacket) MergeAVP(avp *RadiusAVP) *RadiusPacket {
+
+	// Iterate through message avps and do nothing if found
+	for i := range rp.AVPs {
+		if rp.AVPs[i].Name == avp.Name {
+			return rp
+		}
+	}
+
+	rp.AVPs = append(rp.AVPs, *avp)
+
+	return rp
+}
+
+// Adds a new AVP to the message, replacing the existing one if already exists
+func (rp *RadiusPacket) ReplaceAVP(avp *RadiusAVP) *RadiusPacket {
+
+	// Iterate through message avps and delete the target avp if found
+	for i := range rp.AVPs {
+		if rp.AVPs[i].Name == avp.Name {
+			rp.DeleteAllAVP(avp.Name)
+			break
+		}
+	}
+
+	rp.AVPs = append(rp.AVPs, *avp)
+
+	return rp
+}
+
+// Adds a list of AVP to the message
+func (rp *RadiusPacket) AddAVPs(avps []RadiusAVP) *RadiusPacket {
+	for i := range avps {
+		rp.AVPs = append(rp.AVPs, avps[i])
+	}
+	return rp
+}
+
+// Adds a list of AVP to the message using a merge strategy
+func (rp *RadiusPacket) MergeAVPs(avps []RadiusAVP) *RadiusPacket {
+	for i := range avps {
+		rp.MergeAVP(&avps[i])
+	}
+	return rp
+}
+
+// Adds a list of AVP to the message using a replace strategy
+func (rp *RadiusPacket) ReplaceAVPs(avps []RadiusAVP) *RadiusPacket {
+	for i := range avps {
+		rp.ReplaceAVP(&avps[i])
+	}
+	return rp
+}
+
 // Adds a new AVP specified by name to the packet
 func (rp *RadiusPacket) Add(name string, value interface{}) *RadiusPacket {
 

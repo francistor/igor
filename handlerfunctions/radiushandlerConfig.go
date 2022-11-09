@@ -48,8 +48,58 @@ func NewRadiusUserFile(configObjectName string, ci *config.PolicyConfigurationMa
 
 	ruf := RadiusUserFile{}
 	err = json.Unmarshal(jBytes, &ruf)
-	fmt.Println(ruf)
+
 	return ruf, err
+}
+
+// Merges to RadiusEntryFiles. The current high priority.
+// Returns a pointer to a new entry. The ones passed as parameters are not modified
+func (hp RadiusUserFileEntry) Merge(lp RadiusUserFileEntry) RadiusUserFileEntry {
+	r := hp
+
+	// Merge CheckItems
+	for k, v := range lp.CheckItems {
+		if _, found := hp.CheckItems[k]; !found {
+			r.CheckItems[k] = v
+		}
+	}
+
+	// Merge ReplyItems
+	var found bool
+	for i := range lp.ReplyItems {
+		found = false
+		for j := range hp.ReplyItems {
+			if hp.ReplyItems[j].Name == lp.ReplyItems[i].Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			r.ReplyItems = append(r.ReplyItems, lp.ReplyItems[i])
+		}
+	}
+
+	// Merge NonOverridableReplyItems
+	for i := range lp.NonOverridableReplyItems {
+		r.NonOverridableReplyItems = append(r.NonOverridableReplyItems, lp.NonOverridableReplyItems[i])
+	}
+
+	// Merge OOBReplyItems
+	for i := range lp.NonOverridableReplyItems {
+		found = false
+		for j := range hp.NonOverridableReplyItems {
+			if hp.NonOverridableReplyItems[j].Name == lp.NonOverridableReplyItems[i].Name {
+				found = true
+				break
+			}
+		}
+		// If here, no match was found
+		if !found {
+			r.NonOverridableReplyItems = append(r.NonOverridableReplyItems, lp.NonOverridableReplyItems[i])
+		}
+	}
+
+	return r
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -260,7 +310,6 @@ func (fs AVPFilters) FilterPacket(key string, packet *radiuscodec.RadiusPacket) 
 
 // Copy the radius packet with the attributes modified as defined in the specified filter
 func (f *AVPFilter) FilterPacket(packet *radiuscodec.RadiusPacket) *radiuscodec.RadiusPacket {
-	fmt.Printf("%#v\n", f)
 	var rp *radiuscodec.RadiusPacket
 	if len(f.Allow) > 0 {
 		rp = packet.Copy(f.Allow, nil)

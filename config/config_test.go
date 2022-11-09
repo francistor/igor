@@ -122,6 +122,9 @@ func TestRadiusConfig(t *testing.T) {
 	if rc["127.0.0.1"].Secret != "secret" {
 		t.Fatalf("secret for 127.0.0.1 is not as expeted")
 	}
+	if rc["127.0.0.1"].ClientProperties["scope"] != "default" {
+		t.Fatalf("property for scope not ok")
+	}
 
 	// Get Radius Servers configuration
 	rs := GetPolicyConfig().RadiusServersConf()

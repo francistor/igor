@@ -1,0 +1,23 @@
+{
+    "key1":{
+        "checkItems":{
+            "serviceType": "service-type-2",
+            "clientType": "client-type-2",
+            "additionalItem": "additional"
+
+        },
+        "replyItems":[
+            {"Class": "theClassAttribute2"},
+            {"Igor-IntegerAttribute": "Two"},
+            {"Igor-StringAttribute": "additional"}
+
+        ],
+        "nonOverridableReplyItems":[
+            {"Cisco-AVPair": "c=d"}
+        ],
+        "oobReplyItems":[
+            {"HW-Service-Info": "service-info-value2"},
+            {"HW-Account-Info": "additional"}
+        ]
+    }
+}

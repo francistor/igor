@@ -180,9 +180,11 @@ func (c *PolicyConfigurationManager) RadiusServerConf() RadiusServerConfig {
 
 // Holds the configuration of a Radius Client
 type RadiusClient struct {
-	Name      string
-	IPAddress string
-	Secret    string
+	Name             string
+	IPAddress        string
+	Secret           string
+	ClientClass      string
+	ClientProperties map[string]string
 }
 
 // Holds the configuration of all Radius Clients, indexed by IP address
