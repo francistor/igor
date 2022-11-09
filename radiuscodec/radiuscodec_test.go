@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"igor/config"
 	"net"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/francistor/igor/config"
 )
 
 // Initialization
@@ -334,7 +335,7 @@ func TestEncryptFunction(t *testing.T) {
 	}
 }
 
-/////////////////////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////////////////////////////
 func TestRadiusPacket(t *testing.T) {
 
 	theUserName := "MyUserName"

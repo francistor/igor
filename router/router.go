@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"igor/constants"
-	"igor/diamcodec"
-	"igor/instrumentation"
-	"igor/radiuscodec"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/francistor/igor/constants"
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/instrumentation"
+	"github.com/francistor/igor/radiuscodec"
 )
 
 // Statuses of the Router

@@ -2,8 +2,9 @@ package instrumentation
 
 import (
 	"fmt"
-	"igor/config"
 	"testing"
+
+	"github.com/francistor/igor/config"
 
 	"go.uber.org/zap/zapcore"
 )

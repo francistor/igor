@@ -1,8 +1,8 @@
 package cdrwriter
 
 import (
-	"igor/diamcodec"
-	"igor/radiuscodec"
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/radiuscodec"
 )
 
 type CDRFormatter interface {

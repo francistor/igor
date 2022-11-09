@@ -3,10 +3,11 @@ package handlerfunctions
 import (
 	"encoding/json"
 	"fmt"
-	"igor/config"
-	"igor/radiuscodec"
 	"regexp"
 	"strings"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/radiuscodec"
 )
 
 /////////////////////////////////////////////////////////////////////////////

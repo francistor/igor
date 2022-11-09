@@ -1,12 +1,13 @@
 package radiusclient
 
 import (
-	"igor/config"
-	"igor/radiuscodec"
-	"igor/radiusserver"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/radiusserver"
 )
 
 // Simple handler that generates a success response with the same attributes as in the request

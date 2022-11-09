@@ -1,8 +1,8 @@
 package config
 
 import (
-	"igor/diamdict"
-	"igor/radiusdict"
+	"github.com/francistor/igor/diamdict"
+	"github.com/francistor/igor/radiusdict"
 )
 
 // These global variables have to be initialized using initDictionaries

@@ -4,15 +4,16 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"igor/config"
-	"igor/diamcodec"
-	"igor/instrumentation"
-	"igor/radiuscodec"
-	"igor/router"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/instrumentation"
+	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/router"
 
 	"golang.org/x/net/http2"
 )

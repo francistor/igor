@@ -3,16 +3,17 @@ package httphandler
 import (
 	"crypto/tls"
 	"encoding/json"
-	"igor/config"
-	"igor/diamcodec"
-	"igor/handlerfunctions"
-	"igor/radiuscodec"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/handlerfunctions"
+	"github.com/francistor/igor/radiuscodec"
 
 	"golang.org/x/net/http2"
 )

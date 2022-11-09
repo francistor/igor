@@ -2,8 +2,9 @@ package cdrwriter
 
 import (
 	"encoding/json"
-	"igor/diamcodec"
-	"igor/radiuscodec"
+
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/radiuscodec"
 
 	"golang.org/x/exp/slices"
 )

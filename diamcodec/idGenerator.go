@@ -2,7 +2,6 @@ package diamcodec
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"strconv"
@@ -52,7 +51,7 @@ func GetStateId(clean bool, next bool) int {
 		os.Remove(stateIdFileName)
 	}
 
-	if resp, err := ioutil.ReadFile(stateIdFileName); err != nil {
+	if resp, err := os.ReadFile(stateIdFileName); err != nil {
 		// state-id file does not exist
 		return writeStateId(1)
 	} else {
@@ -78,7 +77,7 @@ func writeStateId(stateId int) int {
 	}
 	stateIdFileName := configBase + "state-id"
 
-	if ioutil.WriteFile(stateIdFileName, []byte(fmt.Sprintf("%d", stateId)), 0660) != nil {
+	if os.WriteFile(stateIdFileName, []byte(fmt.Sprintf("%d", stateId)), 0660) != nil {
 		panic("could not write state-id file")
 	}
 

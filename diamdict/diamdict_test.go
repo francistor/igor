@@ -9,7 +9,7 @@ import (
 func TestDiamDict(t *testing.T) {
 
 	// Read the full Diameter Dictionary
-	jsonDict, _ := os.ReadFile("/home/francisco/igor/resources/diameterDictionary.json")
+	jsonDict, _ := os.ReadFile(os.Getenv("IGOR_BASE") + "resources/diameterDictionary.json")
 	diameterDict := NewDictionaryFromJSON(jsonDict)
 
 	// Basic type
@@ -92,7 +92,7 @@ func TestDiamDict(t *testing.T) {
 
 func TestUnknownDiameterAVP(t *testing.T) {
 	// Read the full Diameter Dictionary
-	jsonDict, _ := os.ReadFile("/home/francisco/igor/resources/diameterDictionary.json")
+	jsonDict, _ := os.ReadFile(os.Getenv("IGOR_BASE") + "resources/diameterDictionary.json")
 	diameterDict := NewDictionaryFromJSON(jsonDict)
 
 	avp, err := diameterDict.GetAVPFromName("Igor-Nothing")

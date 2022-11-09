@@ -6,10 +6,11 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"igor/config"
 	"io"
 	"net"
 	"time"
+
+	"github.com/francistor/igor/config"
 
 	"golang.org/x/exp/slices"
 )

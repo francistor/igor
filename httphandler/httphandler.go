@@ -5,14 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"igor/config"
-	"igor/constants"
-	"igor/diamcodec"
-	"igor/instrumentation"
-	"igor/radiuscodec"
 	"io"
 	"net/http"
+	"os"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/constants"
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/instrumentation"
+	"github.com/francistor/igor/radiuscodec"
 )
 
 // Receives Radius & Diameter requests via HTTP2, in JSON format, and processes them with the provided handlers
@@ -65,9 +67,16 @@ func NewHttpHandler(instanceName string, diameterHandler diamcodec.MessageHandle
 // in a goroutine.
 func (dh *HttpHandler) run() {
 
+	if _, err := os.Stat(os.Getenv("IGOR_BASE") + "../cert.pem"); errors.Is(err, os.ErrNotExist) {
+		panic("cert.pm file not found. Should be in the parent of IGOR_BASE " + os.Getenv("IGOR_BASE") + "../cert.pem")
+	}
+	if _, err := os.Stat(os.Getenv("IGOR_BASE") + "../key.pem"); errors.Is(err, os.ErrNotExist) {
+		panic("key.pm file not found. Should be in the parent of IGOR_BASE" + os.Getenv("IGOR_BASE") + "../key.pem")
+	}
+
 	err := dh.httpServer.ListenAndServeTLS(
-		"/home/francisco/cert.pem",
-		"/home/francisco/key.pem")
+		os.Getenv("IGOR_BASE")+"../cert.pem",
+		os.Getenv("IGOR_BASE")+"../key.pem")
 
 	if !errors.Is(err, http.ErrServerClosed) {
 		fmt.Println(err)

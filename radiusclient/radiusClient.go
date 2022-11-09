@@ -2,10 +2,11 @@ package radiusclient
 
 import (
 	"fmt"
-	"igor/config"
-	"igor/radiuscodec"
 	"sync"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/radiuscodec"
 )
 
 const (

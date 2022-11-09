@@ -3,12 +3,13 @@ package cdrwriter
 import (
 	"encoding/json"
 	"fmt"
-	"igor/config"
-	"igor/radiuscodec"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/radiuscodec"
 )
 
 // Initialization

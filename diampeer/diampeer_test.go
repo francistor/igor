@@ -3,14 +3,15 @@ package diampeer
 // TODO: connection cannot be established with peer. DWA not neceived
 
 import (
-	"igor/config"
-	"igor/diamcodec"
-	"igor/instrumentation"
 	"net"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/instrumentation"
 )
 
 // This message handler parses the Igor-Command, which may specify

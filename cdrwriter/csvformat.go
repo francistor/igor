@@ -2,10 +2,11 @@ package cdrwriter
 
 import (
 	"fmt"
-	"igor/diamcodec"
-	"igor/radiuscodec"
-	"igor/radiusdict"
 	"strings"
+
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/radiusdict"
 )
 
 type CSVWriter struct {

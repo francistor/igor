@@ -2,11 +2,12 @@ package radiusserver
 
 import (
 	"fmt"
-	"igor/config"
-	"igor/instrumentation"
-	"igor/radiuscodec"
 	"net"
 	"sync/atomic"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/instrumentation"
+	"github.com/francistor/igor/radiuscodec"
 )
 
 // Valid statuses

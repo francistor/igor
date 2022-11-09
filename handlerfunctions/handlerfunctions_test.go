@@ -3,10 +3,11 @@ package handlerfunctions
 import (
 	"bytes"
 	"encoding/json"
-	"igor/config"
-	"igor/radiuscodec"
 	"os"
 	"testing"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/radiuscodec"
 )
 
 func TestMain(m *testing.M) {

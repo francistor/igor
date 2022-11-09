@@ -2,10 +2,11 @@ package main
 
 import (
 	"flag"
-	"igor/config"
-	"igor/handlerfunctions"
-	"igor/router"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/handlerfunctions"
+	"github.com/francistor/igor/router"
 )
 
 func main() {

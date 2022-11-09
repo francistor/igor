@@ -5,12 +5,13 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"igor/config"
-	"igor/diamdict"
 	"io"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/diamdict"
 
 	"golang.org/x/exp/slices"
 )

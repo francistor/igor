@@ -2,13 +2,14 @@ package radiusclient
 
 import (
 	"fmt"
-	"igor/config"
-	"igor/instrumentation"
-	"igor/radiuscodec"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/instrumentation"
+	"github.com/francistor/igor/radiuscodec"
 )
 
 // Sent to the parent RadiusClient when the connection and the eventloop are terminated, due

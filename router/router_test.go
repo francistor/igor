@@ -3,15 +3,16 @@ package router
 import (
 	"bytes"
 	"encoding/json"
-	"igor/config"
-	"igor/diamcodec"
-	"igor/httphandler"
-	"igor/instrumentation"
-	"igor/radiuscodec"
 	"os"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/httphandler"
+	"github.com/francistor/igor/instrumentation"
+	"github.com/francistor/igor/radiuscodec"
 )
 
 // This message handler parses the Igor1-Command, which may specify

@@ -2,11 +2,12 @@ package cdrwriter
 
 import (
 	"fmt"
-	"igor/diamcodec"
-	"igor/radiuscodec"
-	"igor/radiusdict"
 	"strings"
 	"time"
+
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/radiusdict"
 
 	"golang.org/x/exp/slices"
 )

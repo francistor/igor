@@ -3,16 +3,17 @@ package router
 import (
 	"crypto/tls"
 	"fmt"
-	"igor/config"
-	"igor/diamcodec"
-	"igor/diampeer"
-	"igor/instrumentation"
 	"math/rand"
 	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/diampeer"
+	"github.com/francistor/igor/instrumentation"
 
 	"golang.org/x/net/http2"
 )

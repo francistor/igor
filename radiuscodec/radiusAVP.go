@@ -7,14 +7,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"igor/config"
-	"igor/radiusdict"
 	"io"
 	"net"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/radiusdict"
 )
 
 // Magical reference date is Mon Jan 2 15:04:05 MST 2006

@@ -1,4 +1,4 @@
-module igor
+module github.com/francistor/igor
 
 go 1.18
 

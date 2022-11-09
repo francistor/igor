@@ -2,9 +2,10 @@ package handlerfunctions
 
 import (
 	"encoding/json"
-	"igor/diamcodec"
-	"igor/instrumentation"
-	"igor/radiuscodec"
+
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/instrumentation"
+	"github.com/francistor/igor/radiuscodec"
 
 	"go.uber.org/zap/zapcore"
 )

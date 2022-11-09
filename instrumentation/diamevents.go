@@ -1,8 +1,9 @@
 package instrumentation
 
 import (
-	"igor/diamcodec"
 	"time"
+
+	"github.com/francistor/igor/diamcodec"
 )
 
 // Used as key for diameter metrics, both in storage and as a way to specify queries,

@@ -4,14 +4,15 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"igor/config"
-	"igor/diamcodec"
-	"igor/instrumentation"
 	"io"
 	"net"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/instrumentation"
 )
 
 const (

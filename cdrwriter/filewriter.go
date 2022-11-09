@@ -1,10 +1,11 @@
 package cdrwriter
 
 import (
-	"igor/diamcodec"
-	"igor/radiuscodec"
 	"os"
 	"time"
+
+	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/radiuscodec"
 )
 
 const (

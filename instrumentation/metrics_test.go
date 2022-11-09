@@ -1,11 +1,12 @@
 package instrumentation
 
 import (
-	"igor/config"
-	"igor/diamcodec"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/diamcodec"
 )
 
 // Initializer of the test suite.

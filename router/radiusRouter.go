@@ -3,17 +3,18 @@ package router
 import (
 	"crypto/tls"
 	"fmt"
-	"igor/config"
-	"igor/instrumentation"
-	"igor/radiusclient"
-	"igor/radiuscodec"
-	"igor/radiusserver"
 	"math/rand"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/instrumentation"
+	"github.com/francistor/igor/radiusclient"
+	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/radiusserver"
 
 	"golang.org/x/net/http2"
 )
