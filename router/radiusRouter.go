@@ -320,7 +320,7 @@ func (router *RadiusRouter) eventLoop() {
 				// If message is for this server
 			} else {
 				// Handle the message
-				rh := router.ci.RadiusHandlersConf()
+				rh := router.ci.RadiusHttpHandlersConf()
 				var destinationURLs []string
 				switch rrr.Packet.Code {
 				case radiuscodec.ACCESS_REQUEST:

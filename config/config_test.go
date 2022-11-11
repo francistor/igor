@@ -139,7 +139,7 @@ func TestRadiusConfig(t *testing.T) {
 	}
 
 	// Get Radius handlers configuration
-	rh := GetPolicyConfig().RadiusHandlersConf()
+	rh := GetPolicyConfig().RadiusHttpHandlersConf()
 	if rh.AuthHandlers[0] != "https://localhost:8080/radiusRequest" {
 		t.Fatalf("first radius handler for auth not as expected")
 	}

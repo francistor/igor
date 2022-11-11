@@ -17,7 +17,7 @@ type PolicyConfigurationManager struct {
 	currentRadiusServerConfig RadiusServerConfig
 	currentRadiusClients      RadiusClients
 	currentRadiusServers      RadiusServers
-	currentRadiusHandlers     RadiusHandlers
+	currentRadiusHttpHandlers RadiusHttpHandlers
 
 	currentHttpRouterConfig HttpRouterConfig
 }
@@ -75,7 +75,7 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefau
 		if cerr = policyConfig.UpdateRadiusServers(); cerr != nil {
 			panic(cerr)
 		}
-		if cerr = policyConfig.UpdateRadiusHandlers(); cerr != nil {
+		if cerr = policyConfig.UpdateRadiusHttpHandlers(); cerr != nil {
 			panic(cerr)
 		}
 	} else {
@@ -315,38 +315,38 @@ func (c *PolicyConfigurationManager) RadiusServersConf() RadiusServers {
 }
 
 // Holds the radius handlers configuration
-type RadiusHandlers struct {
+type RadiusHttpHandlers struct {
 	AuthHandlers []string
 	AcctHandlers []string
 	COAHandlers  []string
 }
 
 // Retrieves the radius handlers configuration, forcing a refresh
-func (c *PolicyConfigurationManager) getRadiusHandlersConfig() (RadiusHandlers, error) {
-	var radiusHandlers RadiusHandlers
-	rc, err := c.CM.GetConfigObject("radiusHandlers.json", true)
+func (c *PolicyConfigurationManager) getRadiusHttpHandlersConfig() (RadiusHttpHandlers, error) {
+	var radiusHttpHandlers RadiusHttpHandlers
+	rc, err := c.CM.GetConfigObject("radiusHttpHandlers.json", true)
 	if err != nil {
-		return radiusHandlers, err
+		return radiusHttpHandlers, err
 	}
-	if err := json.Unmarshal(rc.RawBytes, &radiusHandlers); err != nil {
-		return radiusHandlers, err
+	if err := json.Unmarshal(rc.RawBytes, &radiusHttpHandlers); err != nil {
+		return radiusHttpHandlers, err
 	}
-	return radiusHandlers, nil
+	return radiusHttpHandlers, nil
 }
 
 // Updates the radius handlers configuration in the global variable
-func (c *PolicyConfigurationManager) UpdateRadiusHandlers() error {
-	radiusHandlers, error := c.getRadiusHandlersConfig()
+func (c *PolicyConfigurationManager) UpdateRadiusHttpHandlers() error {
+	radiusHttpHandlers, error := c.getRadiusHttpHandlersConfig()
 	if error != nil {
-		return fmt.Errorf("could not retrieve the Radius Handlers configuration: %w", error)
+		return fmt.Errorf("could not retrieve the Radius HttpHandlers configuration: %w", error)
 	}
-	c.currentRadiusHandlers = radiusHandlers
+	c.currentRadiusHttpHandlers = radiusHttpHandlers
 	return nil
 }
 
 // Retrieves the contents of the global variable containing the radius handlers configuration
-func (c *PolicyConfigurationManager) RadiusHandlersConf() RadiusHandlers {
-	return c.currentRadiusHandlers
+func (c *PolicyConfigurationManager) RadiusHttpHandlersConf() RadiusHttpHandlers {
+	return c.currentRadiusHttpHandlers
 }
 
 ///////////////////////////////////////////////////////////////////////////////
