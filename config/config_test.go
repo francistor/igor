@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 	instanceName := "testConfig"
 
 	InitPolicyConfigInstance(bootFile, instanceName, true)
-	InitHandlerConfigInstance(bootFile, instanceName, false)
+	InitHttpHandlerConfigInstance(bootFile, instanceName, false)
 
 	// Start the server for configuration
 	go httpServer()
@@ -145,8 +145,8 @@ func TestRadiusConfig(t *testing.T) {
 	}
 }
 
-func TestHandlerConfig(t *testing.T) {
-	hc := GetHandlerConfig().HandlerConf()
+func TestHttpHandlerConfig(t *testing.T) {
+	hc := GetHttpHandlerConfig().HttpHandlerConf()
 	if hc.BindAddress != "0.0.0.0" {
 		t.Fatalf("BindAddress was <%s>", hc.BindAddress)
 	}

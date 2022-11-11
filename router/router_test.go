@@ -78,7 +78,7 @@ func TestMain(m *testing.M) {
 	config.InitPolicyConfigInstance("resources/searchRules.json", "testSuperServer", false)
 	config.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", false)
 	config.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", false)
-	config.InitHandlerConfigInstance("resources/searchRules.json", "testServer", false)
+	config.InitHttpHandlerConfigInstance("resources/searchRules.json", "testServer", false)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())

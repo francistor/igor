@@ -14,13 +14,58 @@ import (
 // User File read helpers
 /////////////////////////////////////////////////////////////////////////////
 
+type Properties map[string]string
+
+// Merges Properties. The current with higher priority
+func (p Properties) Merge(q Properties) Properties {
+	r := p
+
+	// Merge
+	for k, v := range q {
+		if _, found := p[k]; !found {
+			p[k] = v
+		}
+	}
+
+	return r
+}
+
+type AVPItems []radiuscodec.RadiusAVP
+
+// Merges Radius Items. The current with high priority
+func (hp AVPItems) Merge(lp AVPItems) AVPItems {
+	r := hp
+
+	// Merge Items
+	var found bool
+	for i := range lp {
+		found = false
+		for j := range hp {
+			if hp[j].Name == lp[i].Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			r = append(r, lp[i])
+		}
+	}
+
+	return r
+}
+
+// Adds the two RadiusItems
+func (a AVPItems) Add(b AVPItems) AVPItems {
+	return append(a, b...)
+}
+
 // Represents an entry in a UserFile
 type RadiusUserFileEntry struct {
 	Key                      string
-	CheckItems               map[string]string
-	ReplyItems               []radiuscodec.RadiusAVP
-	NonOverridableReplyItems []radiuscodec.RadiusAVP
-	OOBReplyItems            []radiuscodec.RadiusAVP
+	CheckItems               Properties
+	ReplyItems               AVPItems
+	NonOverridableReplyItems AVPItems
+	OOBReplyItems            AVPItems
 }
 
 type RadiusUserFile map[string]RadiusUserFileEntry
@@ -53,52 +98,15 @@ func NewRadiusUserFile(configObjectName string, ci *config.PolicyConfigurationMa
 	return ruf, err
 }
 
-// Merges to RadiusEntryFiles. The current high priority.
+// Merges to RadiusEntryFiles. The current has higher priority.
 // Returns a pointer to a new entry. The ones passed as parameters are not modified
 func (hp RadiusUserFileEntry) Merge(lp RadiusUserFileEntry) RadiusUserFileEntry {
-	r := hp
+	r := RadiusUserFileEntry{}
 
-	// Merge CheckItems
-	for k, v := range lp.CheckItems {
-		if _, found := hp.CheckItems[k]; !found {
-			r.CheckItems[k] = v
-		}
-	}
-
-	// Merge ReplyItems
-	var found bool
-	for i := range lp.ReplyItems {
-		found = false
-		for j := range hp.ReplyItems {
-			if hp.ReplyItems[j].Name == lp.ReplyItems[i].Name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			r.ReplyItems = append(r.ReplyItems, lp.ReplyItems[i])
-		}
-	}
-
-	// Merge NonOverridableReplyItems
-	for i := range lp.NonOverridableReplyItems {
-		r.NonOverridableReplyItems = append(r.NonOverridableReplyItems, lp.NonOverridableReplyItems[i])
-	}
-
-	// Merge OOBReplyItems
-	for i := range lp.NonOverridableReplyItems {
-		found = false
-		for j := range hp.NonOverridableReplyItems {
-			if hp.NonOverridableReplyItems[j].Name == lp.NonOverridableReplyItems[i].Name {
-				found = true
-				break
-			}
-		}
-		// If here, no match was found
-		if !found {
-			r.NonOverridableReplyItems = append(r.NonOverridableReplyItems, lp.NonOverridableReplyItems[i])
-		}
-	}
+	r.CheckItems = hp.CheckItems.Merge(lp.CheckItems)
+	r.ReplyItems = hp.ReplyItems.Merge(lp.ReplyItems)
+	r.OOBReplyItems = hp.OOBReplyItems.Merge(lp.OOBReplyItems)
+	r.NonOverridableReplyItems = hp.NonOverridableReplyItems.Add(lp.NonOverridableReplyItems)
 
 	return r
 }

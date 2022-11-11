@@ -24,7 +24,7 @@ import (
 
 type HttpHandler struct {
 	// Holds the configuration instance for this Handler
-	ci *config.HandlerConfigurationManager
+	ci *config.HttpHandlerConfigurationManager
 
 	// Holds the httpserver
 	httpServer *http.Server
@@ -43,8 +43,8 @@ func NewHttpHandler(instanceName string, diameterHandler diamcodec.MessageHandle
 	mux.HandleFunc("/diameterRequest", getDiameterRequestHandler(diameterHandler))
 	mux.HandleFunc("/radiusRequest", getRadiusRequestHandler(radiusHandler))
 
-	ci := config.GetHandlerConfigInstance(instanceName)
-	bindAddrPort := fmt.Sprintf("%s:%d", ci.HandlerConf().BindAddress, ci.HandlerConf().BindPort)
+	ci := config.GetHttpHandlerConfigInstance(instanceName)
+	bindAddrPort := fmt.Sprintf("%s:%d", ci.HttpHandlerConf().BindAddress, ci.HttpHandlerConf().BindPort)
 	config.GetLogger().Infof("handler listening in %s", bindAddrPort)
 
 	h := HttpHandler{

@@ -171,9 +171,9 @@ func TestRadiusFilters(t *testing.T) {
 		t.Fatalf("unmarshal error for radius packet: %s", err)
 	}
 
-	filters, err := NewAVPFilters("avpFilters.json", nil)
+	filters, err := NewAVPFilters("radiusFilters.json", nil)
 	if err != nil {
-		t.Fatalf("error reading avpFilters.json")
+		t.Fatalf("error reading radiusFilters.json")
 	}
 
 	frp, err := filters.FilterPacket("myFilter", &rp)

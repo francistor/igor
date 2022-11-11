@@ -1,5 +1,0 @@
-{
-	"url": "jdbc:ignite:thin://localhost:10800/CLIENTS",
-	"driver": "org.apache.ignite.IgniteJdbcThinDriver",
-	"numThreads": 10
-}

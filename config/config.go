@@ -17,6 +17,19 @@ const (
 	HTTP_TIMEOUT_SECONDS = 5
 )
 
+// Custom error type to signal that the object was not found
+type ObjectNotFound struct {
+	InnerError error
+}
+
+func (e *ObjectNotFound) Error() string {
+	return "not found"
+}
+
+func (e *ObjectNotFound) UnWrap() error {
+	return e.InnerError
+}
+
 // General utilities to read configuration files, locally or via http
 
 // Type ConfigObject holds both the raw text and the

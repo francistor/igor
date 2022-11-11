@@ -79,7 +79,7 @@ func TestMain(m *testing.M) {
 	// Initialize the Config Object as done in main.go
 	bootstrapFile := "resources/searchRules.json"
 	instanceName := "testServer"
-	config.InitHandlerConfigInstance(bootstrapFile, instanceName, true)
+	config.InitHttpHandlerConfigInstance(bootstrapFile, instanceName, true)
 
 	// TODO: Needed to generate answers with origin diameter server name
 	config.InitPolicyConfigInstance(bootstrapFile, instanceName, false)

@@ -6,48 +6,48 @@ import (
 )
 
 // Manages the configuration items for the http handlers
-type HandlerConfigurationManager struct {
-	CM                   ConfigurationManager
-	currentHandlerConfig HandlerConfig
+type HttpHandlerConfigurationManager struct {
+	CM                       ConfigurationManager
+	currentHttpHandlerConfig HttpHandlerConfig
 }
 
 // Slice of configuration managers
 // Except during testing, there will be only one instance, which will be retrieved by GetConfig(). A
 // specific instance is retrieved with GetConfigInstance()
-var handlerConfigs []*HandlerConfigurationManager = make([]*HandlerConfigurationManager, 0)
+var httpHandlerConfigs []*HttpHandlerConfigurationManager = make([]*HttpHandlerConfigurationManager, 0)
 
 // Adds a Handler configuration object with the specified name
-func InitHandlerConfigInstance(bootstrapFile string, instanceName string, isDefault bool) *HandlerConfigurationManager {
+func InitHttpHandlerConfigInstance(bootstrapFile string, instanceName string, isDefault bool) *HttpHandlerConfigurationManager {
 
 	// Check not already instantiated
-	for i := range handlerConfigs {
-		if handlerConfigs[i].CM.instanceName == instanceName {
+	for i := range httpHandlerConfigs {
+		if httpHandlerConfigs[i].CM.instanceName == instanceName {
 			panic(instanceName + " already initalized")
 		}
 	}
 
 	// Better to create asap
-	handlerConfig := HandlerConfigurationManager{CM: NewConfigurationManager(bootstrapFile, instanceName)}
-	handlerConfigs = append(handlerConfigs, &handlerConfig)
+	httpHandlerConfig := HttpHandlerConfigurationManager{CM: NewConfigurationManager(bootstrapFile, instanceName)}
+	httpHandlerConfigs = append(httpHandlerConfigs, &httpHandlerConfig)
 
 	// Initialize logger and dictionary, if default
 	if isDefault {
-		initLogger(&handlerConfig.CM)
-		initDictionaries(&handlerConfig.CM)
+		initLogger(&httpHandlerConfig.CM)
+		initDictionaries(&httpHandlerConfig.CM)
 	}
 
 	// Load handler configuraton
-	handlerConfig.UpdateHandlerConfig()
+	httpHandlerConfig.UpdateHttpHandlerConfig()
 
-	return &handlerConfig
+	return &httpHandlerConfig
 }
 
 // Retrieves a specific configuration instance
-func GetHandlerConfigInstance(instanceName string) *HandlerConfigurationManager {
+func GetHttpHandlerConfigInstance(instanceName string) *HttpHandlerConfigurationManager {
 
-	for i := range handlerConfigs {
-		if handlerConfigs[i].CM.instanceName == instanceName {
-			return handlerConfigs[i]
+	for i := range httpHandlerConfigs {
+		if httpHandlerConfigs[i].CM.instanceName == instanceName {
+			return httpHandlerConfigs[i]
 		}
 	}
 
@@ -55,14 +55,14 @@ func GetHandlerConfigInstance(instanceName string) *HandlerConfigurationManager 
 }
 
 // Retrieves the default configuration instance
-func GetHandlerConfig() *HandlerConfigurationManager {
-	return handlerConfigs[0]
+func GetHttpHandlerConfig() *HttpHandlerConfigurationManager {
+	return httpHandlerConfigs[0]
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 // Holds a http handler configuration
-type HandlerConfig struct {
+type HttpHandlerConfig struct {
 	// The IP address in which the http server will listen
 	BindAddress string
 	// The port number in which the http server will listen
@@ -74,9 +74,9 @@ type HandlerConfig struct {
 }
 
 // Retrieves the handler configuration, forcing a refresh
-func (c *HandlerConfigurationManager) getHandlerConfig() (HandlerConfig, error) {
-	hc := HandlerConfig{}
-	h, err := c.CM.GetConfigObject("handler.json", true)
+func (c *HttpHandlerConfigurationManager) getHttpHandlerConfig() (HttpHandlerConfig, error) {
+	hc := HttpHandlerConfig{}
+	h, err := c.CM.GetConfigObject("httpHandler.json", true)
 	if err != nil {
 		return hc, err
 	}
@@ -88,16 +88,16 @@ func (c *HandlerConfigurationManager) getHandlerConfig() (HandlerConfig, error) 
 }
 
 // Updates the global variable with the http handler configuration
-func (c *HandlerConfigurationManager) UpdateHandlerConfig() error {
-	hc, error := c.getHandlerConfig()
+func (c *HttpHandlerConfigurationManager) UpdateHttpHandlerConfig() error {
+	hc, error := c.getHttpHandlerConfig()
 	if error != nil {
 		return fmt.Errorf("could not retrieve the Handler configuration: %w", error)
 	}
-	c.currentHandlerConfig = hc
+	c.currentHttpHandlerConfig = hc
 	return nil
 }
 
 // Retrieves the current http handler configuration
-func (c *HandlerConfigurationManager) HandlerConf() HandlerConfig {
-	return c.currentHandlerConfig
+func (c *HttpHandlerConfigurationManager) HttpHandlerConf() HttpHandlerConfig {
+	return c.currentHttpHandlerConfig
 }

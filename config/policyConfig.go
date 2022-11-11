@@ -53,25 +53,33 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefau
 	if cerr = policyConfig.UpdateDiameterServerConfig(); cerr != nil {
 		panic(cerr)
 	}
-	if cerr = policyConfig.UpdateDiameterPeers(); cerr != nil {
-		panic(cerr)
-	}
-	if cerr = policyConfig.UpdateDiameterRoutingRules(); cerr != nil {
-		panic(cerr)
+	if policyConfig.currentDiameterServerConfig.BindAddress != "" {
+		if cerr = policyConfig.UpdateDiameterPeers(); cerr != nil {
+			panic(cerr)
+		}
+		if cerr = policyConfig.UpdateDiameterRoutingRules(); cerr != nil {
+			panic(cerr)
+		}
+	} else {
+		fmt.Println("diameter server not configured")
 	}
 
 	// Load radius configuration
 	if cerr = policyConfig.UpdateRadiusServerConfig(); cerr != nil {
 		panic(cerr)
 	}
-	if cerr = policyConfig.UpdateRadiusClients(); cerr != nil {
-		panic(cerr)
-	}
-	if cerr = policyConfig.UpdateRadiusServers(); cerr != nil {
-		panic(cerr)
-	}
-	if cerr = policyConfig.UpdateRadiusHandlers(); cerr != nil {
-		panic(cerr)
+	if policyConfig.currentRadiusServerConfig.BindAddress != "" {
+		if cerr = policyConfig.UpdateRadiusClients(); cerr != nil {
+			panic(cerr)
+		}
+		if cerr = policyConfig.UpdateRadiusServers(); cerr != nil {
+			panic(cerr)
+		}
+		if cerr = policyConfig.UpdateRadiusHandlers(); cerr != nil {
+			panic(cerr)
+		}
+	} else {
+		fmt.Println("radius server not configured")
 	}
 
 	// Load http router configuration
