@@ -116,8 +116,6 @@ type RadiusRouter struct {
 // Creates and runs a Router
 func NewRadiusRouter(instanceName string, localHandler radiuscodec.RadiusPacketHandler) *RadiusRouter {
 
-	radiusServerConf := config.GetPolicyConfigInstance(instanceName).RadiusServerConf()
-
 	router := RadiusRouter{
 		instanceName:       instanceName,
 		ci:                 config.GetPolicyConfigInstance(instanceName),
@@ -127,23 +125,6 @@ func NewRadiusRouter(instanceName string, localHandler radiuscodec.RadiusPacketH
 		doneChan:           make(chan interface{}, 1),
 		radiusClient:       radiusclient.NewRadiusClient(config.GetPolicyConfigInstance(instanceName)),
 		localHandler:       localHandler,
-	}
-
-	// Function to be used for the RadiusServers.
-	// This handler function sends the request to this router, signailling that it must not be sent to
-	// an upstream server (destination = "")
-	handler := func(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-		return router.RouteRadiusRequest("", request, 0, 0, 0, "")
-	}
-
-	if radiusServerConf.AuthPort != 0 {
-		router.authServer = radiusserver.NewRadiusServer(router.ci, radiusServerConf.BindAddress, radiusServerConf.AuthPort, handler)
-	}
-	if radiusServerConf.AcctPort != 0 {
-		router.acctServer = radiusserver.NewRadiusServer(router.ci, radiusServerConf.BindAddress, radiusServerConf.AcctPort, handler)
-	}
-	if radiusServerConf.CoAPort != 0 {
-		router.coaServer = radiusserver.NewRadiusServer(router.ci, radiusServerConf.BindAddress, radiusServerConf.CoAPort, handler)
 	}
 
 	// Create an http client with timeout and http2 transport
@@ -167,9 +148,28 @@ func NewRadiusRouter(instanceName string, localHandler radiuscodec.RadiusPacketH
 
 // Start processing
 // Need to separate from creation to make room for initializations before receiving packets
-//
-//	that require the router created
+// that require the router created
 func (router *RadiusRouter) Start() *RadiusRouter {
+
+	radiusServerConf := router.ci.RadiusServerConf()
+
+	// Function to be used for the RadiusServers.
+	// This handler function sends the request to this router, signailling that it must not be sent to
+	// an upstream server (destination = "")
+	handler := func(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+		return router.RouteRadiusRequest("", request, 0, 0, 0, "")
+	}
+
+	if radiusServerConf.AuthPort != 0 {
+		router.authServer = radiusserver.NewRadiusServer(router.ci, radiusServerConf.BindAddress, radiusServerConf.AuthPort, handler)
+	}
+	if radiusServerConf.AcctPort != 0 {
+		router.acctServer = radiusserver.NewRadiusServer(router.ci, radiusServerConf.BindAddress, radiusServerConf.AcctPort, handler)
+	}
+	if radiusServerConf.CoAPort != 0 {
+		router.coaServer = radiusserver.NewRadiusServer(router.ci, radiusServerConf.BindAddress, radiusServerConf.CoAPort, handler)
+	}
+
 	go router.eventLoop()
 	return router
 }
