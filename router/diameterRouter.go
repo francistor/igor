@@ -104,9 +104,14 @@ func NewDiameterRouter(instanceName string, handler diamcodec.MessageHandler) *D
 
 	router.startAndAccept()
 
-	go router.eventLoop()
-
 	return &router
+}
+
+// Needed for cases when initializations are required having the router variable
+// before start processing packets
+func (router *DiameterRouter) Start() *DiameterRouter {
+	go router.eventLoop()
+	return router
 }
 
 // Waits until the Router is finished and closes all resources

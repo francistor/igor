@@ -105,13 +105,13 @@ func TestDiameterBasicSetup(t *testing.T) {
 
 	// First start client, that will not be able to connect to the server (not instantiated).
 	// Will retry the connection every second as per diameterServer.json configuration
-	clientRouter := NewDiameterRouter("testClient", localDiameterHandler)
+	clientRouter := NewDiameterRouter("testClient", localDiameterHandler).Start()
 	// Force some errors not being able to connect to server. Should recover later
 	time.Sleep(2000 * time.Millisecond)
 
-	superServerRouter := NewDiameterRouter("testSuperServer", localDiameterHandler)
+	superServerRouter := NewDiameterRouter("testSuperServer", localDiameterHandler).Start()
 	time.Sleep(150 * time.Millisecond)
-	serverRouter := NewDiameterRouter("testServer", localDiameterHandler)
+	serverRouter := NewDiameterRouter("testServer", localDiameterHandler).Start()
 
 	time.Sleep(1100 * time.Millisecond)
 
@@ -120,8 +120,8 @@ func TestDiameterBasicSetup(t *testing.T) {
 	// as client.igor generates a race condition and none of the client.igor
 	// peers gets engaged
 	time.Sleep(100 * time.Millisecond)
-	b1 := NewDiameterRouter("testClientUnknownClient", localDiameterHandler)
-	b2 := NewDiameterRouter("testClientUnknownServer", localDiameterHandler)
+	b1 := NewDiameterRouter("testClientUnknownClient", localDiameterHandler).Start()
+	b2 := NewDiameterRouter("testClientUnknownServer", localDiameterHandler).Start()
 
 	// Time to settle connections
 	time.Sleep(200 * time.Millisecond)
@@ -211,9 +211,9 @@ func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 
 	// Start Routers
-	server := NewDiameterRouter("testServer", localDiameterHandler)
+	server := NewDiameterRouter("testServer", localDiameterHandler).Start()
 	time.Sleep(150 * time.Millisecond)
-	client := NewDiameterRouter("testClient", localDiameterHandler)
+	client := NewDiameterRouter("testClient", localDiameterHandler).Start()
 
 	// Some time to settle
 	time.Sleep(300 * time.Millisecond)
@@ -255,10 +255,10 @@ func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 func TestDiameterRouteMessagetoLocal(t *testing.T) {
 
 	// Start Routers
-	superServer := NewDiameterRouter("testSuperServer", localDiameterHandler)
-	server := NewDiameterRouter("testServer", nil)
+	superServer := NewDiameterRouter("testSuperServer", localDiameterHandler).Start()
+	server := NewDiameterRouter("testServer", nil).Start()
 	time.Sleep(150 * time.Millisecond)
-	client := NewDiameterRouter("testClient", nil)
+	client := NewDiameterRouter("testClient", nil).Start()
 
 	// Some time to settle
 	time.Sleep(300 * time.Millisecond)
@@ -287,8 +287,8 @@ func TestDiameterRouteMessagetoLocal(t *testing.T) {
 // Notice that http2 and local handlers do not get cancelled upon router termination
 // and are not waited
 func TestDiameterRequestCancellation(t *testing.T) {
-	server := NewDiameterRouter("testServer", localDiameterHandler)
-	superserver := NewDiameterRouter("testSuperServer", localDiameterHandler)
+	server := NewDiameterRouter("testServer", localDiameterHandler).Start()
+	superserver := NewDiameterRouter("testSuperServer", localDiameterHandler).Start()
 
 	time.Sleep(300 * time.Millisecond)
 
@@ -323,7 +323,7 @@ func TestDiameterRequestCancellation(t *testing.T) {
 }
 
 func TestRouteParamRadiusPacket(t *testing.T) {
-	rrouter := NewRadiusRouter("testServer", httpRadiusHandler)
+	rrouter := NewRadiusRouter("testServer", httpRadiusHandler).Start()
 
 	rrouter.buildRadiusServersTable()
 
@@ -350,9 +350,9 @@ func TestRadiusRouteToHTTP(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 
 	// Start Routers
-	server := NewRadiusRouter("testServer", localRadiusHandler)
+	server := NewRadiusRouter("testServer", localRadiusHandler).Start()
 	time.Sleep(150 * time.Millisecond)
-	client := NewRadiusRouter("testClient", localRadiusHandler)
+	client := NewRadiusRouter("testClient", localRadiusHandler).Start()
 
 	// Generate request
 	req := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
@@ -386,7 +386,7 @@ func TestRadiusRouteToHTTP(t *testing.T) {
 func TestRadiusHandleLocal(t *testing.T) {
 
 	// Start Routers
-	client := NewRadiusRouter("testClient", localRadiusHandler)
+	client := NewRadiusRouter("testClient", localRadiusHandler).Start()
 
 	// Generate request
 	req := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
@@ -413,9 +413,9 @@ func TestRadiusTimeout(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Start Routers
-	superserver := NewRadiusRouter("testSuperServer", localRadiusHandler)
+	superserver := NewRadiusRouter("testSuperServer", localRadiusHandler).Start()
 	time.Sleep(50 * time.Millisecond)
-	server := NewRadiusRouter("testServer", localRadiusHandler)
+	server := NewRadiusRouter("testServer", localRadiusHandler).Start()
 
 	// Generate request
 	req := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
@@ -511,7 +511,7 @@ func TestRadiusTimeout(t *testing.T) {
 func TestRadiusRequestCancellation(t *testing.T) {
 
 	// Start Routers
-	client := NewRadiusRouter("testClient", localRadiusHandler)
+	client := NewRadiusRouter("testClient", localRadiusHandler).Start()
 
 	// Generate request
 	req := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)

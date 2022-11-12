@@ -162,9 +162,16 @@ func NewRadiusRouter(instanceName string, localHandler radiuscodec.RadiusPacketH
 	router.buildRadiusServersTable()
 	router.routerControlChan <- SendRadiusTable{}
 
-	go router.eventLoop()
-
 	return &router
+}
+
+// Start processing
+// Need to separate from creation to make room for initializations before receiving packets
+//
+//	that require the router created
+func (router *RadiusRouter) Start() *RadiusRouter {
+	go router.eventLoop()
+	return router
 }
 
 // Waits until the Router is finished

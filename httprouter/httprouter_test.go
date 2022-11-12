@@ -72,10 +72,10 @@ func TestMain(m *testing.M) {
 
 func TestHttpRouterHandler(t *testing.T) {
 
-	rrouter := router.NewRadiusRouter("testServer", nil)
-	drouter := router.NewDiameterRouter("testServer", nil)
-	rsserver := router.NewRadiusRouter("testSuperServer", radiusHandler)
-	dsserver := router.NewDiameterRouter("testSuperServer", diameterHandler)
+	rrouter := router.NewRadiusRouter("testServer", nil).Start()
+	drouter := router.NewDiameterRouter("testServer", nil).Start()
+	rsserver := router.NewRadiusRouter("testSuperServer", radiusHandler).Start()
+	dsserver := router.NewDiameterRouter("testSuperServer", diameterHandler).Start()
 
 	httpRouter := NewHttpRouter("testServer", drouter, rrouter)
 
