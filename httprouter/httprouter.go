@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -36,12 +36,16 @@ type HttpRouter struct {
 	doneChannel chan interface{}
 }
 
-// Creates a new DiameterHandler object
-func NewHttpRouter(instanceName string, diameterRouter *router.DiameterRouter, radiusRouter *router.RadiusRouter) HttpRouter {
+// Creates a new HttpRouter object
+func NewHttpRouter(instanceName string, diameterRouter *router.DiameterRouter, radiusRouter *router.RadiusRouter) *HttpRouter {
 
 	mux := new(http.ServeMux)
-	mux.HandleFunc("/routeDiameterRequest", getDiameterRouteHandler(diameterRouter))
-	mux.HandleFunc("/routeRadiusRequest", getRadiusRouteHandler(radiusRouter))
+	if diameterRouter != nil {
+		mux.HandleFunc("/routeDiameterRequest", getDiameterRouteHandler(diameterRouter))
+	}
+	if radiusRouter != nil {
+		mux.HandleFunc("/routeRadiusRequest", getRadiusRouteHandler(radiusRouter))
+	}
 
 	ci := config.GetPolicyConfigInstance(instanceName)
 	bindAddrPort := fmt.Sprintf("%s:%d", ci.HttpRouterConf().BindAddress, ci.HttpRouterConf().BindPort)
@@ -59,7 +63,7 @@ func NewHttpRouter(instanceName string, diameterRouter *router.DiameterRouter, r
 	}
 
 	go h.Run()
-	return h
+	return &h
 }
 
 // Execute the DiameterHandler. This function blocks. Should be executed
@@ -97,7 +101,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 		logger := config.GetLogger()
 
 		// Get the Routable Diameter Request
-		jRequest, err := ioutil.ReadAll(req.Body)
+		jRequest, err := io.ReadAll(req.Body)
 		if err != nil {
 			logger.Error("error reading request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
@@ -152,7 +156,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 		logger := config.GetLogger()
 
 		// Get the Radius Request
-		jRequest, err := ioutil.ReadAll(req.Body)
+		jRequest, err := io.ReadAll(req.Body)
 		if err != nil {
 			logger.Error("error reading request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)

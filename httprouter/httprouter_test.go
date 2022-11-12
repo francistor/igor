@@ -91,7 +91,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	// Create an http client with timeout and http2 transport
 	client := http.Client{Timeout: 2 * time.Second, Transport: transCfg}
 
-	jRRadiusRequest := `
+	jRadiusRequest := `
 	{
 		"destination": "igor-superserver-group",
 		"packet": {
@@ -119,7 +119,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	}
 	`
 
-	jRadiusAnswer, err := RouteHttp(client, httpRouterURL+"/routeRadiusRequest", []byte(jRRadiusRequest))
+	jRadiusAnswer, err := RouteHttp(client, httpRouterURL+"/routeRadiusRequest", []byte(jRadiusRequest))
 	if err != nil {
 		t.Fatalf("error routing radius: %s", err)
 	}

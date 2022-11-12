@@ -3,7 +3,7 @@ package httprouter
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
@@ -21,7 +21,7 @@ func RouteHttp(client http.Client, url string, jsonRoutableRequest []byte) ([]by
 		return nil, fmt.Errorf("route request got status code %d", httpResp.StatusCode)
 	}
 
-	jsonAnswer, err := ioutil.ReadAll(httpResp.Body)
+	jsonAnswer, err := io.ReadAll(httpResp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response %w", err)
 	}
