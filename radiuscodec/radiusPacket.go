@@ -484,6 +484,13 @@ func NewRadiusResponse(request *RadiusPacket, isSuccess bool) *RadiusPacket {
 	return &RadiusPacket{Code: code, Identifier: request.Identifier, Authenticator: request.Authenticator}
 }
 
+// Converts a proxy response into the response to the original request, tweaking the Authenticator
+func (rp *RadiusPacket) MakeResponseTo(request *RadiusPacket) *RadiusPacket {
+	rp.Authenticator = request.Authenticator
+	rp.Identifier = request.Identifier
+	return rp
+}
+
 // Creates a copy of the radius packet but having only the AVPs in the positiveFilter argument
 // or removing the attributes in the negativeFilter argument. If nil, no filter is applied.
 func (rp *RadiusPacket) Copy(positiveFilter []string, negativeFilter []string) *RadiusPacket {

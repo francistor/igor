@@ -158,7 +158,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 		// Get the Radius Request
 		jRequest, err := io.ReadAll(req.Body)
 		if err != nil {
-			logger.Error("error reading request: %s", err)
+			logger.Errorf("error reading request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			instrumentation.PushHttpRouterExchange(NETWORK_ERROR, req.RequestURI)
@@ -167,7 +167,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 
 		var request router.RoutableRadiusRequest
 		if err = json.Unmarshal(jRequest, &request); err != nil {
-			logger.Error("error unmarshalling request: %s", err)
+			logger.Errorf("error unmarshalling request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			instrumentation.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
@@ -176,7 +176,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 
 		// Fill the timeout
 		if err = request.ParseTimeout(); err != nil {
-			logger.Error("error parsing Timeoutspec: %s", err)
+			logger.Errorf("error parsing Timeoutspec: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			instrumentation.PushHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)

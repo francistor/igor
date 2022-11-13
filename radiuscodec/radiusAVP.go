@@ -1048,3 +1048,13 @@ func AVPFromMap(avpMap map[string]interface{}) (RadiusAVP, error) {
 	// Unreachable code
 	return RadiusAVP{}, fmt.Errorf("ureachable code")
 }
+
+// Stringer interface
+func (avp RadiusAVP) String() string {
+	b, error := avp.MarshalJSON()
+	if error != nil {
+		return "<error>"
+	} else {
+		return string(b)
+	}
+}

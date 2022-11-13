@@ -175,6 +175,7 @@ func (router *RadiusRouter) Start() *RadiusRouter {
 }
 
 // Waits until the Router is finished
+// Closing a non-started router will block forever
 func (router *RadiusRouter) Close() {
 
 	// Start closing procedure

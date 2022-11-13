@@ -116,6 +116,7 @@ func (router *DiameterRouter) Start() *DiameterRouter {
 }
 
 // Waits until the Router is finished and closes all resources
+// Closing a non-started router will block forever
 func (router *DiameterRouter) Close() {
 
 	// Starts the closing process. It will set in StatusTerminated stauts and wait for the peers to finish
