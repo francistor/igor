@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/francistor/igor/config"
-
-	"go.uber.org/zap/zapcore"
 )
 
 // Initializer of the test suite.
@@ -26,7 +24,7 @@ func fakeHandler() {
 		logLines.WriteWLog()
 	}(logLines)
 
-	logLines.WLogEntry(zapcore.InfoLevel, "%s", "--- StartingHandler")
-	logLines.WLogEntry(zapcore.InfoLevel, "%s %d", "EndingHandler", 0)
+	logLines.WLogEntry(config.LEVEL_INFO, "%s", "--- StartingHandler")
+	logLines.WLogEntry(config.LEVEL_INFO, "%s %d", "EndingHandler", 0)
 
 }

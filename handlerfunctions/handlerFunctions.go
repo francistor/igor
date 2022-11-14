@@ -3,11 +3,10 @@ package handlerfunctions
 import (
 	"encoding/json"
 
+	"github.com/francistor/igor/config"
 	"github.com/francistor/igor/diamcodec"
 	"github.com/francistor/igor/instrumentation"
 	"github.com/francistor/igor/radiuscodec"
-
-	"go.uber.org/zap/zapcore"
 )
 
 // The most basic handler ever. Returns an empty response to the received message
@@ -18,13 +17,13 @@ func EmptyDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.Diamet
 		logLines.WriteWLog()
 	}(logLines)
 
-	logLines.WLogEntry(zapcore.InfoLevel, "%s", "Starting EmptyDiameterHandler")
-	logLines.WLogEntry(zapcore.InfoLevel, "%s %s", "request", request)
+	logLines.WLogEntry(config.LEVEL_INFO, "%s", "Starting EmptyDiameterHandler")
+	logLines.WLogEntry(config.LEVEL_INFO, "%s %s", "request", request)
 
 	response := diamcodec.NewDiameterAnswer(request)
 	response.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
 
-	logLines.WLogEntry(zapcore.InfoLevel, "%s %s", "response", request)
+	logLines.WLogEntry(config.LEVEL_INFO, "%s %s", "response", request)
 
 	return response, nil
 }
@@ -52,11 +51,11 @@ func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscode
 
 	// Print the password
 	pwd := request.GetPasswordStringAVP("User-Password")
-	logLines.WLogEntry(zapcore.InfoLevel, "Password: <%s>", pwd)
+	logLines.WLogEntry(config.LEVEL_INFO, "Password: <%s>", pwd)
 
 	// Print all received attributes
 	for _, avp := range request.AVPs {
-		logLines.WLogEntry(zapcore.InfoLevel, avp.Name, avp.GetTaggedString())
+		logLines.WLogEntry(config.LEVEL_INFO, avp.Name, avp.GetTaggedString())
 	}
 
 	// Reply with one attribute of each type
@@ -87,7 +86,7 @@ func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscode
 	var responseAVPs []radiuscodec.RadiusAVP
 	err := json.Unmarshal([]byte(jAVPs), &responseAVPs)
 	if err != nil {
-		logLines.WLogEntry(zapcore.ErrorLevel, "%s", err.Error())
+		logLines.WLogEntry(config.LEVEL_ERROR, "%s", err.Error())
 	}
 
 	for _, avp := range responseAVPs {

@@ -118,7 +118,7 @@ func TestRadiusChecks(t *testing.T) {
 		t.Fatalf("unmarshal error for radius packet: %s", err)
 	}
 
-	radiusChecks, err := NewRadiusChecks("radiusChecks.json", config.GetPolicyConfigInstance("testConfig"))
+	radiusChecks, err := NewRadiusPacketChecks("radiusChecks.json", config.GetPolicyConfigInstance("testConfig"))
 	if err != nil {
 		t.Fatalf("error parsing radiusCheck.json: %s", err.Error())
 	}

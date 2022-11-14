@@ -8,6 +8,13 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+const (
+	LEVEL_DEBUG = -1
+	LEVEL_INFO  = 0
+	LEVEL_WARN  = 1
+	LEVEL_ERROR = 2
+)
+
 // Must be initialized with a call to initLogger, which is done
 // during the initialization of a default policyConfigurationManager or
 // handlerConfigurationManager

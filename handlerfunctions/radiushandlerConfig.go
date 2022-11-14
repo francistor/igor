@@ -10,6 +10,16 @@ import (
 	"github.com/francistor/igor/radiuscodec"
 )
 
+// The following types are defined here
+// Properties
+// AVPItems
+// RadiusUserFileEntry
+// RadiusUserFile
+// RadiusPacketCheck
+// RadiusPacketChecks
+// AVPFilter
+// AVPFilters
+
 /////////////////////////////////////////////////////////////////////////////
 // User File read helpers
 /////////////////////////////////////////////////////////////////////////////
@@ -191,7 +201,7 @@ func (c *RadiusPacketCheck) CheckPacket(packet *radiuscodec.RadiusPacket) bool {
 // ["attribute", "check-type", "value to check (optional)"]
 //
 // that is, it can be a two or three element array, or an object containing a condition and nested check objects
-func NewRadiusChecks(configObjectName string, ci *config.PolicyConfigurationManager) (RadiusPacketChecks, error) {
+func NewRadiusPacketChecks(configObjectName string, ci *config.PolicyConfigurationManager) (RadiusPacketChecks, error) {
 
 	checks := make(RadiusPacketChecks)
 
@@ -215,7 +225,7 @@ func NewRadiusChecks(configObjectName string, ci *config.PolicyConfigurationMana
 		return checks, err
 	}
 	for key, entry := range entries {
-		if parsedEntry, err := parseRadiusCheck(entry); err != nil {
+		if parsedEntry, err := parseRadiusPacketCheck(entry); err != nil {
 			return checks, err
 		} else {
 			checks[key] = parsedEntry
@@ -227,7 +237,7 @@ func NewRadiusChecks(configObjectName string, ci *config.PolicyConfigurationMana
 }
 
 // Parses the, possibly nested, check specification
-func parseRadiusCheck(radiusCheck interface{}) (RadiusPacketCheck, error) {
+func parseRadiusPacketCheck(radiusCheck interface{}) (RadiusPacketCheck, error) {
 
 	// May be an object that contains an operation and a Branch, or a Leaf, which is a single condition
 	// A Branch is an object with a single property ('and' or 'or') and a value which is an array of
@@ -274,7 +284,7 @@ func parseRadiusCheck(radiusCheck interface{}) (RadiusPacketCheck, error) {
 			} else {
 				// Parse all the nested items
 				for _, leaf := range leafs {
-					if check, err := parseRadiusCheck(leaf); err != nil {
+					if check, err := parseRadiusPacketCheck(leaf); err != nil {
 						return RadiusPacketCheck{}, err
 					} else {
 						branch = append(branch, check)

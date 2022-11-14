@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/francistor/igor/config"
@@ -493,6 +494,9 @@ func (rp *RadiusPacket) MakeResponseTo(request *RadiusPacket) *RadiusPacket {
 
 // Creates a copy of the radius packet but having only the AVPs in the positiveFilter argument
 // or removing the attributes in the negativeFilter argument. If nil, no filter is applied.
+// NOTICE that a request will be modified when sent (the authenticator is re-calculated). For
+// this reason, a copy must be used when proxying or the answer generated from the original packet
+// before being sent
 func (rp *RadiusPacket) Copy(positiveFilter []string, negativeFilter []string) *RadiusPacket {
 	copiedPacket := RadiusPacket{
 		Code:          rp.Code,
@@ -516,6 +520,22 @@ func (rp *RadiusPacket) Copy(positiveFilter []string, negativeFilter []string) *
 	}
 
 	return &copiedPacket
+}
+
+// Helper for Cisco-AVPair. Returns the AVP with the specified inner name
+func (rp *RadiusPacket) GetCiscoAVPair(name string) string {
+	avpairs := rp.GetAllAVP("Cisco-AVPair")
+	for i := range avpairs {
+		components := strings.Split(avpairs[i].GetString(), "=")
+		if len(components) > 1 {
+			pairName := strings.TrimSpace(components[0])
+			if pairName == name {
+				return strings.TrimSpace(components[1])
+			}
+		}
+	}
+
+	return ""
 }
 
 ///////////////////////////////////////////////////////////////
