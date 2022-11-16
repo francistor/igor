@@ -28,8 +28,8 @@ func TestRadiusUserFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if ruf["key1"].CheckItems["clientType"] != "client-type-1" {
-		t.Fatal("bad check item value")
+	if ruf["key1"].ConfigItems["clientType"] != "client-type-1" {
+		t.Fatal("bad config item value")
 	}
 
 	if ruf["key1"].ReplyItems[2].GetInt() != 1 {
@@ -50,38 +50,42 @@ func TestRadiusUserFile(t *testing.T) {
 }
 
 func TestMergeUserFileEntry(t *testing.T) {
-	ruf1, err := NewRadiusUserFile("radiusUserFile.json", config.GetPolicyConfigInstance("testConfig"))
+	ruf1, err := NewRadiusUserFile("radiusUserFileHighPriority.json", config.GetPolicyConfigInstance("testConfig"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ruf2, err := NewRadiusUserFile("radiusUserFileToMerge.json", config.GetPolicyConfigInstance("testConfig"))
+	ruf2, err := NewRadiusUserFile("radiusUserFileHighPriority.json", config.GetPolicyConfigInstance("testConfig"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	mergedEntry := ruf1["key1"].Merge(ruf2["key1"])
-	if v := mergedEntry.CheckItems["serviceType"]; v != "service-type-1" {
-		t.Fatal("bad merged entry for serviceType")
+	pEntries := ruf1["key1"].ConfigItems.OverrideWith(ruf2["key1"].ConfigItems)
+	if pEntries["clientType"] != "client-type-2" {
+		t.Fatal("bad overriden entry for clientType")
 	}
-	if v := mergedEntry.CheckItems["additionalItem"]; v != "additional" {
-		t.Fatal("bad merged entry for additionalItem")
+	if pEntries["additionalItem"] != "additional" {
+		t.Fatal("bad overriden entry for additionalItem")
 	}
-	classAttrs := findAttributes(mergedEntry.ReplyItems, "Class")
+
+	ovEntries := ruf1["key1"].ReplyItems.OverrideWith(ruf2["key1"].ReplyItems)
+	classAttrs := findAttributes(ovEntries, "Class")
 	if len(classAttrs) != 1 {
 		t.Fatal("number of class attributes is not 1")
 	}
-	if classAttrs[0].GetString() != "theClassAttribute" {
+	if classAttrs[0].GetString() != "theClassAttribute2" {
 		t.Fatal("bad merged entry for Class")
 	}
-	stringAttribute := findAttributes(mergedEntry.ReplyItems, "Igor-StringAttribute")
+	stringAttribute := findAttributes(ovEntries, "Igor-StringAttribute")
 	if len(stringAttribute) != 1 {
 		t.Fatal("number of class stringAttribute is not 1")
 	}
 	if stringAttribute[0].GetString() != "additional" {
 		t.Fatal("bad merged entry for StringAttribute")
 	}
-	ciscoAVPAttributes := findAttributes(mergedEntry.NonOverridableReplyItems, "Cisco-AVPair")
+
+	noEntries := ruf1["key1"].NonOverridableReplyItems.Add(ruf2["key1"].NonOverridableReplyItems)
+	ciscoAVPAttributes := findAttributes(noEntries, "Cisco-AVPair")
 	if len(ciscoAVPAttributes) != 2 {
 		t.Fatalf("number of class ciscoAVPAttributes is not 2 but %d", len(ciscoAVPAttributes))
 	}

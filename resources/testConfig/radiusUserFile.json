@@ -1,6 +1,9 @@
 {
     "key1":{
         "checkItems":{
+            "password": "secret"
+        },
+        "configItems":{
             "serviceType": "service-type-1",
             "clientType": "client-type-1"
         },

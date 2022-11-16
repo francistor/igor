@@ -26,8 +26,8 @@ import (
 
 type Properties map[string]string
 
-// Merges Properties. The current with higher priority
-func (p Properties) Merge(q Properties) Properties {
+// Merges Properties. New with higher priority
+func (q Properties) OverrideWith(p Properties) Properties {
 	r := p
 
 	// Merge
@@ -42,8 +42,8 @@ func (p Properties) Merge(q Properties) Properties {
 
 type AVPItems []radiuscodec.RadiusAVP
 
-// Merges Radius Items. The current with high priority
-func (hp AVPItems) Merge(lp AVPItems) AVPItems {
+// Merges Radius Items. The new with higher priority
+func (lp AVPItems) OverrideWith(hp AVPItems) AVPItems {
 	r := hp
 
 	// Merge Items
@@ -73,6 +73,7 @@ func (a AVPItems) Add(b AVPItems) AVPItems {
 type RadiusUserFileEntry struct {
 	Key                      string
 	CheckItems               Properties
+	ConfigItems              Properties
 	ReplyItems               AVPItems
 	NonOverridableReplyItems AVPItems
 	OOBReplyItems            AVPItems
@@ -84,10 +85,11 @@ type RadiusUserFile map[string]RadiusUserFileEntry
 // Entries are of the form
 // key:
 //
-//	checkItems: {attr: value, attr:value}
-//	replyItems: [<AVP>],
-//	nonOverridableReplyItems: [<AVP>] -- typically for Cisco-AVPair
-//	oobReplyItems: [<AVP>]			   -- Service definition queries from BNG
+//		checkItems: {attr: value, attr:value}
+//	 configItems: {attr: value, attr:value}
+//		replyItems: [<AVP>],
+//		nonOverridableReplyItems: [<AVP>] -- typically for Cisco-AVPair
+//		oobReplyItems: [<AVP>]			   -- Service definition queries from BNG
 func NewRadiusUserFile(configObjectName string, ci *config.PolicyConfigurationManager) (RadiusUserFile, error) {
 	// If we pass nil as last parameter, use the default
 	var myCi *config.PolicyConfigurationManager
@@ -106,19 +108,6 @@ func NewRadiusUserFile(configObjectName string, ci *config.PolicyConfigurationMa
 	err = json.Unmarshal(jBytes, &ruf)
 
 	return ruf, err
-}
-
-// Merges to RadiusEntryFiles. The current has higher priority.
-// Returns a pointer to a new entry. The ones passed as parameters are not modified
-func (hp RadiusUserFileEntry) Merge(lp RadiusUserFileEntry) RadiusUserFileEntry {
-	r := RadiusUserFileEntry{}
-
-	r.CheckItems = hp.CheckItems.Merge(lp.CheckItems)
-	r.ReplyItems = hp.ReplyItems.Merge(lp.ReplyItems)
-	r.OOBReplyItems = hp.OOBReplyItems.Merge(lp.OOBReplyItems)
-	r.NonOverridableReplyItems = hp.NonOverridableReplyItems.Add(lp.NonOverridableReplyItems)
-
-	return r
 }
 
 /////////////////////////////////////////////////////////////////////////////

@@ -1,6 +1,6 @@
 {
     "key1":{
-        "checkItems":{
+        "configItems":{
             "serviceType": "service-type-2",
             "clientType": "client-type-2",
             "additionalItem": "additional"
