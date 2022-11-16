@@ -40,6 +40,19 @@ func (q Properties) OverrideWith(p Properties) Properties {
 	return r
 }
 
+// Stringer interface
+func (p Properties) String() string {
+	var sb strings.Builder
+	for k, v := range p {
+		sb.WriteString(k)
+		sb.WriteString("=")
+		sb.WriteString(v)
+		sb.WriteString("\n")
+	}
+
+	return sb.String()
+}
+
 type AVPItems []radiuscodec.RadiusAVP
 
 // Merges Radius Items. The new with higher priority
