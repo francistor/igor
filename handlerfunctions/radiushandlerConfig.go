@@ -256,17 +256,17 @@ func parseRadiusPacketCheck(radiusCheck interface{}) (RadiusPacketCheck, error) 
 		}
 		// Sanity Check
 		if len(arrayItems) < 2 {
-			return RadiusPacketCheck{}, fmt.Errorf("bad format specification %v", arrayItems)
+			return RadiusPacketCheck{}, fmt.Errorf("bad format specification. Missing at least one item: %v", arrayItems)
 		} else {
 			if arrayItems[1] != "equals" &&
 				arrayItems[1] != "matches" &&
 				arrayItems[1] != "contains" &&
 				arrayItems[1] != "present" &&
 				arrayItems[1] != "notpresent" {
-				return RadiusPacketCheck{}, fmt.Errorf("bad format specification %v", arrayItems)
+				return RadiusPacketCheck{}, fmt.Errorf("bad format specification. Unknown check type: %v", arrayItems)
 			}
-			if arrayItems[1] != "present" && len(arrayItems) < 3 {
-				return RadiusPacketCheck{}, fmt.Errorf("bad format specification %v", arrayItems)
+			if arrayItems[1] != "present" && arrayItems[1] != "notpresent" && len(arrayItems) < 3 {
+				return RadiusPacketCheck{}, fmt.Errorf("bad format specification. Missing at least one item: %v", arrayItems)
 			}
 		}
 		return RadiusPacketCheck{Leaf: arrayItems}, nil
