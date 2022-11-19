@@ -19,8 +19,8 @@ import (
 
 // Magical reference date is Mon Jan 2 15:04:05 MST 2006
 // Time AVP is the number of seconds since 1/1/1900
-var zeroTime, _ = time.Parse("2006-01-02T15:04:05 UTC", "1900-01-01T00:00:00 UTC")
-var timeFormatString = "2006-01-02T15:04:05 UTC"
+var zeroTime, _ = time.Parse("2006-01-02T15:04:05 MST", "1900-01-01T00:00:00 UTC")
+var timeFormatString = "2006-01-02T15:04:05 MST"
 var ipv6PrefixRegex = regexp.MustCompile(`[0-9a-zA-z:\\.]+/[0-9]+`)
 
 type DiameterAVP struct {

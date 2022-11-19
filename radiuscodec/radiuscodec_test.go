@@ -208,7 +208,7 @@ func TestIPv6PrefixAVP(t *testing.T) {
 
 func TestVendorTimeAVP(t *testing.T) {
 
-	var timeFormatString = "2006-01-02T15:04:05 UTC"
+	var timeFormatString = "2006-01-02T15:04:05 MST"
 	var theValue = "2020-09-06T21:08:09 UTC"
 	var timeValue, err = time.Parse(timeFormatString, theValue)
 

@@ -800,7 +800,7 @@ func TestDiameterMessageAllAttributeTypes(t *testing.T) {
 	if recoveredMessage.GetStringAVP("Igor-myTestAllGrouped.Igor-myEnumerated") != "two" {
 		t.Errorf("Error recovering Enumerated. Got <%s> instead of <two>", recoveredMessage.GetStringAVP("Igor-myTestAllGrouped.Igor-myEnumerated"))
 	}
-	targetTime, _ := time.Parse("2006-01-02T15:04:05 UTC", "1966-11-26T03:34:08 UTC")
+	targetTime, _ := time.Parse("2006-01-02T15:04:05 MST", "1966-11-26T03:34:08 UTC")
 	if recoveredMessage.GetDateAVP("Igor-myTestAllGrouped.Igor-myTime") != targetTime {
 		t.Errorf("Error recovering date. Got <%v> instead of <1966-11-26T03:34:08 UTC>", recoveredMessage.GetDateAVP("Igor-myTestAllGrouped.Igor-myTime"))
 	}

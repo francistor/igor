@@ -21,13 +21,13 @@ type FileCDRWriter struct {
 	// TODO: re-write as either *RadiusPacket or *DiameterMessage
 	packetChan chan interface{}
 
-	// To singal that we have finished processing CDR
+	// To signal that we have finished processing CDR
 	doneChan chan struct{}
 
 	// Externally created, holding the method to format the CDR
 	formatter CDRFormatter
 
-	// Timestamp in unix seconds for the currently being used file
+	// Timestamp in unix seconds for the file currently being used
 	currentFileTimestamp int64
 
 	// For sanity check
@@ -67,6 +67,8 @@ func NewFileCDRWriter(filePath string, fileNameFormat string, formatter CDRForma
 
 func (w *FileCDRWriter) eventLoop() {
 
+	// The loop will finish when the packet channel is closed, which occurs
+	// when invoking Close()
 	for p := range w.packetChan {
 
 		// Check if we must rotate

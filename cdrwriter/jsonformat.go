@@ -26,7 +26,10 @@ func NewJSONWriter(positiveFilter []string, negativeFilter []string) *JSONWriter
 
 ///---> What to write to ELASTIC?
 
-// Not implemented
+// There is no specific field for the Timestamp. If needed, the attribute must be already present
+// in the packet/message. A Timestamp attribute may be added in the handler if not sent by the BRAS
+
+// Writes the Diameter CDR in JSON format
 func (w *JSONWriter) GetDiameterCDRString(dm *diamcodec.DiameterMessage) string {
 	toSerialize := make([]*diamcodec.DiameterAVP, 0)
 
@@ -47,8 +50,7 @@ func (w *JSONWriter) GetDiameterCDRString(dm *diamcodec.DiameterMessage) string 
 	return string(jsonAttributes)
 }
 
-// Write CDR as list with separators
-// Ints are not tried to write as strings, even if an enum is defined
+// Writes the CDR in JSON format
 func (w *JSONWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) string {
 
 	toSerialize := make([]*radiuscodec.RadiusAVP, 0)

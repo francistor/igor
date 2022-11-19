@@ -35,7 +35,7 @@ func TestLivingstoneFormat(t *testing.T) {
 	// Read JSON to Radius Packet
 	rp := buildSimpleRadiusPacket(t)
 
-	lw := NewLivingstoneWriter(nil, []string{"User-Name"}, time.RFC3339, time.RFC3339)
+	lw := NewLivingstoneWriter(nil, []string{"User-Name"}, "2006-01-02T15:04:05 MST", "2006-01-02T15:04:05 MST")
 	cdrString := lw.GetRadiusCDRString(&rp)
 	if strings.Contains(cdrString, "User-Name") {
 		t.Fatalf("Written CDR contains filtered attribute User-Name")
@@ -51,7 +51,6 @@ func TestCSVFormat(t *testing.T) {
 	rp := buildSimpleRadiusPacket(t)
 
 	result := `"0102030405060708090a0b";;"stringvalue,anotherStringvalue";0,1,1;"127.0.0.1";"1966-11-26T03:34:08 UTC";"bebe:cafe::";"bebe:cafe:cccc::0/64";"00aabbccddeeff11";999999999999;"myString:1";"1122aabbccdd"`
-
 	csvw := NewCSVWriter([]string{
 		"Igor-OctetsAttribute",
 		"Non-existing",
@@ -65,7 +64,7 @@ func TestCSVFormat(t *testing.T) {
 		"Igor-Integer64Attribute",
 		"Igor-TaggedStringAttribute",
 		"Igor-SaltedOctetsAttribute"},
-		";", ",", time.RFC3339, true, false)
+		";", ",", "2006-01-02T15:04:05 MST", true, false)
 	cdrString := csvw.GetRadiusCDRString(&rp)
 	if strings.Contains(cdrString, "MyUserName") {
 		t.Fatalf("Written CDR contains filtered attribute User-Name")
@@ -87,8 +86,8 @@ func TestCSVParsedIntsFormat(t *testing.T) {
 	rp := buildSimpleRadiusPacket(t)
 
 	result := `"0102030405060708090a0b";;"stringvalue,anotherStringvalue";"Zero,One,One";"127.0.0.1";"1966-11-26T03:34:08 UTC";"bebe:cafe::";"bebe:cafe:cccc::0/64";"00aabbccddeeff11";"999999999999";"myString:1";"1122aabbccdd"`
-
 	csvw := NewCSVWriter([]string{
+		"%Timestamp%",
 		"Igor-OctetsAttribute",
 		"Non-existing",
 		"Igor-StringAttribute",
@@ -101,7 +100,8 @@ func TestCSVParsedIntsFormat(t *testing.T) {
 		"Igor-Integer64Attribute",
 		"Igor-TaggedStringAttribute",
 		"Igor-SaltedOctetsAttribute"},
-		";", ",", time.RFC3339, true, true)
+		";", ",", "2006-01-02T15:04:05 MST", true, true)
+
 	cdrString := csvw.GetRadiusCDRString(&rp)
 	if strings.Contains(cdrString, "MyUserName") {
 		t.Fatalf("Written CDR contains filtered attribute User-Name")
@@ -112,9 +112,11 @@ func TestCSVParsedIntsFormat(t *testing.T) {
 	if !strings.Contains(cdrString, ";;") {
 		t.Fatalf("pattern for non existing attribute not found")
 	}
-	if cdrString != result+"\n" {
+	if !strings.Contains(cdrString, result) {
 		t.Fatalf("bad csv string <%s>", cdrString)
 	}
+
+	t.Log(cdrString)
 }
 
 func TestJSONFormat(t *testing.T) {
@@ -142,9 +144,9 @@ func TestFileWriter(t *testing.T) {
 	// Read JSON to Radius Packet
 	rp := buildSimpleRadiusPacket(t)
 
-	lw := NewLivingstoneWriter(nil, []string{"User-Name"}, time.RFC3339, time.RFC3339)
+	lw := NewLivingstoneWriter(nil, []string{"User-Name"}, "2006-01-02T15:04:05 MST", "2006-01-02T15:04:05 MST")
 
-	// Magic date is 2006-01-02T15:04:05 UTC"
+	// Magic date is 2006-01-02T15:04:05 MST"
 	fw := NewFileCDRWriter(cdrDirectoryName, "cdr_2006-01-02", lw, 1000)
 
 	fw.WriteRadiusCDR(&rp)
@@ -177,9 +179,9 @@ func TestFileWriterRotation(t *testing.T) {
 	// Read JSON to Radius Packet
 	rp := buildSimpleRadiusPacket(t)
 
-	lw := NewLivingstoneWriter(nil, []string{"User-Name"}, time.RFC3339, time.RFC3339)
+	lw := NewLivingstoneWriter(nil, []string{"User-Name"}, "2006-01-02T15:04:05 MST", "2006-01-02T15:04:05 MST")
 
-	// Magic date is 2006-01-02T15:04:05 UTC"
+	// Magic date is 2006-01-02T15:04:05 MST"
 	// Rotate in 2 seconds
 	fw := NewFileCDRWriter(cdrDirectoryName, "cdr_2006-01-02T15-04-05", lw, 2)
 

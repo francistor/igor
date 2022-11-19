@@ -158,6 +158,8 @@ func (c *RadiusPacketCheck) CheckPacket(packet *radiuscodec.RadiusPacket) bool {
 			return attributeValue == c.Leaf[2]
 		case "present":
 			return attributeValue != ""
+		case "notpresent":
+			return attributeValue == ""
 		case "contains":
 			return strings.Contains(attributeValue, c.Leaf[2])
 		case "matches":
@@ -259,7 +261,8 @@ func parseRadiusPacketCheck(radiusCheck interface{}) (RadiusPacketCheck, error) 
 			if arrayItems[1] != "equals" &&
 				arrayItems[1] != "matches" &&
 				arrayItems[1] != "contains" &&
-				arrayItems[1] != "present" {
+				arrayItems[1] != "present" &&
+				arrayItems[1] != "notpresent" {
 				return RadiusPacketCheck{}, fmt.Errorf("bad format specification %v", arrayItems)
 			}
 			if arrayItems[1] != "present" && len(arrayItems) < 3 {

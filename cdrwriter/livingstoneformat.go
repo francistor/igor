@@ -57,7 +57,7 @@ func (w *LivingstoneWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) str
 
 		switch rp.AVPs[i].DictItem.RadiusType {
 
-		case radiusdict.None, radiusdict.Octets, radiusdict.String, radiusdict.InterfaceId, radiusdict.Address, radiusdict.IPv6Address, radiusdict.IPv6Prefix, radiusdict.Time:
+		case radiusdict.None, radiusdict.Octets, radiusdict.String, radiusdict.InterfaceId, radiusdict.Address, radiusdict.IPv6Address, radiusdict.IPv6Prefix:
 			// Write as a string
 			builder.WriteString("=\"")
 			builder.WriteString(rp.AVPs[i].GetTaggedString())
@@ -75,6 +75,11 @@ func (w *LivingstoneWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) str
 				builder.WriteString(fmt.Sprintf("%d", intValue))
 				builder.WriteString("\n")
 			}
+		case radiusdict.Time:
+			// Format date
+			builder.WriteString("=\"")
+			builder.WriteString(rp.AVPs[i].GetDate().Format(w.attributeDateFormat))
+			builder.WriteString("\"\n")
 		}
 
 	}

@@ -3,6 +3,7 @@ package cdrwriter
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/francistor/igor/diamcodec"
 	"github.com/francistor/igor/radiuscodec"
@@ -44,11 +45,25 @@ func (w *CSVWriter) GetDiameterCDRString(dm *diamcodec.DiameterMessage) string {
 }
 
 // Write CDR as list with separators
+// Special field names:
+// * %Timestamp% -> Datetime of CDR generation
 func (w *CSVWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) string {
 	var builder strings.Builder
 
 	// Iterate through the fields in the spec
 	for i, field := range w.fields {
+
+		if field == "%Timestamp%" {
+			// Write as string
+			if w.quoteStrings {
+				builder.WriteString("\"")
+			}
+			builder.WriteString(time.Now().Format(w.attributeDateFormat))
+			// Write as string
+			if w.quoteStrings {
+				builder.WriteString("\"")
+			}
+		}
 
 		// Get all the attributes for that name
 		avps := rp.GetAllAVP(field)
@@ -64,6 +79,20 @@ func (w *CSVWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) string {
 					if j < len(avps)-1 {
 						builder.WriteString(w.attributeSeparator)
 					}
+				}
+			} else if radiusType == radiusdict.Time {
+				// Write as string
+				if w.quoteStrings {
+					builder.WriteString("\"")
+				}
+				for j := range avps {
+					builder.WriteString(avps[j].GetDate().Format(w.attributeDateFormat))
+					if j < len(avps)-1 {
+						builder.WriteString(w.attributeSeparator)
+					}
+				}
+				if w.quoteStrings {
+					builder.WriteString("\"")
 				}
 			} else {
 				// Write as string
