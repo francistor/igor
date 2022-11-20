@@ -18,13 +18,13 @@ func TestWideLog(t *testing.T) {
 }
 
 func fakeHandler() {
-	logLines := NewLogLines()
+	wideLogger := NewWideLogger()
 
-	defer func(lines *LogLines) {
-		logLines.WriteWLog()
-	}(logLines)
+	defer func(lines *WideLogger) {
+		wideLogger.Write()
+	}(wideLogger)
 
-	logLines.WLogEntry(config.LEVEL_INFO, "%s", "--- StartingHandler")
-	logLines.WLogEntry(config.LEVEL_INFO, "%s %d", "EndingHandler", 0)
+	wideLogger.Log(config.LEVEL_INFO, "%s", "--- StartingHandler")
+	wideLogger.Log(config.LEVEL_INFO, "%s %d", "EndingHandler", 0)
 
 }

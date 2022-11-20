@@ -11,30 +11,30 @@ import (
 
 // The most basic handler ever. Returns an empty response to the received message
 func EmptyDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-	logLines := instrumentation.NewLogLines()
+	wideLogger := instrumentation.NewWideLogger()
 
-	defer func(lines *instrumentation.LogLines) {
-		logLines.WriteWLog()
-	}(logLines)
+	defer func(lines *instrumentation.WideLogger) {
+		wideLogger.Write()
+	}(wideLogger)
 
-	logLines.WLogEntry(config.LEVEL_INFO, "%s", "Starting EmptyDiameterHandler")
-	logLines.WLogEntry(config.LEVEL_INFO, "%s %s", "request", request)
+	wideLogger.Log(config.LEVEL_INFO, "%s", "Starting EmptyDiameterHandler")
+	wideLogger.Log(config.LEVEL_INFO, "%s %s", "request", request)
 
 	response := diamcodec.NewDiameterAnswer(request)
 	response.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
 
-	logLines.WLogEntry(config.LEVEL_INFO, "%s %s", "response", request)
+	wideLogger.Log(config.LEVEL_INFO, "%s %s", "response", request)
 
 	return response, nil
 }
 
 // The most basic handler ever. Returns an empty response to the received message
 func EmptyRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-	logLines := instrumentation.NewLogLines()
+	wideLogger := instrumentation.NewWideLogger()
 
-	defer func(lines *instrumentation.LogLines) {
-		logLines.WriteWLog()
-	}(logLines)
+	defer func(lines *instrumentation.WideLogger) {
+		wideLogger.Write()
+	}(wideLogger)
 
 	resp := radiuscodec.NewRadiusResponse(request, true)
 
@@ -43,19 +43,19 @@ func EmptyRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusP
 
 // Used to test all possible attribute types
 func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-	logLines := instrumentation.NewLogLines()
+	wideLogger := instrumentation.NewWideLogger()
 
-	defer func(lines *instrumentation.LogLines) {
-		logLines.WriteWLog()
-	}(logLines)
+	defer func(lines *instrumentation.WideLogger) {
+		wideLogger.Write()
+	}(wideLogger)
 
 	// Print the password
 	pwd := request.GetPasswordStringAVP("User-Password")
-	logLines.WLogEntry(config.LEVEL_INFO, "Password: <%s>", pwd)
+	wideLogger.Log(config.LEVEL_INFO, "Password: <%s>", pwd)
 
 	// Print all received attributes
 	for _, avp := range request.AVPs {
-		logLines.WLogEntry(config.LEVEL_INFO, avp.Name, avp.GetTaggedString())
+		wideLogger.Log(config.LEVEL_INFO, avp.Name, avp.GetTaggedString())
 	}
 
 	// Reply with one attribute of each type
@@ -86,7 +86,7 @@ func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscode
 	var responseAVPs []radiuscodec.RadiusAVP
 	err := json.Unmarshal([]byte(jAVPs), &responseAVPs)
 	if err != nil {
-		logLines.WLogEntry(config.LEVEL_ERROR, "%s", err.Error())
+		wideLogger.Log(config.LEVEL_ERROR, "%s", err.Error())
 	}
 
 	for _, avp := range responseAVPs {
