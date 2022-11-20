@@ -600,3 +600,12 @@ func (rp RadiusPacket) String() string {
 		return string(b)
 	}
 }
+
+func (rp *RadiusPacket) ToString() string {
+	b, error := json.Marshal(rp)
+	if error != nil {
+		return ""
+	} else {
+		return string(b)
+	}
+}

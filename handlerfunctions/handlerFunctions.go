@@ -11,9 +11,9 @@ import (
 
 // The most basic handler ever. Returns an empty response to the received message
 func EmptyDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-	logLines := make(instrumentation.LogLines, 0)
+	logLines := instrumentation.NewLogLines()
 
-	defer func(lines []instrumentation.LogLine) {
+	defer func(lines *instrumentation.LogLines) {
 		logLines.WriteWLog()
 	}(logLines)
 
@@ -30,9 +30,9 @@ func EmptyDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.Diamet
 
 // The most basic handler ever. Returns an empty response to the received message
 func EmptyRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-	logLines := make(instrumentation.LogLines, 0)
+	logLines := instrumentation.NewLogLines()
 
-	defer func(lines []instrumentation.LogLine) {
+	defer func(lines *instrumentation.LogLines) {
 		logLines.WriteWLog()
 	}(logLines)
 
@@ -43,9 +43,9 @@ func EmptyRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusP
 
 // Used to test all possible attribute types
 func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-	logLines := make(instrumentation.LogLines, 0)
+	logLines := instrumentation.NewLogLines()
 
-	defer func(lines []instrumentation.LogLine) {
+	defer func(lines *instrumentation.LogLines) {
 		logLines.WriteWLog()
 	}(logLines)
 

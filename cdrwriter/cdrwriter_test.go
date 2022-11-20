@@ -25,7 +25,7 @@ func TestMain(m *testing.M) {
 	exitCode := m.Run()
 
 	// Clean cdr files
-	//os.RemoveAll(cdrDirectoryName)
+	os.RemoveAll(cdrDirectoryName)
 
 	os.Exit(exitCode)
 }
@@ -147,7 +147,7 @@ func TestFileWriter(t *testing.T) {
 	lw := NewLivingstoneWriter(nil, []string{"User-Name"}, "2006-01-02T15:04:05 MST", "2006-01-02T15:04:05 MST")
 
 	// Magic date is 2006-01-02T15:04:05 MST"
-	fw := NewFileCDRWriter(cdrDirectoryName, "cdr_2006-01-02", lw, 1000)
+	fw := NewFileCDRWriter(cdrDirectoryName, "cdr_2006-01-02.txt", lw, 1000)
 
 	fw.WriteRadiusCDR(&rp)
 
@@ -183,7 +183,7 @@ func TestFileWriterRotation(t *testing.T) {
 
 	// Magic date is 2006-01-02T15:04:05 MST"
 	// Rotate in 2 seconds
-	fw := NewFileCDRWriter(cdrDirectoryName, "cdr_2006-01-02T15-04-05", lw, 2)
+	fw := NewFileCDRWriter(cdrDirectoryName, "cdr_2006-01-02T15-04-05.txt", lw, 2)
 
 	fw.WriteRadiusCDR(&rp)
 	time.Sleep(2100 * time.Millisecond)

@@ -117,7 +117,7 @@ func (w *FileCDRWriter) rotateFile() {
 		w.file.Close()
 	}
 
-	fileName := w.filePath + "/" + time.Now().Format(w.fileNameFormat) + ".txt"
+	fileName := w.filePath + "/" + time.Now().Format(w.fileNameFormat)
 	// Sanity check
 	if fileName == w.currentFileName {
 		panic("File name not changed when rotating: " + fileName)

@@ -10,7 +10,10 @@
             ["Igor-SaltedOctetsAttribute", "matches", "1122.*"]
         ]
     },
-    "leafOnlyCheck1": ["User-Name", "matches", "My.*"],
-    "leafOnlyCheck2": ["User-Name", "matches", "other.*"]
+    "leafOnlyUserNameMatchesMy": ["User-Name", "matches", "My.*"],
+    "leafOnlyUserNameMatchesOnly": ["User-Name", "matches", "other.*"],
+    "leafOnlyCheckClassPresent": ["Class", "present"],
+    "leafOnlyCheckClassNotPresent": ["Class", "notpresent"],
+    "leafOnlyCheckUserNameNotPresent": ["User-Name", "notpresent"]
 }
 

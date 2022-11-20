@@ -26,30 +26,39 @@ type LogLine struct {
 }
 
 // The set of log entries to be written on function exit
-type LogLines []LogLine
+type LogLines struct {
+	Lines []LogLine
+	//wg    sync.WaitGroup
+}
+
+func NewLogLines() *LogLines {
+	return &LogLines{
+		Lines: make([]LogLine, 1),
+	}
+}
 
 // Adds a log entry to the slize of entries to be written
 func (l *LogLines) WLogEntry(level zapcore.Level, format string, args ...interface{}) {
 	if config.IsLevelEnabled(level) {
 		line := fmt.Sprintf(format, args...)
-		*l = append(*l, LogLine{level: level, log: line})
+		l.Lines = append(l.Lines, LogLine{level: level, log: line})
 	}
 }
 
 // Writes the log lines
-func (l LogLines) WriteWLog() {
+func (l *LogLines) WriteWLog() {
 	logger := config.GetLogger()
-	for i := range l {
-		if config.IsLevelEnabled(l[i].level) {
-			switch l[i].level {
+	for i := range l.Lines {
+		if config.IsLevelEnabled(l.Lines[i].level) {
+			switch l.Lines[i].level {
 			case zapcore.DebugLevel:
-				logger.Debug(l[i].log)
+				logger.Debug(l.Lines[i].log)
 			case zapcore.InfoLevel:
-				logger.Info(l[i].log)
+				logger.Info(l.Lines[i].log)
 			case zapcore.WarnLevel:
-				logger.Warn(l[i].log)
+				logger.Warn(l.Lines[i].log)
 			case zapcore.ErrorLevel:
-				logger.Error(l[i].log)
+				logger.Error(l.Lines[i].log)
 			}
 		}
 	}

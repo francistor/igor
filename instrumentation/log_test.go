@@ -18,9 +18,9 @@ func TestWideLog(t *testing.T) {
 }
 
 func fakeHandler() {
-	logLines := make(LogLines, 0)
+	logLines := NewLogLines()
 
-	defer func(lines []LogLine) {
+	defer func(lines *LogLines) {
 		logLines.WriteWLog()
 	}(logLines)
 

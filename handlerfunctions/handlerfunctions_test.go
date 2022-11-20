@@ -139,11 +139,20 @@ func TestRadiusChecks(t *testing.T) {
 	}
 
 	// Check with branch only
-	if !radiusChecks.CheckPacket("leafOnlyCheck1", &rp) {
+	if !radiusChecks.CheckPacket("leafOnlyUserNameMatchesMy", &rp) {
 		t.Fatalf("wrongly discarded packet")
 	}
-	if radiusChecks.CheckPacket("leafOnlyCheck2", &rp) {
+	if radiusChecks.CheckPacket("leafOnlyUserNameMatchesOnly", &rp) {
 		t.Fatalf("wrongly accepted packet")
+	}
+	if radiusChecks.CheckPacket("leafOnlyCheckClassPresent", &rp) {
+		t.Fatalf("wrongly accepted packet (Class)")
+	}
+	if !radiusChecks.CheckPacket("leafOnlyCheckClassNotPresent", &rp) {
+		t.Fatalf("wrongly rejected packet (Class)")
+	}
+	if radiusChecks.CheckPacket("leafOnlyCheckUserNameNotPresent", &rp) {
+		t.Fatalf("wrongly accepted packet (User-Name)")
 	}
 }
 
