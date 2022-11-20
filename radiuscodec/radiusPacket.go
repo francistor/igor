@@ -219,7 +219,7 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 		writtenBytes = n
 	} else {
 		// Authenticator is md5(code+identifier+(current authenticator in Authenticator field)+request_attributes+secret)
-		//                                      (zero or the authenticator in the request    )
+		//                                      (wich is a generated one (auth request) zero (other requests) or the authenticator in the request (response))
 		hasher := md5.New()
 		hasher.Write(writer.Bytes())
 		hasher.Write([]byte(secret))
@@ -232,10 +232,13 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 			return int64(n1), err
 		}
 		// Write authenticator
+		// And update the authenticator in the packet!
 		n2, err := outWriter.Write(auth)
 		if err != nil {
 			return int64(n1 + n2), err
 		}
+		rp.Authenticator = *(*[16]byte)(auth)
+
 		// Write AVPs
 		n3, err := outWriter.Write(bytesToWrite[20:])
 		if err != nil {
@@ -550,6 +553,27 @@ func ValidateResponseAuthenticator(packetBytes []byte, requestAuthenticator [16]
 	hasher := md5.New()
 	hasher.Write(packetBytes[0:4])
 	hasher.Write(requestAuthenticator[:])
+	hasher.Write(packetBytes[20:])
+	hasher.Write([]byte(secret))
+	auth := hasher.Sum(nil)
+
+	// Compare by brute force, better than reflect
+	for i, b := range packetBytes[4:20] {
+		if auth[i] != b {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Checks the request authenticator
+// Request authenticator must be the md5 hash of the received bytes followed by the secret
+func ValidateRequestAuthenticator(packetBytes []byte, secret string) bool {
+
+	hasher := md5.New()
+	hasher.Write(packetBytes[0:4])
+	hasher.Write(zero_authenticator[:])
 	hasher.Write(packetBytes[20:])
 	hasher.Write([]byte(secret))
 	auth := hasher.Sum(nil)

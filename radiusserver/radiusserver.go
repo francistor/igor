@@ -99,8 +99,17 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 		config.GetLogger().Debugf("received packet: %v", reqBuf[:packetSize])
 		radiusPacket, err := radiuscodec.RadiusPacketFromBytes((reqBuf[:packetSize]), radiusClient.Secret)
 		if err != nil {
-			config.GetLogger().Errorf("error decoding packet %s", err)
+			config.GetLogger().Errorf("error decoding packet %s\n", err)
 			continue
+		}
+
+		// Validate the packet
+		if radiusPacket.Code != radiuscodec.ACCESS_REQUEST {
+			if !radiuscodec.ValidateRequestAuthenticator(reqBuf[:packetSize], radiusClient.Secret) {
+				instrumentation.PushRadiusServerDrop(clientIPAddr, string(radiusPacket.Code))
+				config.GetLogger().Warnf("invalid request packet %s\n", radiusPacket)
+				continue
+			}
 		}
 
 		instrumentation.PushRadiusServerRequest(clientIPAddr, string(radiusPacket.Code))

@@ -336,7 +336,7 @@ func TestEncryptFunction(t *testing.T) {
 }
 
 // ///////////////////////////////////////////////////////////////////////////////////
-func TestRadiusPacket(t *testing.T) {
+func TestAccessRequest(t *testing.T) {
 
 	theUserName := "MyUserName"
 	thePassword := "pwd"
@@ -363,6 +363,40 @@ func TestRadiusPacket(t *testing.T) {
 
 	if password := recoveredPacket.GetPasswordStringAVP("User-Password"); password != thePassword {
 		t.Errorf("attribute does not match <%s>", password)
+	}
+
+	response := NewRadiusResponse(request, true)
+	responseBytes, err := response.ToBytes(secret, 0)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !ValidateResponseAuthenticator(responseBytes, request.Authenticator, secret) {
+		t.Errorf("response has invalid authenticator")
+	}
+}
+
+func TestAccountingRequest(t *testing.T) {
+
+	theClass := "MyClass"
+
+	request := NewRadiusRequest(ACCOUNTING_REQUEST)
+	request.Add("Class", theClass)
+
+	// Serialize
+	packetBytes, err := request.ToBytes(secret, 0)
+	if err != nil {
+		t.Errorf("could not serialize packet: %s", err)
+	}
+
+	// Unserialize
+	recoveredPacket, err := RadiusPacketFromBytes(packetBytes, secret)
+	if err != nil {
+		t.Errorf("could not unserialize packet: %s", err)
+	}
+
+	if class := recoveredPacket.GetStringAVP("Class"); class != theClass {
+		t.Errorf("attribute does not match <%s>", class)
 	}
 
 	response := NewRadiusResponse(request, true)

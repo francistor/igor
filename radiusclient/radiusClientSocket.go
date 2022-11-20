@@ -351,7 +351,8 @@ func (rcs *RadiusClientSocket) eventLoop() {
 					instrumentation.PushRadiusClientTimeout(v.endpoint, string(v.packet.Code))
 
 				}),
-				secret:        v.secret,
+				secret: v.secret,
+				// The authenticator is generated after ToBytes is called!
 				authenticator: v.packet.Authenticator,
 			}
 
