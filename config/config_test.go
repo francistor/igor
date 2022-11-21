@@ -170,3 +170,17 @@ func TestHttpRouterConfig(t *testing.T) {
 		t.Fatalf("BindPort was %d", hrc.BindPort)
 	}
 }
+
+func TestHandlerLogger(t *testing.T) {
+
+	hl := NewHandlerLogger()
+	hl.L.Debugf("message in debug level <%s>", "debug message")
+	hl.L.Infof("message in info level <%s>", "info message")
+	logDump := hl.String()
+	if strings.Contains(logDump, "<debug message>") {
+		t.Fatalf("incorrectly dumped handler logger message in debug mode")
+	}
+	if !strings.Contains(logDump, "<info message>") {
+		t.Fatalf("missing handler logger message in info mode")
+	}
+}

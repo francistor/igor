@@ -38,6 +38,14 @@ func localDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.Diamet
 
 // The most basic handler ever. Returns an empty response to the received message
 func localRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+	hl := config.NewHandlerLogger()
+	l := hl.L
+
+	defer func(l *config.HandlerLogger) {
+		l.WriteLog()
+	}(hl)
+
+	l.Infof("started localRadiusHandler for request %s", request)
 	resp := radiuscodec.NewRadiusResponse(request, true)
 	resp.Add("User-Name", "EchoLocal")
 

@@ -1,12 +1,28 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+// Two types of loggers are used
+// The Core logger (or Igor logger) is general to Igor, initialized in the initLogger
+// method. Only a single instance exists
+// The Handler loggers are created on each handler, using NewHandlerLogger
+
+type LogConfig struct {
+	CoreLogConfig    json.RawMessage
+	HandlerLogConfig json.RawMessage
+}
+
+type HandlerLogger struct {
+	L *zap.SugaredLogger
+	b bytes.Buffer
+}
 
 const (
 	LEVEL_DEBUG = -1
@@ -20,57 +36,131 @@ const (
 // handlerConfigurationManager
 var ilogger *zap.SugaredLogger
 
-// The configured logLevel
+// The configured logLevel for the core logger
 var ilogLevel zapcore.Level
+
+// The configuration for the handler loggers
+var handlerCfg zap.Config
 
 // https://pkg.go.dev/go.uber.org/zap
 // Returns a configured instance of zap logger
 func initLogger(cm *ConfigurationManager) {
 
 	defaultLogConfig := `{
-		"level": "info",
-		"development": true,
-		"encoding": "console",
-		"outputPaths": ["stdout"],
-		"errorOutputPaths": ["stderr"],
-		"disableCaller": false,
-		"disableStackTrace": false,
-		"encoderConfig": {
-			"messageKey": "message",
-			"levelKey": "level",
-			"levelEncoder": "lowercase",
-			"callerKey": "caller",
-			"callerEncoder": "",
-			"timeKey": "ts",
-			"timeEncoder": "ISO8601"
+		"coreLogConfig":{
+			"level": "info",
+			"development": true,
+			"encoding": "console",
+			"outputPaths": ["stdout"],
+			"errorOutputPaths": ["stderr"],
+			"disableCaller": false,
+			"disableStackTrace": false,
+			"encoderConfig": {
+				"messageKey": "message",
+				"levelKey": "level",
+				"levelEncoder": "lowercase",
+				"callerKey": "caller",
+				"callerEncoder": "",
+				"timeKey": "ts",
+				"timeEncoder": "ISO8601"
 			}
-		}`
+		},
+		"handlerLogConfig": {
+			"level": "info",
+			"development": true,
+			"encoding": "console",
+			"outputPaths": ["stdout"],
+			"errorOutputPaths": ["stderr"],
+			"disableCaller": false,
+			"disableStackTrace": false,
+			"encoderConfig": {
+				"messageKey": "message",
+				"levelKey": "level",
+				"levelEncoder": "lowercase",
+				"callerKey": "caller",
+				"callerEncoder": "",
+				"timeKey": "ts",
+				"timeEncoder": "ISO8601"
+			}
+		}
+	}`
 
 	// Retrieve the log configuration
 	jConfig, err := cm.GetConfigObjectAsText("log.json", false)
 	if err != nil {
-		fmt.Println("using default logging configuration")
+		fmt.Println("using default logging configuration: " + err.Error())
 		jConfig = []byte(defaultLogConfig)
 	}
 
-	// Parse the JSON
-	var cfg zap.Config
-	if err := json.Unmarshal(jConfig, &cfg); err != nil {
+	// Parse complete JSON
+	var rawConfig LogConfig
+	if err := json.Unmarshal(jConfig, &rawConfig); err != nil {
 		panic("bad log configuration " + err.Error())
+	}
+
+	// Global Logger Configuration
+
+	// Parse the core logger configuration
+	var coreCfg zap.Config
+	if err := json.Unmarshal(rawConfig.CoreLogConfig, &coreCfg); err != nil {
+		panic("bad core log configuration " + err.Error())
 	}
 
 	// Build a logger with the specified configuration
-	logger, err := cfg.Build()
+	logger, err := coreCfg.Build()
 	if err != nil {
-		panic("bad log configuration " + err.Error())
+		panic("bad core log configuration " + err.Error())
 	}
 
-	ilogLevel = cfg.Level.Level()
+	ilogLevel = coreCfg.Level.Level()
 
 	ilogger = logger.Sugar()
+
+	// Handler Loggers Configuration
+
+	if err := json.Unmarshal(rawConfig.HandlerLogConfig, &handlerCfg); err != nil {
+		panic("bad handler log configuration " + err.Error())
+	}
 }
 
-// Used globally to get access to the logger
+// Creates a new HandlerLogger
+func NewHandlerLogger() *HandlerLogger {
+
+	handlerLogger := HandlerLogger{}
+
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(handlerCfg.EncoderConfig),
+		zapcore.AddSync(&handlerLogger.b),
+		handlerCfg.Level,
+	)
+
+	handlerLogger.L = zap.New(core).Sugar()
+
+	return &handlerLogger
+}
+
+func (h *HandlerLogger) String() string {
+	// Probably unecessary
+	h.L.Sync()
+
+	return h.b.String()
+}
+
+// Writes the handler log using the igor log
+func (h *HandlerLogger) WriteLog() {
+
+	if ilogLevel.Enabled(zapcore.DebugLevel) {
+		ilogger.Debugln(h.String())
+	} else if ilogLevel.Enabled(zapcore.InfoLevel) {
+		ilogger.Infoln(h.String())
+	} else if ilogLevel.Enabled(zapcore.WarnLevel) {
+		ilogger.Warnln(h.String())
+	} else if ilogLevel.Enabled(zapcore.ErrorLevel) {
+		ilogger.Errorln(h.String())
+	}
+}
+
+// Used globally to get access to the core logger
 func GetLogger() *zap.SugaredLogger {
 	return ilogger
 }
