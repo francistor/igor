@@ -153,7 +153,6 @@ func (c *RadiusPacketCheck) CheckPacket(packet *radiuscodec.RadiusPacket) bool {
 		attributeName := c.Leaf[0]
 		attributeValue := packet.GetStringAVP(attributeName)
 		condition := c.Leaf[1]
-		fmt.Println(condition)
 		switch condition {
 		case "equals":
 			return attributeValue == c.Leaf[2]

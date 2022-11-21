@@ -146,18 +146,36 @@ func (h *HandlerLogger) String() string {
 	return h.b.String()
 }
 
-// Writes the handler log using the igor log
+// Writes the handler log using the highest compatible log level
 func (h *HandlerLogger) WriteLog() {
 
-	if ilogLevel.Enabled(zapcore.DebugLevel) {
-		ilogger.Debugln(h.String())
-	} else if ilogLevel.Enabled(zapcore.InfoLevel) {
-		ilogger.Infoln(h.String())
-	} else if ilogLevel.Enabled(zapcore.WarnLevel) {
-		ilogger.Warnln(h.String())
-	} else if ilogLevel.Enabled(zapcore.ErrorLevel) {
-		ilogger.Errorln(h.String())
+	text := h.String()
+	if text != "" {
+		if ilogLevel.Enabled(zapcore.DebugLevel) {
+			ilogger.Debugln(text)
+		} else if ilogLevel.Enabled(zapcore.InfoLevel) {
+			ilogger.Infoln(text)
+		} else if ilogLevel.Enabled(zapcore.WarnLevel) {
+			ilogger.Warnln(text)
+		} else if ilogLevel.Enabled(zapcore.ErrorLevel) {
+			ilogger.Errorln(text)
+		}
 	}
+}
+
+func (h *HandlerLogger) IsLevelEnabled(level int) bool {
+	switch level {
+	case LEVEL_ERROR:
+		return handlerCfg.Level.Enabled(zapcore.ErrorLevel)
+	case LEVEL_WARN:
+		return handlerCfg.Level.Enabled(zapcore.WarnLevel)
+	case LEVEL_INFO:
+		return handlerCfg.Level.Enabled(zapcore.InfoLevel)
+	case LEVEL_DEBUG:
+		return handlerCfg.Level.Enabled(zapcore.DebugLevel)
+	}
+
+	return true
 }
 
 // Used globally to get access to the core logger
