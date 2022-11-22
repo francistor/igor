@@ -163,6 +163,7 @@ func (h *HandlerLogger) WriteLog() {
 	}
 }
 
+// Check whether the specified log level is enabled
 func (h *HandlerLogger) IsLevelEnabled(level int) bool {
 	switch level {
 	case LEVEL_ERROR:
