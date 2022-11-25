@@ -321,24 +321,24 @@ type AVPFilter struct {
 }
 
 // Contents of the AVPFilters file. Set of AVPFilters by key
-type AVPFilters map[string]AVPFilter
+type AVPFilters map[string]*AVPFilter
 
 // Creates a copy of the radius packet with the attributes filtered as specified in the filter for the passed key
-func (fs AVPFilters) FilterPacket(key string, packet *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+func (fs AVPFilters) FilteredPacket(key string, packet *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
 	if filter, ok := fs[key]; !ok {
 		return &radiuscodec.RadiusPacket{}, fmt.Errorf("%s filter not found", key)
 	} else {
-		return filter.FilterPacket(packet), nil
+		return filter.FilteredPacket(packet), nil
 	}
 }
 
 // Copy the radius packet with the attributes modified as defined in the specified filter
-func (f *AVPFilter) FilterPacket(packet *radiuscodec.RadiusPacket) *radiuscodec.RadiusPacket {
+func (f *AVPFilter) FilteredPacket(packet *radiuscodec.RadiusPacket) *radiuscodec.RadiusPacket {
 	var rp *radiuscodec.RadiusPacket
 	if len(f.Allow) > 0 {
 		rp = packet.Copy(f.Allow, nil)
 	} else if len(f.Remove) > 0 {
-		rp = packet.Copy(f.Allow, nil)
+		rp = packet.Copy(nil, f.Remove)
 	} else {
 		rp = packet.Copy(nil, nil)
 	}

@@ -367,7 +367,7 @@ func TestRadiusRouteToHTTP(t *testing.T) {
 	req.Add("User-Name", "myUserName")
 
 	// Send to named group
-	resp, err := client.RouteRadiusRequest("igor-server-group", req, 2*time.Second, 1, 1, "secret")
+	resp, err := client.RouteRadiusRequest(req, "igor-server-group", 2*time.Second, 1, 1, "secret")
 	if err != nil {
 		t.Fatalf("error sending request to igor-server-group %s", err)
 	}
@@ -377,7 +377,7 @@ func TestRadiusRouteToHTTP(t *testing.T) {
 
 	// Send to specific endpoint
 	// Send to named group
-	resp, err = client.RouteRadiusRequest("127.0.0.1:1812", req, 2*time.Second, 1, 1, "secret")
+	resp, err = client.RouteRadiusRequest(req, "127.0.0.1:1812", 2*time.Second, 1, 1, "secret")
 	if err != nil {
 		t.Fatalf("error sending request to 127.0.0.1:1812: %s", err)
 	}
@@ -401,7 +401,7 @@ func TestRadiusHandleLocal(t *testing.T) {
 	req.Add("User-Name", "myUserName")
 
 	// No destination: handle locally
-	resp, err := client.RouteRadiusRequest("", req, 2*time.Second, 1, 1, "")
+	resp, err := client.RouteRadiusRequest(req, "", 2*time.Second, 1, 1, "")
 	if err != nil {
 		t.Fatalf("error sending request to testClient %s", err)
 	}
@@ -430,7 +430,7 @@ func TestRadiusTimeout(t *testing.T) {
 	req.Add("User-Name", "myUserName")
 
 	// Send to first server of named group (non existing) twice
-	_, err := server.RouteRadiusRequest("igor-server-ne-group", req, 100*time.Millisecond, 1, 2, "secret")
+	_, err := server.RouteRadiusRequest(req, "igor-server-ne-group", 100*time.Millisecond, 1, 2, "secret")
 	if err == nil {
 		t.Fatalf("request did not get a timeout %s", err)
 	}
@@ -450,7 +450,7 @@ func TestRadiusTimeout(t *testing.T) {
 	}
 
 	// Repeat
-	_, err = server.RouteRadiusRequest("igor-server-ne-group", req, 100*time.Millisecond, 1, 2, "secret")
+	_, err = server.RouteRadiusRequest(req, "igor-server-ne-group", 100*time.Millisecond, 1, 2, "secret")
 	if err == nil {
 		t.Fatalf("request did not get a timeout %s", err)
 	}
@@ -470,7 +470,7 @@ func TestRadiusTimeout(t *testing.T) {
 	}
 
 	// Repeat. Request will not get a timeout and will increment client requests by one
-	_, err = server.RouteRadiusRequest("igor-server-ne-group", req, 100*time.Millisecond, 1, 2, "secret")
+	_, err = server.RouteRadiusRequest(req, "igor-server-ne-group", 100*time.Millisecond, 1, 2, "secret")
 	if err != nil {
 		t.Fatalf("request failed %s", err)
 	}
@@ -499,7 +499,7 @@ func TestRadiusTimeout(t *testing.T) {
 	}
 
 	// Send to specific server
-	_, err = server.RouteRadiusRequest("127.0.0.1:7777", req, 100*time.Millisecond, 1, 2, "secret")
+	_, err = server.RouteRadiusRequest(req, "127.0.0.1:7777", 100*time.Millisecond, 1, 2, "secret")
 	if err == nil {
 		t.Fatal("should get a timeout sending to non existing specific server")
 	}

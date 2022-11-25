@@ -3,6 +3,7 @@ package handlerfunctions
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 
@@ -189,11 +190,15 @@ func TestRadiusFilters(t *testing.T) {
 		t.Fatalf("error reading radiusFilters.json")
 	}
 
-	frp, err := filters.FilterPacket("myFilter", &rp)
+	fmt.Println(rp)
+
+	frp, err := filters.FilteredPacket("myFilter", &rp)
 	if err != nil {
 		t.Fatalf("error reading filters file")
 	}
-	if frp.GetStringAVP("Igor-OctetsAttibute") != "" {
+	fmt.Println("--------------")
+	fmt.Println(frp)
+	if frp.GetStringAVP("Igor-OctetsAttribute") != "" {
 		t.Fatalf("attribute not removed")
 	}
 	if frp.GetStringAVP("User-Name") != "Modified-User-Name" {

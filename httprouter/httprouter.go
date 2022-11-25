@@ -184,7 +184,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 		}
 
 		// Generate the Radius Answer, passing it to the router
-		answer, err := radiusRouter.RouteRadiusRequest(request.Destination, request.Packet, request.PerRequestTimeout, request.Tries, request.ServerTries, request.Secret)
+		answer, err := radiusRouter.RouteRadiusRequest(request.Packet, request.Destination, request.PerRequestTimeout, request.Tries, request.ServerTries, request.Secret)
 		if err != nil {
 			logger.Errorf("error handling request: %s", err)
 			w.WriteHeader(http.StatusGatewayTimeout)

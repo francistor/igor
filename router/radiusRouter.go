@@ -157,7 +157,7 @@ func (router *RadiusRouter) Start() *RadiusRouter {
 	// This handler function sends the request to this router, signailling that it must not be sent to
 	// an upstream server (destination = "")
 	handler := func(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-		return router.RouteRadiusRequest("", request, 0, 0, 0, "")
+		return router.RouteRadiusRequest(request, "", 0, 0, 0, "")
 	}
 
 	if radiusServerConf.AuthPort != 0 {
@@ -398,7 +398,7 @@ func (router *RadiusRouter) eventLoop() {
 // if pointing to an ipaddress:port, sent to that specific, possibly undeclared upstream server; if pointing to
 // a server group, it is routed according to the availability of the servers in the group
 // The total timeout wil be perRequestTimeout*tries*serverTries
-func (router *RadiusRouter) RouteRadiusRequest(destination string, packet *radiuscodec.RadiusPacket,
+func (router *RadiusRouter) RouteRadiusRequest(packet *radiuscodec.RadiusPacket, destination string,
 	perRequestTimeout time.Duration, tries int, serverTries int, secret string) (*radiuscodec.RadiusPacket, error) {
 
 	rchan := make(chan interface{}, 1)

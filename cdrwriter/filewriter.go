@@ -58,7 +58,7 @@ func NewFileCDRWriter(filePath string, fileNameFormat string, formatter CDRForma
 		fileNameFormat: fileNameFormat,
 	}
 
-	w.rotateFile()
+	// The first file will be created with the first CDR
 
 	go w.eventLoop()
 
