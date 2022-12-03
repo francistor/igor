@@ -1,0 +1,8 @@
+{
+    "internet": {
+        "replyItems":[
+            {"HW-Input-Peak-Information-Rate": {{.Speed}} },
+            {"Reply-Message": "{{.Message}}"}
+        ]
+    }
+}

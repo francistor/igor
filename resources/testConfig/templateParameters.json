@@ -1,0 +1,10 @@
+{
+    "key1":{
+        "speed": 1000,
+        "message": "hello key1"
+    },
+    "key2":{
+        "speed": 2000,
+        "message": "hello key2"
+    }
+}

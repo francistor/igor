@@ -153,6 +153,8 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 
 	if strings.HasPrefix(location, "database") {
 		// Format is database:table:keycolumn:paramscolumn
+		// The returned object is always a JSON whosw first level are properties, not arrays
+		// as per the values of the keycolumn
 		items := strings.Split(location, ":")
 		tableName := items[1]
 		keyColumn := items[2]
@@ -205,6 +207,9 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 			return nil, err
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("got status code %d while retrieving %s", resp.StatusCode, location)
+		}
 		if body, err := io.ReadAll(resp.Body); err != nil {
 			return nil, err
 		} else {

@@ -1,7 +1,7 @@
 package config
 
 import (
-	"fmt"
+	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
@@ -10,7 +10,7 @@ import (
 
 func httpServer() {
 	// Serve configuration
-	var fileHandler = http.FileServer(http.Dir("resources"))
+	var fileHandler = http.FileServer(http.Dir(os.Getenv("IGOR_BASE") + "resources"))
 	http.Handle("/", fileHandler)
 	if err := http.ListenAndServe(":8100", nil); err != nil {
 		panic("could not start http server")
@@ -33,12 +33,10 @@ func TestMain(m *testing.M) {
 }
 
 // Uncomment to test
+// Requires to populate the PSBA database with
+// INSERT INTO accessNodes (AccessNodeId, Parameters) values ("RepublicaHW01", '{"ipAddress": "127.0.0.1", "secret": "mysecret", "attributes": [{"Redback-Primary-DNS": "1.2.3.4"}, {"Session-Timeout": 3600}]}');
+// INSERT INTO accessNodes (AccessNodeId, Parameters) values ("RepublicaHW02", '{"ipAddress": "127.0.0.2", "secret": "mysecret", "attributes": [{"Redback-Primary-DNS": "1.2.3.4"}, {"Session-Timeout": 7200}]}');
 func TestDatabaseObject(t *testing.T) {
-	rc, err := GetPolicyConfig().CM.GetBytesConfigObject("radiusclients.database")
-	if err != nil {
-		t.Fatalf("could not read radiusclients.database: %s", err)
-	}
-	fmt.Println(string(rc))
 
 	type RadiusClientEntry struct {
 		Secret    string
@@ -46,15 +44,15 @@ func TestDatabaseObject(t *testing.T) {
 	}
 
 	var rcEntries map[string]RadiusClientEntry
-	err = GetPolicyConfig().CM.BuildJSONConfigObject("radiusclients.database", &rcEntries)
+	err := GetPolicyConfig().CM.BuildJSONConfigObject("radiusclients.database", &rcEntries)
 	if err != nil {
 		t.Fatalf("could not read radiusclients.database: %s", err)
 	}
-	fmt.Printf("%#v\n", rcEntries)
 
+	if rcEntries["RepublicaHW01"].Secret != "mysecret" {
+		t.Fatalf("bad content in radiusclients.database")
+	}
 }
-
-// Retrieve a configuration object from multiple threads
 
 // Diameter Configuration
 func TestDiamConfig(t *testing.T) {
@@ -173,5 +171,30 @@ func TestHandlerLogger(t *testing.T) {
 	}
 	if !strings.Contains(logDump, "<info message>") {
 		t.Fatalf("missing handler logger message in info mode")
+	}
+}
+
+func TestParametricObject(t *testing.T) {
+	type CParam struct {
+		Speed   int
+		Message string
+	}
+
+	oBytes, err := GetBytesTemplatedConfigObject[CParam]("template.txt", "templateParameters.json", nil)
+	if err != nil {
+		t.Fatalf("error in getting templated config object %s", err)
+	}
+
+	var o map[string]interface{}
+	err = json.Unmarshal(oBytes, &o)
+	if err != nil {
+		t.Fatalf("error in unmarshaling templated config object %s", err)
+	}
+
+	okey1 := o["key1"].(map[string]interface{})
+	okey1Internet := okey1["internet"].(map[string]interface{})
+	okey1InternetReplyItems := okey1Internet["replyItems"].([]interface{})
+	if len(okey1InternetReplyItems) != 2 {
+		t.Fatalf("number of reply items is incorrect")
 	}
 }
