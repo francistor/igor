@@ -46,6 +46,35 @@ func genAnswer(rChan chan interface{}) {
 	close(rChan)
 }
 
+type A struct {
+	S string
+	T string
+}
+
+func TestGenericUnmarshal(t *testing.T) {
+
+	jstr := `{
+		"s": "thestring",
+		"t": "otherstring"
+		
+	}
+	`
+
+	var a A
+
+	unm([]byte(jstr), &a)
+
+	fmt.Printf("%#v\n", a)
+
+}
+
+func unm(str []byte, obj any) {
+
+	if err := json.Unmarshal(str, obj); err != nil {
+		fmt.Println(err)
+	}
+}
+
 func TestLog(t *testing.T) {
 
 	defaultLogConfig := `{

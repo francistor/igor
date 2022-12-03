@@ -12,7 +12,7 @@ import (
 
 	"github.com/francistor/igor/config"
 	"github.com/francistor/igor/diamcodec"
-	"github.com/francistor/igor/handlerfunctions"
+	"github.com/francistor/igor/handler"
 	"github.com/francistor/igor/radiuscodec"
 
 	"golang.org/x/net/http2"
@@ -90,7 +90,7 @@ func TestMain(m *testing.M) {
 
 func TestBasicHandlers(t *testing.T) {
 
-	handler := NewHttpHandler("testServer", handlerfunctions.EmptyDiameterHandler, handlerfunctions.EmptyRadiusHandler)
+	handler := NewHttpHandler("testServer", handler.EmptyDiameterHandler, handler.EmptyRadiusHandler)
 
 	time.Sleep(200 * time.Millisecond)
 

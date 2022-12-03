@@ -1,10 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 )
 
@@ -32,38 +32,29 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// Retrieve a configuration object from multiple threads
-func TestObjectRetrieval(t *testing.T) {
-
-	var wg sync.WaitGroup
-
-	var co *ConfigObject
-	var err error
-	var objectName = "testFile.json"
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			co, err = GetPolicyConfig().CM.GetConfigObject(objectName, true)
-			t.Log("Got configuration object")
-			if err != nil {
-				panic(err)
-			}
-		}()
+// Uncomment to test
+func TestDatabaseObject(t *testing.T) {
+	rc, err := GetPolicyConfig().CM.GetBytesConfigObject("radiusclients.database")
+	if err != nil {
+		t.Fatalf("could not read radiusclients.database: %s", err)
 	}
-	wg.Wait()
+	fmt.Println(string(rc))
 
-	// Parse Raw
-	if !strings.Contains(string(co.RawBytes), "correctly") {
-		t.Fatal("raw testFile.json not retrieved correctly")
+	type RadiusClientEntry struct {
+		Secret    string
+		IPAddress string
 	}
 
-	// Parse as JSON
-	var jsonMap = co.Json.(map[string]interface{})
-	if jsonMap["test"].(string) != "file retreived correctly" {
-		t.Fatal("json testFile.json not retrieved correctly")
+	var rcEntries map[string]RadiusClientEntry
+	err = GetPolicyConfig().CM.BuildJSONConfigObject("radiusclients.database", &rcEntries)
+	if err != nil {
+		t.Fatalf("could not read radiusclients.database: %s", err)
 	}
+	fmt.Printf("%#v\n", rcEntries)
+
 }
+
+// Retrieve a configuration object from multiple threads
 
 // Diameter Configuration
 func TestDiamConfig(t *testing.T) {

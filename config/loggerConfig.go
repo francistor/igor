@@ -86,7 +86,7 @@ func initLogger(cm *ConfigurationManager) {
 	}`
 
 	// Retrieve the log configuration
-	jConfig, err := cm.GetConfigObjectAsText("log.json", false)
+	jConfig, err := cm.GetBytesConfigObject("log.json")
 	if err != nil {
 		fmt.Println("using default logging configuration: " + err.Error())
 		jConfig = []byte(defaultLogConfig)

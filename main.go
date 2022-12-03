@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/handlerfunctions"
+	"github.com/francistor/igor/handler"
 	"github.com/francistor/igor/router"
 )
 
@@ -26,12 +26,12 @@ func main() {
 	logger := config.GetLogger()
 
 	// Start Diameter
-	_ = router.NewDiameterRouter(*instancePtr, handlerfunctions.EmptyDiameterHandler).Start()
+	_ = router.NewDiameterRouter(*instancePtr, handler.EmptyDiameterHandler).Start()
 	logger.Info("Diameter router started")
 
 	// Start Radius
-	// _ = router.NewRadiusRouter(*instancePtr, handlerfunctions.TestRadiusAttributesHandler)
-	_ = router.NewRadiusRouter(*instancePtr, handlerfunctions.EmptyRadiusHandler).Start()
+	// _ = router.NewRadiusRouter(*instancePtr, handler.TestRadiusAttributesHandler)
+	_ = router.NewRadiusRouter(*instancePtr, handler.EmptyRadiusHandler).Start()
 	logger.Info("Radius router started")
 
 	time.Sleep(1000 * time.Minute)

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
@@ -73,25 +72,12 @@ type HttpHandlerConfig struct {
 	RouterPort int
 }
 
-// Retrieves the handler configuration, forcing a refresh
-func (c *HttpHandlerConfigurationManager) getHttpHandlerConfig() (HttpHandlerConfig, error) {
-	hc := HttpHandlerConfig{}
-	h, err := c.CM.GetConfigObject("httpHandler.json", true)
-	if err != nil {
-		return hc, err
-	}
-	err = json.Unmarshal(h.RawBytes, &hc)
-	if err != nil {
-		return hc, err
-	}
-	return hc, nil
-}
-
 // Updates the global variable with the http handler configuration
 func (c *HttpHandlerConfigurationManager) UpdateHttpHandlerConfig() error {
-	hc, error := c.getHttpHandlerConfig()
-	if error != nil {
-		return fmt.Errorf("could not retrieve the Handler configuration: %w", error)
+	hc := HttpHandlerConfig{}
+	err := c.CM.BuildJSONConfigObject("httpHandler.json", &hc)
+	if err != nil {
+		return fmt.Errorf("could not retrieve the Handler configuration: %w", err)
 	}
 	c.currentHttpHandlerConfig = hc
 	return nil

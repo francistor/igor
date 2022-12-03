@@ -1,9 +1,8 @@
-package handlerfunctions
+package handler
 
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"os"
 	"testing"
 
@@ -190,14 +189,11 @@ func TestRadiusFilters(t *testing.T) {
 		t.Fatalf("error reading radiusFilters.json")
 	}
 
-	fmt.Println(rp)
-
-	frp, err := filters.FilteredPacket("myFilter", &rp)
+	frp, err := filters.FilteredPacket(&rp, "myFilter")
 	if err != nil {
 		t.Fatalf("error reading filters file")
 	}
-	fmt.Println("--------------")
-	fmt.Println(frp)
+
 	if frp.GetStringAVP("Igor-OctetsAttribute") != "" {
 		t.Fatalf("attribute not removed")
 	}

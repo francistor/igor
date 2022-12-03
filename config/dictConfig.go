@@ -15,14 +15,14 @@ func initDictionaries(cm *ConfigurationManager) {
 	// Load dictionaries
 
 	// Diameter
-	diamDictJSON, err := cm.GetConfigObjectAsText("diameterDictionary.json", false)
+	diamDictJSON, err := cm.GetBytesConfigObject("diameterDictionary.json")
 	if err != nil {
 		panic("Could not read diameterDictionary.json")
 	}
 	diameterDict = diamdict.NewDictionaryFromJSON([]byte(diamDictJSON))
 
 	// Radius
-	radiusDictJSON, err := cm.GetConfigObjectAsText("radiusDictionary.json", false)
+	radiusDictJSON, err := cm.GetBytesConfigObject("radiusDictionary.json")
 	if err != nil {
 		panic("Could not read radiusDictionary.json")
 	}

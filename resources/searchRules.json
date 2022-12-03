@@ -1,6 +1,16 @@
+{
+    "rules": [
+        {"nameRegex": "(.*txt)",                        "origin": "http://localhost:8100/"},
+        {"nameRegex": "(radiusclients.database)",       "origin": "database:accessNodes:AccessNodeId:Parameters"},
+        {"nameRegex": "Gy/(.*)",                        "origin": "resources/"},
+        {"nameRegex": "(.*)",                           "origin": "resources/"}
+    ],
+    "db": {
+        "__doc": "use loc=UTC if necessary",
+        "url": "francisco:francisco@tcp(n2:3306)/PSBA?parseTime=true",
+        "driver": "mysql",
+        "maxOpenConns": 10,
+        "maxIdleConns": 1
+    }
+}
 
-[
-    {"nameRegex": "(.*txt)",  "base": "http://localhost:8100/"},
-	{"nameRegex": "Gy/(.*)",  "base": "resources/"},
-    {"nameRegex": "(.*)",     "base": "resources/"}
-]
