@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 
@@ -222,4 +223,22 @@ func findAttributes(v []radiuscodec.RadiusAVP, name string) []radiuscodec.Radius
 	}
 
 	return avps
+}
+
+func TestTemplatedConfigObject(t *testing.T) {
+	type CParam struct {
+		Speed   int
+		Message string
+	}
+	// To avoid warning
+	var v CParam
+	println(v)
+
+	var o = config.NewTemplatedConfigObject[RadiusUserFile, CParam]("template.txt", "templateParameters.json")
+	if err := o.Update(&config.GetPolicyConfig().CM); err != nil {
+		t.Fatalf("could not get templated configuration object: %s", err)
+	}
+
+	fmt.Printf("%#v\n", o.Get())
+
 }

@@ -32,6 +32,16 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestHttpRetrieval(t *testing.T) {
+	txt, err := GetPolicyConfig().CM.GetBytesConfigObject("template_http.txt")
+	if err != nil {
+		t.Fatalf("error using http to get config object: %s", err)
+	}
+	if !strings.Contains(string(txt), "internet") {
+		t.Fatal("contents of http object are not ok")
+	}
+}
+
 // Uncomment to test
 // Requires to populate the PSBA database with
 // INSERT INTO accessNodes (AccessNodeId, Parameters) values ("RepublicaHW01", '{"ipAddress": "127.0.0.1", "secret": "mysecret", "attributes": [{"Redback-Primary-DNS": "1.2.3.4"}, {"Session-Timeout": 3600}]}');

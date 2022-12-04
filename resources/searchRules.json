@@ -1,6 +1,6 @@
 {
     "rules": [
-        {"nameRegex": "(.*txt)",                        "origin": "http://localhost:8100/"},
+        {"nameRegex": "(template_http.txt)",                        "origin": "http://localhost:8100/"},
         {"nameRegex": "(radiusclients.database)",       "origin": "database:accessNodes:AccessNodeId:Parameters"},
         {"nameRegex": "Gy/(.*)",                        "origin": "resources/"},
         {"nameRegex": "(.*)",                           "origin": "resources/"}

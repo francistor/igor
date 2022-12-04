@@ -2,7 +2,7 @@
     "internet": {
         "checkItems": {
             "password": "secret"
-        },
+        }
         "replyItems":[
             {"HW-Input-Peak-Information-Rate": {{.Speed}} },
             {"Reply-Message": "{{.Message}}"}
