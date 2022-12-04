@@ -1,9 +1,4 @@
 {
-	"servers" : 
-	[
-	],
-	"serverGroups" :
-	[
-
-	]
+	"servers" : {},
+	"serverGroups": {}
 }

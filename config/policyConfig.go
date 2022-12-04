@@ -162,9 +162,9 @@ func (c *PolicyConfigurationManager) RadiusServerConf() RadiusServerConfig {
 }
 
 // Holds the configuration of a Radius Client
+// Key in the RadiusClients map will be the IPAddress
 type RadiusClient struct {
 	Name             string
-	IPAddress        string
 	Secret           string
 	ClientClass      string
 	ClientProperties map[string]string
@@ -176,19 +176,12 @@ type RadiusClients map[string]RadiusClient
 // Updates the radius clients configuration in the global variable
 func (c *PolicyConfigurationManager) UpdateRadiusClients() error {
 
-	// To store the parsed JSON
-	var clientsArray []RadiusClient
-
 	// To be returned
 	radiusClients := make(RadiusClients)
-	err := c.CM.BuildJSONConfigObject("radiusClients.json", &clientsArray)
+
+	err := c.CM.BuildJSONConfigObject("radiusClients.json", &radiusClients)
 	if err != nil {
 		return fmt.Errorf("could not retrieve the Radius clients configuration: %w", err)
-	}
-
-	// Fill the map
-	for _, c := range clientsArray {
-		radiusClients[c.IPAddress] = c
 	}
 
 	c.currentRadiusClients = radiusClients
@@ -203,7 +196,6 @@ func (c *PolicyConfigurationManager) RadiusClientsConf() RadiusClients {
 
 // Holds the configuration for an upstream Radius Server
 type RadiusServer struct {
-	Name                  string
 	IPAddress             string
 	Secret                string
 	AuthPort              int
@@ -232,29 +224,15 @@ type RadiusServers struct {
 // Updates the radius servers configuration in the global variable
 func (c *PolicyConfigurationManager) UpdateRadiusServers() error {
 
-	// To unmarshal from JSON
-	var radiusServersArray struct {
-		Servers      []RadiusServer
-		ServerGroups []RadiusServerGroup
-	}
-
 	// Returned value, with maps indexed by name
 	radiusServers := RadiusServers{
 		Servers:      make(map[string]RadiusServer),
 		ServerGroups: make(map[string]RadiusServerGroup),
 	}
 
-	err := c.CM.BuildJSONConfigObject("radiusServers.json", &radiusServersArray)
+	err := c.CM.BuildJSONConfigObject("radiusServers.json", &radiusServers)
 	if err != nil {
 		return fmt.Errorf("could not retrieve the Radius Servers configuration: %w", err)
-	}
-
-	// Do the formating, as maps indexed by name
-	for _, rs := range radiusServersArray.Servers {
-		radiusServers.Servers[rs.Name] = rs
-	}
-	for _, rg := range radiusServersArray.ServerGroups {
-		radiusServers.ServerGroups[rg.Name] = rg
 	}
 
 	c.currentRadiusServers = radiusServers

@@ -1,39 +1,34 @@
 {
-	"servers" : 
-	[
-		{
-        "name": "igor-superserver",
-        "IPAddress": "localhost",
-        "secret": "secret",
-        "authPort": 11812,
-        "acctPort": 11813,
-        "coaPort": 13799,
-        "originPorts": [8000, 8001],
-        "errorLimit": 3,
-        "quarantineTimeSeconds": 60
-      },
-      {
-        "name": "non-existing-server",
-        "IPAddress": "127.0.0.2",
-        "secret": "secret",
-        "authPort": 51812,
-        "acctPort": 51813,
-        "coaPort": 53799,
-        "errorLimit": 3,
-        "quarantineTimeSeconds": 60
-      }
-	],
-	"serverGroups" :
-	[
-	  {
-        "name": "igor-server-ne-group",
-        "servers": ["non-existing-server", "igor-superserver"],
-        "policy": "fixed"
-      },
-      {
-      	"name": "igor-superserver-group",
-      	"servers": ["igor-superserver"],
-      	"policy": "random"
-      }
-	]
+	"servers" : {
+    "igor-superserver": {
+      "IPAddress": "localhost",
+      "secret": "secret",
+      "authPort": 11812,
+      "acctPort": 11813,
+      "coaPort": 13799,
+      "originPorts": [8000, 8001],
+      "errorLimit": 3,
+      "quarantineTimeSeconds": 60
+    },
+    "non-existing-server":{
+      "IPAddress": "127.0.0.2",
+      "secret": "secret",
+      "authPort": 51812,
+      "acctPort": 51813,
+      "coaPort": 53799,
+      "errorLimit": 3,
+      "quarantineTimeSeconds": 60
+    }
+  },
+  
+	"serverGroups" :{
+    "igor-server-ne-group":{
+      "servers": ["non-existing-server", "igor-superserver"],
+      "policy": "fixed"
+    },
+    "igor-superserver-group":{
+      "servers": ["igor-superserver"],
+      "policy": "random"
+    }
+  }
 }

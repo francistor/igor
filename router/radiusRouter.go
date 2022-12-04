@@ -571,12 +571,12 @@ func (router *RadiusRouter) buildRadiusServersTable() {
 	table := make(map[string]*RadiusServerWithStatus)
 
 	// Populate the server table
-	for _, conf := range serversConf {
+	for serverName, conf := range serversConf {
 		serverWithStatus := RadiusServerWithStatus{
 			conf:        conf,
 			isAvailable: true,
 		}
-		table[conf.Name] = &serverWithStatus
+		table[serverName] = &serverWithStatus
 	}
 
 	// And update in router object

@@ -1,7 +1,6 @@
-[
-	{
-		"name": "radiuserver",
-		"IPAddress": "127.0.0.1",
+{
+	"127.0.0.1":{
+		"name": "radiusserver",
 		"secret": "secret"
 	}
-]
+}
