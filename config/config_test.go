@@ -68,6 +68,9 @@ func TestDiamConfig(t *testing.T) {
 	if dp["superserver.igorsuperserver"].WatchdogIntervalMillis != 300000 {
 		t.Fatalf("WatchdogIntervalMillis was %d", dp["superserver.igorsuperserver"].WatchdogIntervalMillis)
 	}
+	if dp["superserver.igorsuperserver"].DiameterHost != "superserver.igorsuperserver" {
+		t.Fatal("DiameterHost was not found for superserver.igorsuperserver")
+	}
 	peer, found := dp["client.igorclient"]
 	if !found {
 		t.Fatalf("Peer not found for client.igorclient")
@@ -110,6 +113,9 @@ func TestRadiusConfig(t *testing.T) {
 	rc := GetPolicyConfig().RadiusClientsConf()
 	if rc["127.0.0.1"].Secret != "secret" {
 		t.Fatalf("secret for 127.0.0.1 is not as expeted")
+	}
+	if rc["127.0.0.1"].ClientProperties["scope"] != "default" {
+		t.Fatalf("property for scope not ok")
 	}
 	if rc["127.0.0.1"].ClientProperties["scope"] != "default" {
 		t.Fatalf("property for scope not ok")

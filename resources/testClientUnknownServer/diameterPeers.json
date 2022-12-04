@@ -1,6 +1,5 @@
-[
-	{
-        "diameterHost": "unkserver.igorserver",
+{
+	"unkserver.igorserver":{
         "IPAddress": "127.0.0.1",
         "port": 3868,
 		"connectionPolicy": "active",
@@ -8,4 +7,4 @@
 		"watchdogIntervalMillis": 300000,
 		"originNetwork": "0.0.0.0/0"
 	}
-]
+}

@@ -1,11 +1,10 @@
-[
-	{
-        "diameterHost": "nokiaaaa.nokia",
-        "IPAddress": "127.0.0.1",
+{
+	"nokiaaaa.nokia":{
+		"IPAddress": "127.0.0.1",
         "port": 43867,
 		"connectionPolicy": "passive",
 		"connectionTimeoutMillis": 5000,
 		"watchdogIntervalMillis": 300000,
 		"originNetwork": "0.0.0.0/0"
 	}
-]
+}
