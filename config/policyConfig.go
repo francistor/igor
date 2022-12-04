@@ -173,11 +173,13 @@ type RadiusClient struct {
 type RadiusClients map[string]RadiusClient
 
 // Initializer to copy the name into the RadiusClient struct
-func (rc RadiusClients) initialize() {
+func (rc RadiusClients) initialize() error {
 	for ipAddr, client := range rc {
 		client.IPAddress = ipAddr
 		rc[ipAddr] = client
 	}
+
+	return nil
 }
 
 // Updates the radius clients configuration in the global variable

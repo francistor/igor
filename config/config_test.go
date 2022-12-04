@@ -117,8 +117,8 @@ func TestRadiusConfig(t *testing.T) {
 	if rc["127.0.0.1"].ClientProperties["scope"] != "default" {
 		t.Fatalf("property for scope not ok")
 	}
-	if rc["127.0.0.1"].ClientProperties["scope"] != "default" {
-		t.Fatalf("property for scope not ok")
+	if rc["127.0.0.1"].IPAddress != "127.0.0.1" {
+		t.Fatalf("IPAddress was not in the radius client object")
 	}
 
 	// Get Radius Servers configuration
