@@ -64,7 +64,7 @@ func TestDiamConfig(t *testing.T) {
 	}
 
 	// Diameter Peers configuration
-	dp := GetPolicyConfig().PeersConf()
+	dp := GetPolicyConfig().DiameterPeers()
 	if dp["superserver.igorsuperserver"].WatchdogIntervalMillis != 300000 {
 		t.Fatalf("WatchdogIntervalMillis was %d", dp["superserver.igorsuperserver"].WatchdogIntervalMillis)
 	}
@@ -81,7 +81,7 @@ func TestDiamConfig(t *testing.T) {
 
 	// Routing rules configuration
 	// Find the rule {"realm": "igorsuperserver", "applicationId": "*", "peers": ["superserver.igorsuperserver"], "policy": "fixed"}
-	rr := GetPolicyConfig().RoutingRulesConf()
+	rr := GetPolicyConfig().DiameterRoutingRules()
 	found = false
 	for _, rule := range rr {
 		if rule.Realm == "igorsuperserver" && rule.ApplicationId == "*" && rule.Peers[0] == "superserver.igorsuperserver" && rule.Policy == "fixed" {
@@ -93,7 +93,7 @@ func TestDiamConfig(t *testing.T) {
 		t.Fatal(`Rule not found for {"realm": "igorsuperserver", "applicationId": "*", "peers": ["superserver.igorsuperserver"], "policy": "fixed"}`)
 	}
 	// Using the helper function
-	rule, _ := rr.FindDiameterRoute("igorsuperserver", "Sp", false)
+	rule, _ := rr.FindDiameterRoutingRule("igorsuperserver", "Sp", false)
 	if rule.Realm != "igorsuperserver" || rule.ApplicationId != "*" {
 		t.Fatal(`Rule not found for realm "igorsuperserver" and applicaton "Sp"`)
 	}
@@ -110,7 +110,7 @@ func TestRadiusConfig(t *testing.T) {
 	}
 
 	// Radius Clients configuration
-	rc := GetPolicyConfig().RadiusClientsConf()
+	rc := GetPolicyConfig().RadiusClients()
 	if rc["127.0.0.1"].Secret != "secret" {
 		t.Fatalf("secret for 127.0.0.1 is not as expeted")
 	}
@@ -122,7 +122,7 @@ func TestRadiusConfig(t *testing.T) {
 	}
 
 	// Get Radius Servers configuration
-	rs := GetPolicyConfig().RadiusServersConf()
+	rs := GetPolicyConfig().RadiusServers()
 	if rs.Servers["non-existing-server"].IPAddress != "127.0.0.2" {
 		t.Fatalf("address of non-existing-server is not 127.0.0.2")
 	}
@@ -134,7 +134,7 @@ func TestRadiusConfig(t *testing.T) {
 	}
 
 	// Get Radius handlers configuration
-	rh := GetPolicyConfig().RadiusHttpHandlersConf()
+	rh := GetPolicyConfig().RadiusHttpHandlers()
 	if rh.AuthHandlers[0] != "https://localhost:8080/radiusRequest" {
 		t.Fatalf("first radius handler for auth not as expected")
 	}

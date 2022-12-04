@@ -173,7 +173,7 @@ func (router *DiameterRouter) startAndAccept() {
 			logger.Infof("accepted connection from %s", remoteAddr)
 
 			remoteIPAddr, _ := net.ResolveIPAddr("", remoteAddr)
-			peersConf := router.ci.PeersConf()
+			peersConf := router.ci.DiameterPeers()
 
 			// Check that the incoming IP address is on the list of originCIDR for declared Peers
 			if !peersConf.ValidateIncomingAddress("", remoteIPAddr.IP) {
@@ -324,7 +324,7 @@ func (router *DiameterRouter) eventLoop() {
 
 				// If origin-host now not in configuration, remove from peers table. It was there
 				// temporarily, until the PeerDown event is received
-				diameterPeersConf := router.ci.PeersConf()
+				diameterPeersConf := router.ci.DiameterPeers()
 				if peer, found := diameterPeersConf[v.Sender.GetPeerConfig().DiameterHost]; !found {
 					delete(router.diameterPeersTable, peer.DiameterHost)
 				}
@@ -349,7 +349,7 @@ func (router *DiameterRouter) eventLoop() {
 			// Diameter Request message to be routed
 		case rdr := <-router.diameterRequestsChan:
 
-			route, err := router.ci.RoutingRulesConf().FindDiameterRoute(
+			route, err := router.ci.DiameterRoutingRules().FindDiameterRoutingRule(
 				rdr.Message.GetStringAVP("Destination-Realm"),
 				rdr.Message.ApplicationName,
 				false)
@@ -515,7 +515,7 @@ func (router *DiameterRouter) RouteDiameterRequestAsync(request *diamcodec.Diame
 func (router *DiameterRouter) updatePeersTable() {
 
 	// Get the current configuration
-	diameterPeersConf := router.ci.PeersConf()
+	diameterPeersConf := router.ci.DiameterPeers()
 
 	// Force non configured peers to disengage
 	// The real removal from the table will take place when the PeerDownEvent is received
@@ -563,7 +563,7 @@ func (router *DiameterRouter) buildPeersStatusTable() instrumentation.DiameterPe
 			connectionPolicy = peerConfig.ConnectionPolicy
 		} else {
 			// Take from configuration
-			diameterPeersConf := router.ci.PeersConf()
+			diameterPeersConf := router.ci.DiameterPeers()
 			peerConfig := diameterPeersConf[diameterHost]
 			ipAddress = peerConfig.IPAddress
 			connectionPolicy = peerConfig.ConnectionPolicy

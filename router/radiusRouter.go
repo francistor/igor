@@ -328,7 +328,7 @@ func (router *RadiusRouter) eventLoop() {
 				// If message is for this server
 			} else {
 				// Handle the message
-				rh := router.ci.RadiusHttpHandlersConf()
+				rh := router.ci.RadiusHttpHandlers()
 				var destinationURLs []string
 				switch rrr.Packet.Code {
 				case radiuscodec.ACCESS_REQUEST:
@@ -486,7 +486,7 @@ func (router *RadiusRouter) getRouteParams(req RoutableRadiusRequest) []RadiusRe
 
 	} else {
 		// Server group
-		if serverGroup, found := router.ci.RadiusServersConf().ServerGroups[req.Destination]; found {
+		if serverGroup, found := router.ci.RadiusServers().ServerGroups[req.Destination]; found {
 
 			// Filter for available servers
 			availableServerNames := make([]string, 0)
@@ -565,7 +565,7 @@ func (router *RadiusRouter) getRouteParams(req RoutableRadiusRequest) []RadiusRe
 func (router *RadiusRouter) buildRadiusServersTable() {
 
 	// Get the current configuration
-	serversConf := router.ci.RadiusServersConf().Servers
+	serversConf := router.ci.RadiusServers().Servers
 
 	// The table being built
 	table := make(map[string]*RadiusServerWithStatus)

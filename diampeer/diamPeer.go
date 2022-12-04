@@ -807,7 +807,7 @@ func (dp *DiameterPeer) handleCER(request *diamcodec.DiameterMessage) (string, e
 	originHostAVP, err := request.GetAVP("Origin-Host")
 	if err == nil {
 		originHost := originHostAVP.GetString()
-		peersConf := dp.ci.PeersConf()
+		peersConf := dp.ci.DiameterPeers()
 
 		remoteAddr, _, _ := net.SplitHostPort(dp.connection.RemoteAddr().String())
 		remoteIPAddr, _ := net.ResolveIPAddr("", remoteAddr)
@@ -860,7 +860,7 @@ func (dp *DiameterPeer) pushCEAttributes(cer *diamcodec.DiameterMessage) {
 	cer.Add("Origin-State-Id", diamcodec.GetStateId(false, true))
 
 	// Add supported applications
-	routingRules := dp.ci.RoutingRulesConf()
+	routingRules := dp.ci.DiameterRoutingRules()
 	var relaySet = false
 	for _, rule := range routingRules {
 		if rule.ApplicationId != "*" {

@@ -188,7 +188,7 @@ func (c *PolicyConfigurationManager) UpdateRadiusClients() error {
 }
 
 // Retrieves the contents of the global variable containing the radius clients configuration
-func (c *PolicyConfigurationManager) RadiusClientsConf() RadiusClients {
+func (c *PolicyConfigurationManager) RadiusClients() RadiusClients {
 	return c.radiusClients.Get()
 }
 
@@ -225,7 +225,7 @@ func (c *PolicyConfigurationManager) UpdateRadiusServers() error {
 }
 
 // Retrieves the contents of the global variable containing the radius servers configuration
-func (c *PolicyConfigurationManager) RadiusServersConf() RadiusServers {
+func (c *PolicyConfigurationManager) RadiusServers() RadiusServers {
 	return c.radiusServers.Get()
 }
 
@@ -242,7 +242,7 @@ func (c *PolicyConfigurationManager) UpdateRadiusHttpHandlers() error {
 }
 
 // Retrieves the contents of the global variable containing the radius handlers configuration
-func (c *PolicyConfigurationManager) RadiusHttpHandlersConf() RadiusHttpHandlers {
+func (c *PolicyConfigurationManager) RadiusHttpHandlers() RadiusHttpHandlers {
 	return c.radiusHttpHandlers.Get()
 }
 
@@ -262,7 +262,7 @@ type DiameterRoutingRules []DiameterRoutingRule
 
 // Finds the appropriate route, taking into account wildcards.
 // If remote is true, force that the route is not local (has no nandler, it is sent to other peer)
-func (rr DiameterRoutingRules) FindDiameterRoute(realm string, application string, remote bool) (DiameterRoutingRule, error) {
+func (rr DiameterRoutingRules) FindDiameterRoutingRule(realm string, application string, remote bool) (DiameterRoutingRule, error) {
 	for _, rule := range rr {
 		if rule.Realm == "*" || rule.Realm == realm {
 			if rule.ApplicationId == "*" || rule.ApplicationId == application {
@@ -282,7 +282,7 @@ func (c *PolicyConfigurationManager) UpdateDiameterRoutingRules() error {
 }
 
 // Retrieves the contents of the global variable containing the diameter routing rules configuration
-func (c *PolicyConfigurationManager) RoutingRulesConf() DiameterRoutingRules {
+func (c *PolicyConfigurationManager) DiameterRoutingRules() DiameterRoutingRules {
 	return c.diameterRoutes.Get()
 }
 
@@ -346,7 +346,7 @@ func (c *PolicyConfigurationManager) UpdateDiameterPeers() error {
 }
 
 // Returs the current DiameterPeers configuration
-func (c *PolicyConfigurationManager) PeersConf() DiameterPeers {
+func (c *PolicyConfigurationManager) DiameterPeers() DiameterPeers {
 	return c.diameterPeers.Get()
 }
 

@@ -88,7 +88,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 
 		// Verify client and get shared secret
 		clientIPAddr := clientAddr.(*net.UDPAddr).IP.String()
-		radiusClient, found := rs.ci.RadiusClientsConf()[clientIPAddr]
+		radiusClient, found := rs.ci.RadiusClients()[clientIPAddr]
 
 		if !found {
 			config.GetLogger().Warnf("message from unknown client %s", clientIPAddr)
