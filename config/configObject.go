@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"text/template"
 )
@@ -114,6 +115,11 @@ func (tco *TemplatedConfigObject[T, P]) Get() map[string]T {
 }
 
 // Provides access to the configuration object.
-func (tco *TemplatedConfigObject[T, P]) GetKey(key string) T {
-	return tco.o[key]
+func (tco *TemplatedConfigObject[T, P]) GetKey(key string) (T, error) {
+	if co, found := tco.o[key]; !found {
+		return co, fmt.Errorf("key %s not found", key)
+	} else {
+		return co, nil
+	}
+
 }
