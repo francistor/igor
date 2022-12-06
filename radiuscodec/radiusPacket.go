@@ -351,15 +351,42 @@ func (rp *RadiusPacket) Add(name string, value interface{}) *RadiusPacket {
 		return rp
 	}
 
-	avp, error := NewAVP(name, value)
+	if avp, err := NewAVP(name, value); err != nil {
+		config.GetLogger().Errorf("avp %s could not be added: %v, due to %s", name, value, err)
+		return rp
+	} else {
+		rp.AVPs = append(rp.AVPs, *avp)
+		return rp
+	}
+}
 
-	if error != nil {
-		config.GetLogger().Errorf("avp %s could not be added: %v, due to %s", name, value, error)
+// Merges the AVP specified by name in the packet
+func (rp *RadiusPacket) Merge(name string, value interface{}) *RadiusPacket {
+	// If avp to add is nil, do nothing
+	if value == nil {
 		return rp
 	}
 
-	rp.AVPs = append(rp.AVPs, *avp)
-	return rp
+	if avp, err := NewAVP(name, value); err != nil {
+		config.GetLogger().Errorf("avp %s could not be merged: %v, due to %s", name, value, err)
+		return rp
+	} else {
+		return rp.MergeAVP(avp)
+	}
+}
+
+// Replaces the AVP specified by name in the packet
+func (rp *RadiusPacket) Replace(name string, value interface{}) *RadiusPacket {
+	// If avp to add is nil, do nothing
+	if value == nil {
+		return rp
+	}
+	if avp, err := NewAVP(name, value); err != nil {
+		config.GetLogger().Errorf("avp %s could not be replaced: %v, due to %s", name, value, err)
+		return rp
+	} else {
+		return rp.ReplaceAVP(avp)
+	}
 }
 
 // Retrieves the first AVP with the specified name from the message
