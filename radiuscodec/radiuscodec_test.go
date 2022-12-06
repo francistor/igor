@@ -137,7 +137,7 @@ func TestVendorIntegerAVP(t *testing.T) {
 
 func TestVendorTaggedAVP(t *testing.T) {
 
-	var theValue = "myStriing"
+	var theValue = "myString"
 
 	// Create avp
 	avp, err := NewAVP("Igor-TaggedStringAttribute", theValue+":1")
@@ -152,7 +152,7 @@ func TestVendorTaggedAVP(t *testing.T) {
 	// Serialize and unserialize
 	binaryAVP, _ := avp.ToBytes(authenticator, secret)
 	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP, authenticator, secret)
-	if !rebuiltAVP.GetIPAddress().Equal(net.ParseIP(theValue)) {
+	if rebuiltAVP.GetString() != theValue {
 		t.Errorf("value does not match after unmarshalling. Got <%v>", avp.GetIPAddress())
 	}
 }
@@ -498,5 +498,15 @@ func TestJSONAndCopyPacket(t *testing.T) {
 	}
 	if negativePacket.GetStringAVP("Igor-SaltedOctetsAttribute") != "1122aabbccdd" {
 		t.Fatalf("missing attribute after positive filtering")
+	}
+}
+
+func TestCiscoAVPair(t *testing.T) {
+	packet := NewRadiusRequest(ACCESS_REQUEST).
+		Add("Cisco-AVPair", "subscriber:sa=internet(shape-rate=1000)").
+		Add("Cisco-AVPair", "ip:qos-policy-in=add-class(sub,(class-default),police(512,96,512,192,transmit,transmit,drop))")
+
+	if packet.GetCiscoAVPair("subscriber:sa") != "internet(shape-rate=1000)" {
+		t.Fatalf("bad Cisco AVPair <%s>", packet.GetCiscoAVPair("subscriber:sa"))
 	}
 }

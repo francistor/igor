@@ -556,11 +556,11 @@ func (rp *RadiusPacket) Copy(positiveFilter []string, negativeFilter []string) *
 func (rp *RadiusPacket) GetCiscoAVPair(name string) string {
 	avpairs := rp.GetAllAVP("Cisco-AVPair")
 	for i := range avpairs {
-		components := strings.Split(avpairs[i].GetString(), "=")
-		if len(components) > 1 {
-			pairName := strings.TrimSpace(components[0])
+		before, after, found := strings.Cut(avpairs[i].GetString(), "=")
+		if found {
+			pairName := strings.TrimSpace(before)
 			if pairName == name {
-				return strings.TrimSpace(components[1])
+				return strings.TrimSpace(after)
 			}
 		}
 	}
