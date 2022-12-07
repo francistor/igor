@@ -5,9 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/francistor/igor/diamcodec"
-	"github.com/francistor/igor/radiuscodec"
-	"github.com/francistor/igor/radiusdict"
+	"github.com/francistor/igor/core"
 
 	"golang.org/x/exp/slices"
 )
@@ -32,11 +30,11 @@ func NewLivingstoneWriter(positiveFilter []string, negativeFilter []string, head
 }
 
 // Not implemented
-func (w *LivingstoneWriter) GetDiameterCDRString(dm *diamcodec.DiameterMessage) string {
+func (w *LivingstoneWriter) GetDiameterCDRString(dm *core.DiameterMessage) string {
 	panic("GetDiameterCDRString is not implemented by CSVWriter")
 }
 
-func (w *LivingstoneWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) string {
+func (w *LivingstoneWriter) GetRadiusCDRString(rp *core.RadiusPacket) string {
 	var builder strings.Builder
 
 	// Write header
@@ -57,13 +55,13 @@ func (w *LivingstoneWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) str
 
 		switch rp.AVPs[i].DictItem.RadiusType {
 
-		case radiusdict.None, radiusdict.Octets, radiusdict.String, radiusdict.InterfaceId, radiusdict.Address, radiusdict.IPv6Address, radiusdict.IPv6Prefix:
+		case core.RadiusTypeNone, core.RadiusTypeOctets, core.RadiusTypeString, core.RadiusTypeInterfaceId, core.RadiusTypeAddress, core.RadiusTypeIPv6Address, core.RadiusTypeIPv6Prefix:
 			// Write as a string
 			builder.WriteString("=\"")
 			builder.WriteString(rp.AVPs[i].GetTaggedString())
 			builder.WriteString("\"\n")
 
-		case radiusdict.Integer:
+		case core.RadiusTypeInteger:
 			// Try dictionary, if not found use integer value
 			var intValue, _ = rp.AVPs[i].Value.(int64)
 			if stringValue, ok := rp.AVPs[i].DictItem.EnumCodes[int(intValue)]; ok {
@@ -75,7 +73,7 @@ func (w *LivingstoneWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) str
 				builder.WriteString(fmt.Sprintf("%d", intValue))
 				builder.WriteString("\n")
 			}
-		case radiusdict.Time:
+		case core.RadiusTypeTime:
 			// Format date
 			builder.WriteString("=\"")
 			builder.WriteString(rp.AVPs[i].GetDate().Format(w.attributeDateFormat))
@@ -92,7 +90,7 @@ func (w *LivingstoneWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) str
 /*
 https://pkg.go.dev/time#pkg-constants
 
-ANSIC       = "Mon Jan _2 15:04:05 2006"
+ANSIC       = "Mon Jan _2 15:04:05 2006"s
 UnixDate    = "Mon Jan _2 15:04:05 MST 2006"
 RubyDate    = "Mon Jan 02 15:04:05 -0700 2006"
 RFC822      = "02 Jan 06 15:04 MST"

@@ -11,9 +11,8 @@ import (
 	"time"
 
 	"github.com/francistor/igor/constants"
-	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/instrumentation"
-	"github.com/francistor/igor/radiuscodec"
 )
 
 // Statuses of the Router
@@ -48,7 +47,7 @@ const DEFAULT_REQUEST_TIMEOUT_SECONDS = 10
 // or to another Diameter Peer
 type RoutableDiameterRequest struct {
 	// Pointer to the actual Diameter message
-	Message *diamcodec.DiameterMessage
+	Message *core.DiameterMessage
 
 	// Timeout in string format, for JSON encoding
 	// Format is <number><units> where
@@ -73,7 +72,7 @@ type RoutableRadiusRequest struct {
 	Secret string
 
 	// Pointer to the actual RadiusPacket
-	Packet *radiuscodec.RadiusPacket
+	Packet *core.RadiusPacket
 
 	// Timeout in string format, for JSON encoding
 	// Format is <number><units> where
@@ -152,7 +151,7 @@ type RouterCloseCommand struct {
 }
 
 // Helper function to serialize, send request, get response and unserialize Diameter Request
-func HttpDiameterRequest(client http.Client, endpoint string, diameterRequest *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
+func HttpDiameterRequest(client http.Client, endpoint string, diameterRequest *core.DiameterMessage) (*core.DiameterMessage, error) {
 	// Serialize the message
 	jsonRequest, err := json.Marshal(diameterRequest)
 	if err != nil {
@@ -180,7 +179,7 @@ func HttpDiameterRequest(client http.Client, endpoint string, diameterRequest *d
 	}
 
 	// Unserialize to Diameter Message
-	var diameterAnswer diamcodec.DiameterMessage
+	var diameterAnswer core.DiameterMessage
 	err = json.Unmarshal(jsonAnswer, &diameterAnswer)
 	if err != nil {
 		instrumentation.PushHttpClientExchange(endpoint, constants.UNSERIALIZATION_ERROR)
@@ -192,7 +191,7 @@ func HttpDiameterRequest(client http.Client, endpoint string, diameterRequest *d
 }
 
 // Helper function to serialize, send request, get response and unserialize Radius Request
-func HttpRadiusRequest(client http.Client, endpoint string, packet *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+func HttpRadiusRequest(client http.Client, endpoint string, packet *core.RadiusPacket) (*core.RadiusPacket, error) {
 	// Serialize the message
 	jsonRequest, err := json.Marshal(packet)
 	if err != nil {
@@ -220,7 +219,7 @@ func HttpRadiusRequest(client http.Client, endpoint string, packet *radiuscodec.
 	}
 
 	// Unserialize to Radius Packet
-	var radiusResponse radiuscodec.RadiusPacket
+	var radiusResponse core.RadiusPacket
 	err = json.Unmarshal(jsonResponse, &radiusResponse)
 	if err != nil {
 		instrumentation.PushHttpClientExchange(endpoint, constants.UNSERIALIZATION_ERROR)

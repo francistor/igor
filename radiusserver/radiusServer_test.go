@@ -6,14 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 )
 
 // Simple handler that generates a success response with the same attributes as in the request
-func echoHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+func echoHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
 
-	response := radiuscodec.NewRadiusResponse(request, true)
+	response := core.NewRadiusResponse(request, true)
 	for i := range request.AVPs {
 		response.AddAVP(&request.AVPs[i])
 	}
@@ -24,7 +23,7 @@ func echoHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, 
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
-	config.InitPolicyConfigInstance("resources/searchRules.json", "testServer", true)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", true)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())
@@ -35,17 +34,17 @@ func TestRadiusServer(t *testing.T) {
 	theUserName := "myUserName"
 
 	// Get the configuration
-	pci := config.GetPolicyConfigInstance("testServer")
+	pci := core.GetPolicyConfigInstance("testServer")
 	serverConf := pci.RadiusServerConf()
 
 	// Instantiate a radius server
-	rs := NewRadiusServer(config.GetPolicyConfigInstance("testServer"), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
+	rs := NewRadiusServer(core.GetPolicyConfigInstance("testServer"), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
 
 	// Wait fo the socket to be created
 	time.Sleep(100 * time.Millisecond)
 
 	// Create a request radius packet
-	request := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
+	request := core.NewRadiusRequest(core.ACCESS_REQUEST)
 	request.Add("User-Name", theUserName)
 
 	// Send a request using a local socket
@@ -69,7 +68,7 @@ func TestRadiusServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	receivedPacket, err := radiuscodec.RadiusPacketFromBytes(responseBuffer, "secret")
+	receivedPacket, err := core.RadiusPacketFromBytes(responseBuffer, "secret")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,8 +3,7 @@ package cdrwriter
 import (
 	"encoding/json"
 
-	"github.com/francistor/igor/diamcodec"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 
 	"golang.org/x/exp/slices"
 )
@@ -30,8 +29,8 @@ func NewJSONWriter(positiveFilter []string, negativeFilter []string) *JSONWriter
 // in the packet/message. A Timestamp attribute may be added in the handler if not sent by the BRAS
 
 // Writes the Diameter CDR in JSON format
-func (w *JSONWriter) GetDiameterCDRString(dm *diamcodec.DiameterMessage) string {
-	toSerialize := make([]*diamcodec.DiameterAVP, 0)
+func (w *JSONWriter) GetDiameterCDRString(dm *core.DiameterMessage) string {
+	toSerialize := make([]*core.DiameterAVP, 0)
 
 	// Write AVPs
 	for i := range dm.AVPs {
@@ -51,9 +50,9 @@ func (w *JSONWriter) GetDiameterCDRString(dm *diamcodec.DiameterMessage) string 
 }
 
 // Writes the CDR in JSON format
-func (w *JSONWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) string {
+func (w *JSONWriter) GetRadiusCDRString(rp *core.RadiusPacket) string {
 
-	toSerialize := make([]*radiuscodec.RadiusAVP, 0)
+	toSerialize := make([]*core.RadiusAVP, 0)
 
 	// Write AVPs
 	for i := range rp.AVPs {

@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/go-sql-driver/mysql v1.7.0
-	go.uber.org/zap v1.23.0
+	go.uber.org/zap v1.24.0
 	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
 )
 

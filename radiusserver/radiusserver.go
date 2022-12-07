@@ -5,9 +5,8 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/instrumentation"
-	"github.com/francistor/igor/radiuscodec"
 )
 
 // Valid statuses
@@ -21,11 +20,11 @@ const (
 type RadiusServer struct {
 
 	// Configuration instance object
-	ci *config.PolicyConfigurationManager
+	ci *core.PolicyConfigurationManager
 
 	// Handler function for incoming packets
 	// handler RadiusPacketHandler
-	handler radiuscodec.RadiusPacketHandler
+	handler core.RadiusPacketHandler
 
 	// The UDP socket
 	socket net.PacketConn
@@ -35,14 +34,14 @@ type RadiusServer struct {
 }
 
 // Creates a Radius Server
-func NewRadiusServer(ci *config.PolicyConfigurationManager, bindAddress string, bindPort int, handler radiuscodec.RadiusPacketHandler) *RadiusServer {
+func NewRadiusServer(ci *core.PolicyConfigurationManager, bindAddress string, bindPort int, handler core.RadiusPacketHandler) *RadiusServer {
 
 	// Create the server socket
 	socket, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", bindAddress, bindPort))
 	if err != nil {
 		panic(fmt.Sprintf("could not create listen socket in %s:%d : %s", bindAddress, bindPort, err))
 	} else {
-		config.GetLogger().Infof("RADIUS server listening in %s:%d", bindAddress, bindPort)
+		core.GetLogger().Infof("RADIUS server listening in %s:%d", bindAddress, bindPort)
 	}
 
 	radiusServer := RadiusServer{
@@ -78,7 +77,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 			// Check here if the error is due to the socket being closed
 			if atomic.LoadInt32(&rs.status) == StatusTerminated {
 				// The socket was closed gracefully
-				config.GetLogger().Infof("finished radius server socket %s", socket.LocalAddr().String())
+				core.GetLogger().Infof("finished radius server socket %s", socket.LocalAddr().String())
 				return
 			} else {
 				// Some other error
@@ -91,57 +90,57 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 		radiusClient, found := rs.ci.RadiusClients()[clientIPAddr]
 
 		if !found {
-			config.GetLogger().Warnf("message from unknown client %s", clientIPAddr)
+			core.GetLogger().Warnf("message from unknown client %s", clientIPAddr)
 			continue
 		}
 
 		// Decode the packet
-		config.GetLogger().Debugf("received packet: %v", reqBuf[:packetSize])
-		radiusPacket, err := radiuscodec.RadiusPacketFromBytes((reqBuf[:packetSize]), radiusClient.Secret)
+		core.GetLogger().Debugf("received packet: %v", reqBuf[:packetSize])
+		radiusPacket, err := core.RadiusPacketFromBytes((reqBuf[:packetSize]), radiusClient.Secret)
 		if err != nil {
-			config.GetLogger().Errorf("error decoding packet %s\n", err)
+			core.GetLogger().Errorf("error decoding packet %s\n", err)
 			continue
 		}
 
 		// Validate the packet
-		if radiusPacket.Code != radiuscodec.ACCESS_REQUEST {
-			if !radiuscodec.ValidateRequestAuthenticator(reqBuf[:packetSize], radiusClient.Secret) {
+		if radiusPacket.Code != core.ACCESS_REQUEST {
+			if !core.ValidateRequestAuthenticator(reqBuf[:packetSize], radiusClient.Secret) {
 				instrumentation.PushRadiusServerDrop(clientIPAddr, string(radiusPacket.Code))
-				config.GetLogger().Warnf("invalid request packet %s\n", radiusPacket)
+				core.GetLogger().Warnf("invalid request packet %s\n", radiusPacket)
 				continue
 			}
 		}
 
 		instrumentation.PushRadiusServerRequest(clientIPAddr, string(radiusPacket.Code))
-		config.GetLogger().Debugf("<- Server received RadiusPacket %s\n", radiusPacket)
+		core.GetLogger().Debugf("<- Server received RadiusPacket %s\n", radiusPacket)
 
 		// Wait for response
-		go func(radiusPacket *radiuscodec.RadiusPacket, secret string, addr net.Addr) {
+		go func(radiusPacket *core.RadiusPacket, secret string, addr net.Addr) {
 
 			code := radiusPacket.Code
 
 			response, err := rs.handler(radiusPacket)
 
 			if err != nil {
-				config.GetLogger().Errorf("discarding packet for %s with code %d: %s", addr.String(), radiusPacket.Code, err)
+				core.GetLogger().Errorf("discarding packet for %s with code %d: %s", addr.String(), radiusPacket.Code, err)
 				instrumentation.PushRadiusServerDrop(clientIPAddr, string(code))
 				return
 			}
 
 			respBuf, err := response.ToBytes(secret, radiusPacket.Identifier)
 			if err != nil {
-				config.GetLogger().Errorf("error serializing packet for %s with code %d: %s", addr.String(), code, err)
+				core.GetLogger().Errorf("error serializing packet for %s with code %d: %s", addr.String(), code, err)
 				instrumentation.PushRadiusServerDrop(clientIPAddr, string(code))
 				return
 			}
 			if _, err = socket.WriteTo(respBuf, addr); err != nil {
-				config.GetLogger().Errorf("error sending packet to %s with code %d: %s", addr.String(), code, err)
+				core.GetLogger().Errorf("error sending packet to %s with code %d: %s", addr.String(), code, err)
 				instrumentation.PushRadiusServerDrop(clientIPAddr, string(code))
 				return
 			}
 
 			instrumentation.PushRadiusServerResponse(clientIPAddr, string(code))
-			config.GetLogger().Debugf("-> Server sent RadiusPacket %s\n", response)
+			core.GetLogger().Debugf("-> Server sent RadiusPacket %s\n", response)
 
 		}(radiusPacket, radiusClient.Secret, clientAddr)
 	}

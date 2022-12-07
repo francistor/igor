@@ -9,18 +9,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/instrumentation"
 )
 
 // This message handler parses the Igor-Command, which may specify
 // whether to introduce a small delay (value "Slow") or a big one (value "VerySlow")
 // A Class attribute with the value "TestUserNameEcho" is added to the answer
-func MyMessageHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
+func MyMessageHandler(request *core.DiameterMessage) (*core.DiameterMessage, error) {
 
-	answer := diamcodec.NewDiameterAnswer(request).
-		AddOriginAVPs(config.GetPolicyConfig()).
+	answer := core.NewDiameterAnswer(request).
+		AddOriginAVPs(core.GetPolicyConfig()).
 		Add("Class", "TestUserNameEcho")
 
 	command := request.GetStringAVP("Igor-Command")
@@ -39,11 +38,11 @@ func MyMessageHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMe
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
-	config.InitPolicyConfigInstance("resources/searchRules.json", "testServer", true)
-	config.InitPolicyConfigInstance("resources/searchRules.json", "testClient", false)
-	config.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", false)
-	config.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", false)
-	config.InitPolicyConfigInstance("resources/searchRules.json", "testServerBadOriginNetwork", false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", true)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClient", false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServerBadOriginNetwork", false)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())
@@ -54,7 +53,7 @@ func TestDiameterPeerOK(t *testing.T) {
 	var passivePeer *DiameterPeer
 	var activePeer *DiameterPeer
 
-	activePeerConfig := config.DiameterPeer{
+	activePeerConfig := core.DiameterPeer{
 		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
@@ -104,8 +103,8 @@ func TestDiameterPeerOK(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Correct response
-	request, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
-	request.AddOriginAVPs(config.GetPolicyConfigInstance("testClient"))
+	request, _ := core.NewDiameterRequest("TestApplication", "TestRequest")
+	request.AddOriginAVPs(core.GetPolicyConfigInstance("testClient"))
 	request.Add("User-Name", "TestUserNameRequest")
 	request.Add("Destination-Realm", "igorserver")
 	var rc1 = make(chan interface{}, 1)
@@ -115,7 +114,7 @@ func TestDiameterPeerOK(t *testing.T) {
 	switch v := a1.(type) {
 	case error:
 		t.Fatal("bad response", err)
-	case *diamcodec.DiameterMessage:
+	case *core.DiameterMessage:
 		classAVP, error := v.GetAVP("Class")
 		if error != nil {
 			t.Fatal("bad AVP", err)
@@ -193,7 +192,7 @@ func TestDiameterPeerBadServerName(t *testing.T) {
 
 	// The passive peer will receive a connection from client.igor that will succeed
 	// The active peer will establish a connection with unkserver.igorserver but the CEA will report server.igor
-	activePeerConfig := config.DiameterPeer{
+	activePeerConfig := core.DiameterPeer{
 		DiameterHost:            "unkserver.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
@@ -247,7 +246,7 @@ func TestDiameterPeerBadClientName(t *testing.T) {
 
 	// The active client reports itself as unkclient.igor, which is not recongized by the server
 	// The passive peer reports an error (unkclient.igor not known),
-	activePeerConfig := config.DiameterPeer{
+	activePeerConfig := core.DiameterPeer{
 		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
@@ -293,7 +292,7 @@ func TestDiameterPeerUnableToConnect(t *testing.T) {
 	var activePeer *DiameterPeer
 
 	// The active client tries to connect to an unavailable server
-	activePeerConfig := config.DiameterPeer{
+	activePeerConfig := core.DiameterPeer{
 		DiameterHost:            "server.igorserver",
 		IPAddress:               "1.0.0.1",
 		Port:                    3868,
@@ -321,7 +320,7 @@ func TestBadOriginNetwork(t *testing.T) {
 	var passivePeer *DiameterPeer
 	var activePeer *DiameterPeer
 
-	activePeerConfig := config.DiameterPeer{
+	activePeerConfig := core.DiameterPeer{
 		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
@@ -368,7 +367,7 @@ func TestRequestsCancellation(t *testing.T) {
 	var passivePeer *DiameterPeer
 	var activePeer *DiameterPeer
 
-	activePeerConfig := config.DiameterPeer{
+	activePeerConfig := core.DiameterPeer{
 		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
@@ -409,11 +408,11 @@ func TestRequestsCancellation(t *testing.T) {
 	}
 
 	// Simulate two long requests
-	request1, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
-	request1.AddOriginAVPs(config.GetPolicyConfigInstance("testClient"))
+	request1, _ := core.NewDiameterRequest("TestApplication", "TestRequest")
+	request1.AddOriginAVPs(core.GetPolicyConfigInstance("testClient"))
 	request1.Add("Igor-Command", "Slow")
-	request2, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
-	request2.AddOriginAVPs(config.GetPolicyConfigInstance("testClient"))
+	request2, _ := core.NewDiameterRequest("TestApplication", "TestRequest")
+	request2.AddOriginAVPs(core.GetPolicyConfigInstance("testClient"))
 	request2.Add("Igor-Command", "Slow")
 
 	rc1 := make(chan interface{}, 1)
@@ -454,7 +453,7 @@ func TestSocketError(t *testing.T) {
 	var passivePeer *DiameterPeer
 	var activePeer *DiameterPeer
 
-	activePeerConfig := config.DiameterPeer{
+	activePeerConfig := core.DiameterPeer{
 		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
@@ -517,7 +516,7 @@ func TestDisconnectMessage(t *testing.T) {
 	var passivePeer *DiameterPeer
 	var activePeer *DiameterPeer
 
-	activePeerConfig := config.DiameterPeer{
+	activePeerConfig := core.DiameterPeer{
 		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,

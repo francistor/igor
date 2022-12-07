@@ -1,4 +1,4 @@
-package diamcodec
+package core
 
 import (
 	"bytes"
@@ -8,20 +8,10 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/diamdict"
 )
-
-// Magical reference date is Mon Jan 2 15:04:05 MST 2006
-// Time AVP is the number of seconds since 1/1/1900
-var zeroTime, _ = time.Parse("2006-01-02T15:04:05 MST", "1900-01-01T00:00:00 UTC")
-var timeFormatString = "2006-01-02T15:04:05 MST"
-var ipv6PrefixRegex = regexp.MustCompile(`[0-9a-zA-z:\\.]+/[0-9]+`)
 
 type DiameterAVP struct {
 	Code        uint32
@@ -35,7 +25,7 @@ type DiameterAVP struct {
 	Value interface{}
 
 	// Dictionary item
-	DictItem *diamdict.AVPDictItem
+	DictItem *DiameterAVPDictItem
 }
 
 // AVP Header is
@@ -108,14 +98,14 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Get the relevant info from the dictionary
 	// If not in the dictionary, will get some defaults
-	avp.DictItem, _ = config.GetDDict().GetAVPFromCode(diamdict.AVPCode{VendorId: avp.VendorId, Code: avp.Code})
+	avp.DictItem, _ = GetDDict().GetAVPFromCode(DiameterAVPCode{VendorId: avp.VendorId, Code: avp.Code})
 	avp.Name = avp.DictItem.Name
 
 	// Parse according to type
 	switch avp.DictItem.DiameterType {
 
 	// OctetString
-	case diamdict.None, diamdict.OctetString:
+	case DiameterTypeNone, DiameterTypeOctetString:
 		// Read including padding
 		avpBytes = make([]byte, int(dataLen+padLen))
 		_, err := io.ReadAtLeast(reader, avpBytes, int(dataLen+padLen))
@@ -126,21 +116,21 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		return currentIndex + int64(dataLen+padLen), err
 
 	// Int32
-	case diamdict.Integer32:
+	case DiameterTypeInteger32:
 		var value int32
 		err := binary.Read(reader, binary.BigEndian, &value)
 		avp.Value = int64(value)
 		return currentIndex + 4, err
 
 	// Int64
-	case diamdict.Integer64:
+	case DiameterTypeInteger64:
 		var value int64
 		err := binary.Read(reader, binary.BigEndian, &value)
 		avp.Value = int64(value)
 		return currentIndex + 8, err
 
 	// UInt32
-	case diamdict.Unsigned32:
+	case DiameterTypeUnsigned32:
 		var value uint32
 		err := binary.Read(reader, binary.BigEndian, &value)
 		avp.Value = int64(value)
@@ -148,28 +138,28 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// UInt64
 	// Stored internally as an int64. This is a limitation!
-	case diamdict.Unsigned64:
+	case DiameterTypeUnsigned64:
 		var value uint64
 		err := binary.Read(reader, binary.BigEndian, &value)
 		avp.Value = int64(value)
 		return currentIndex + 8, err
 
 	// Float32
-	case diamdict.Float32:
+	case DiameterTypeFloat32:
 		var value float32
 		err := binary.Read(reader, binary.BigEndian, &value)
 		avp.Value = float64(value)
 		return currentIndex + 4, err
 
 	// Float64
-	case diamdict.Float64:
+	case DiameterTypeFloat64:
 		var value float64
 		err := binary.Read(reader, binary.BigEndian, &value)
 		avp.Value = value
 		return currentIndex + 8, err
 
 	// Grouped
-	case diamdict.Grouped:
+	case DiameterTypeGrouped:
 		for currentIndex < int64(avpLen+padLen) {
 			nextAVP := DiameterAVP{}
 			bytesRead, err := nextAVP.ReadFrom(reader)
@@ -187,7 +177,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 	// Address
 	// Two bytes for address type, and 4 /16 bytes for address
-	case diamdict.Address:
+	case DiameterTypeAddress:
 		var addrType uint16
 		var padding uint16
 		if err := binary.Read(reader, binary.BigEndian, &addrType); err != nil {
@@ -218,14 +208,14 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		}
 
 	// Time
-	case diamdict.Time:
+	case DiameterTypeTime:
 		var value uint32
 		err := binary.Read(reader, binary.BigEndian, &value)
-		avp.Value = zeroTime.Add(time.Second * time.Duration(value))
+		avp.Value = zeroDiameterTime.Add(time.Second * time.Duration(value))
 		return currentIndex + 4, err
 
 	// UTF8 String
-	case diamdict.UTF8String, diamdict.DiamIdent, diamdict.DiameterURI, diamdict.IPFilterRule:
+	case DiameterTypeUTF8String, DiameterTypeDiamIdent, DiameterTypeDiameterURI, DiameterTypeIPFilterRule:
 		// Read including padding
 		avpBytes = make([]byte, int(dataLen+padLen))
 		_, err := io.ReadAtLeast(reader, avpBytes, int(dataLen+padLen))
@@ -235,13 +225,13 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 
 		return currentIndex + int64(dataLen+padLen), err
 
-	case diamdict.Enumerated:
+	case DiameterTypeEnumerated:
 		var value int32
 		err := binary.Read(reader, binary.BigEndian, &value)
 		avp.Value = int64(value)
 		return currentIndex + 4, err
 
-	case diamdict.IPv4Address, diamdict.IPv6Address:
+	case DiameterTypeIPv4Address, DiameterTypeIPv6Address:
 		avpBytes = make([]byte, int(dataLen+padLen))
 		_, err := io.ReadAtLeast(reader, avpBytes, int(dataLen+padLen))
 		avp.Value = net.IP(avpBytes)
@@ -250,7 +240,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		// First byte is ignored
 		// Second byte is prefix size
 		// Rest is an IPv6 Address
-	case diamdict.IPv6Prefix:
+	case DiameterTypeIPv6Prefix:
 		var dummy byte
 		var prefixLen byte
 		var padding uint16
@@ -331,7 +321,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 
 	switch avp.DictItem.DiameterType {
 
-	case diamdict.None, diamdict.OctetString:
+	case DiameterTypeNone, DiameterTypeOctetString:
 		var octetsValue, ok = avp.Value.([]byte)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -341,7 +331,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		}
 		bytesWritten += len(octetsValue)
 
-	case diamdict.Integer32:
+	case DiameterTypeInteger32:
 		var value, ok = avp.Value.(int64)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -351,7 +341,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		}
 		bytesWritten += 4
 
-	case diamdict.Integer64:
+	case DiameterTypeInteger64:
 		var value, ok = avp.Value.(int64)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -361,7 +351,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		}
 		bytesWritten += 8
 
-	case diamdict.Unsigned32:
+	case DiameterTypeUnsigned32:
 		var value, ok = avp.Value.(int64)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -371,7 +361,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		}
 		bytesWritten += 4
 
-	case diamdict.Unsigned64:
+	case DiameterTypeUnsigned64:
 		var value, ok = avp.Value.(int64)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -381,7 +371,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		}
 		bytesWritten += 8
 
-	case diamdict.Float32:
+	case DiameterTypeFloat32:
 		var value, ok = avp.Value.(float64)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -391,7 +381,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		}
 		bytesWritten += 4
 
-	case diamdict.Float64:
+	case DiameterTypeFloat64:
 		var value, ok = avp.Value.(float64)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -401,7 +391,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		}
 		bytesWritten += 8
 
-	case diamdict.Grouped:
+	case DiameterTypeGrouped:
 		var groupedValue, ok = avp.Value.([]DiameterAVP)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -415,7 +405,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 
 		}
 
-	case diamdict.Address:
+	case DiameterTypeAddress:
 		var addressValue, ok = avp.Value.(net.IP)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -440,17 +430,17 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 			bytesWritten += 18
 		}
 
-	case diamdict.Time:
+	case DiameterTypeTime:
 		var timeValue, ok = avp.Value.(time.Time)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
 		}
-		if err = binary.Write(buffer, binary.BigEndian, uint32(timeValue.Sub(zeroTime).Seconds())); err != nil {
+		if err = binary.Write(buffer, binary.BigEndian, uint32(timeValue.Sub(zeroDiameterTime).Seconds())); err != nil {
 			return int64(bytesWritten), err
 		}
 		bytesWritten += 4
 
-	case diamdict.UTF8String, diamdict.DiamIdent, diamdict.DiameterURI, diamdict.IPFilterRule:
+	case DiameterTypeUTF8String, DiameterTypeDiamIdent, DiameterTypeDiameterURI, DiameterTypeIPFilterRule:
 		var stringValue, ok = avp.Value.(string)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -460,7 +450,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		}
 		bytesWritten += len(stringValue)
 
-	case diamdict.Enumerated:
+	case DiameterTypeEnumerated:
 		var value, ok = avp.Value.(int64)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -470,7 +460,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		}
 		bytesWritten += 4
 
-	case diamdict.IPv4Address:
+	case DiameterTypeIPv4Address:
 		var ipAddress, ok = avp.Value.(net.IP)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -480,7 +470,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		}
 		bytesWritten += 4
 
-	case diamdict.IPv6Address:
+	case DiameterTypeIPv6Address:
 		var ipAddress, ok = avp.Value.(net.IP)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -490,7 +480,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		}
 		bytesWritten += 16
 
-	case diamdict.IPv6Prefix:
+	case DiameterTypeIPv6Prefix:
 		var ipv6Prefix, ok = avp.Value.(string)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
@@ -556,65 +546,65 @@ func (avp *DiameterAVP) DataLen() int {
 
 	switch avp.DictItem.DiameterType {
 
-	case diamdict.None, diamdict.OctetString:
+	case DiameterTypeNone, DiameterTypeOctetString:
 		dataSize = len(avp.Value.([]byte))
 
-	case diamdict.Integer32:
+	case DiameterTypeInteger32:
 		dataSize = 4
 
-	case diamdict.Integer64:
+	case DiameterTypeInteger64:
 		dataSize = 8
 
-	case diamdict.Unsigned32:
+	case DiameterTypeUnsigned32:
 		dataSize = 4
 
-	case diamdict.Unsigned64:
+	case DiameterTypeUnsigned64:
 		dataSize = 8
 
-	case diamdict.Float32:
+	case DiameterTypeFloat32:
 		dataSize = 4
 
-	case diamdict.Float64:
+	case DiameterTypeFloat64:
 		dataSize = 8
 
-	case diamdict.Grouped:
+	case DiameterTypeGrouped:
 		values := avp.Value.([]DiameterAVP)
 		for i := range values {
 			dataSize += values[i].Len()
 		}
 
-	case diamdict.Address:
+	case DiameterTypeAddress:
 		if avp.Value.(net.IP).To4() != nil {
 			dataSize = 6
 		} else {
 			dataSize = 18
 		}
 
-	case diamdict.Time:
+	case DiameterTypeTime:
 		dataSize = 4
 
-	case diamdict.UTF8String:
+	case DiameterTypeUTF8String:
 		dataSize = len(avp.Value.(string))
 
-	case diamdict.DiamIdent:
+	case DiameterTypeDiamIdent:
 		dataSize = len(avp.Value.(string))
 
-	case diamdict.DiameterURI:
+	case DiameterTypeDiameterURI:
 		dataSize = len(avp.Value.(string))
 
-	case diamdict.Enumerated:
+	case DiameterTypeEnumerated:
 		dataSize = 4
 
-	case diamdict.IPFilterRule:
+	case DiameterTypeIPFilterRule:
 		dataSize = len(avp.Value.(string))
 
-	case diamdict.IPv4Address:
+	case DiameterTypeIPv4Address:
 		dataSize = 4
 
-	case diamdict.IPv6Address:
+	case DiameterTypeIPv6Address:
 		dataSize = 16
 
-	case diamdict.IPv6Prefix:
+	case DiameterTypeIPv6Prefix:
 		dataSize = 18
 	}
 
@@ -648,7 +638,7 @@ func (avp *DiameterAVP) GetOctets() []byte {
 
 	var value, ok = avp.Value.([]byte)
 	if !ok {
-		config.GetLogger().Errorf("cannot convert %T %v to []byte", avp.Value, avp.Value)
+		GetLogger().Errorf("cannot convert %T %v to []byte", avp.Value, avp.Value)
 		return nil
 	}
 
@@ -660,20 +650,20 @@ func (avp *DiameterAVP) GetString() string {
 
 	switch avp.DictItem.DiameterType {
 
-	case diamdict.None, diamdict.OctetString:
+	case DiameterTypeNone, DiameterTypeOctetString:
 		// Treat as octetString
 		var octetsValue, _ = avp.Value.([]byte)
 		return fmt.Sprintf("%x", octetsValue)
 
-	case diamdict.Integer32, diamdict.Integer64, diamdict.Unsigned32, diamdict.Unsigned64:
+	case DiameterTypeInteger32, DiameterTypeInteger64, DiameterTypeUnsigned32, DiameterTypeUnsigned64:
 		var value, _ = avp.Value.(int64)
 		return fmt.Sprintf("%d", value)
 
-	case diamdict.Float32, diamdict.Float64:
+	case DiameterTypeFloat32, DiameterTypeFloat64:
 		var value, _ = avp.Value.(float64)
 		return fmt.Sprintf("%f", value)
 
-	case diamdict.Grouped:
+	case DiameterTypeGrouped:
 		var groupedValue, _ = avp.Value.([]DiameterAVP)
 		var sb strings.Builder
 
@@ -687,43 +677,43 @@ func (avp *DiameterAVP) GetString() string {
 
 		return sb.String()
 
-	case diamdict.Address:
+	case DiameterTypeAddress:
 		var addressValue, _ = avp.Value.(net.IP)
 		return addressValue.String()
 
-	case diamdict.Time:
-		var timeValue, _ = avp.Value.(time.Time)
+	case DiameterTypeTime:
+		var timeValue = avp.Value.(time.Time)
 		return timeValue.Format(timeFormatString)
 
-	case diamdict.UTF8String:
+	case DiameterTypeUTF8String:
 		var stringValue, _ = avp.Value.(string)
 		return stringValue
 
-	case diamdict.DiamIdent:
+	case DiameterTypeDiamIdent:
 		var stringValue, _ = avp.Value.(string)
 		return stringValue
 
-	case diamdict.DiameterURI:
+	case DiameterTypeDiameterURI:
 		var stringValue, _ = avp.Value.(string)
 		return stringValue
 
-	case diamdict.Enumerated:
+	case DiameterTypeEnumerated:
 		var intValue, _ = avp.Value.(int64)
 		return avp.DictItem.EnumCodes[int(intValue)]
 
-	case diamdict.IPFilterRule:
+	case DiameterTypeIPFilterRule:
 		var stringValue, _ = avp.Value.(string)
 		return stringValue
 
-	case diamdict.IPv4Address:
+	case DiameterTypeIPv4Address:
 		var ipAddress, _ = avp.Value.(net.IP)
 		return ipAddress.String()
 
-	case diamdict.IPv6Address:
+	case DiameterTypeIPv6Address:
 		var ipAddress, _ = avp.Value.(net.IP)
 		return ipAddress.String()
 
-	case diamdict.IPv6Prefix:
+	case DiameterTypeIPv6Prefix:
 		var stringValue, _ = avp.Value.(string)
 		return stringValue
 	}
@@ -735,11 +725,11 @@ func (avp *DiameterAVP) GetString() string {
 func (avp *DiameterAVP) GetInt() int64 {
 
 	switch avp.DictItem.DiameterType {
-	case diamdict.Integer32, diamdict.Integer64, diamdict.Unsigned32, diamdict.Unsigned64, diamdict.Enumerated:
+	case DiameterTypeInteger32, DiameterTypeInteger64, DiameterTypeUnsigned32, DiameterTypeUnsigned64, DiameterTypeEnumerated:
 
 		return avp.Value.(int64)
 	default:
-		config.GetLogger().Errorf("cannot convert value to int64 %T %v", avp.Value, avp.Value)
+		GetLogger().Errorf("cannot convert value to int64 %T %v", avp.Value, avp.Value)
 		return 0
 	}
 }
@@ -748,10 +738,10 @@ func (avp *DiameterAVP) GetInt() int64 {
 func (avp *DiameterAVP) GetFloat() float64 {
 
 	switch avp.DictItem.DiameterType {
-	case diamdict.Float32, diamdict.Float64:
+	case DiameterTypeFloat32, DiameterTypeFloat64:
 		return avp.Value.(float64)
 	default:
-		config.GetLogger().Errorf("cannot convert value to float64 %T %v", avp.Value, avp.Value)
+		GetLogger().Errorf("cannot convert value to float64 %T %v", avp.Value, avp.Value)
 		return 0
 	}
 }
@@ -761,7 +751,7 @@ func (avp *DiameterAVP) GetDate() time.Time {
 
 	var value, ok = avp.Value.(time.Time)
 	if !ok {
-		config.GetLogger().Errorf("cannot convert %T %v to time", avp.Value, avp.Value)
+		GetLogger().Errorf("cannot convert %T %v to time", avp.Value, avp.Value)
 		return time.Time{}
 	}
 
@@ -773,7 +763,7 @@ func (avp *DiameterAVP) GetIPAddress() net.IP {
 
 	var value, ok = avp.Value.(net.IP)
 	if !ok {
-		config.GetLogger().Errorf("cannot convert %T %v to ip address", avp.Value, avp.Value)
+		GetLogger().Errorf("cannot convert %T %v to ip address", avp.Value, avp.Value)
 		return net.IP{}
 	}
 
@@ -782,10 +772,10 @@ func (avp *DiameterAVP) GetIPAddress() net.IP {
 
 // Creates a new AVP
 // If the type of value is not compatible with the Diameter type in the dictionary, an error is returned
-func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
+func NewDiameterAVP(name string, value interface{}) (*DiameterAVP, error) {
 	var avp = DiameterAVP{}
 
-	di, e := config.GetDDict().GetAVPFromName(name)
+	di, e := GetDDict().GetAVPFromName(name)
 	if e != nil {
 		return &avp, fmt.Errorf("%s not found in dictionary", name)
 	}
@@ -797,7 +787,7 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 
 	switch avp.DictItem.DiameterType {
 
-	case diamdict.OctetString:
+	case DiameterTypeOctetString:
 		var octetsValue, ok = value.([]byte)
 		if !ok {
 			var stringValue, ok = value.(string)
@@ -813,7 +803,7 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 			avp.Value = octetsValue
 		}
 
-	case diamdict.Integer32, diamdict.Integer64, diamdict.Unsigned32, diamdict.Unsigned64:
+	case DiameterTypeInteger32, DiameterTypeInteger64, DiameterTypeUnsigned32, DiameterTypeUnsigned64:
 		var value, error = toInt64(value)
 
 		if error != nil {
@@ -821,14 +811,14 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 		}
 		avp.Value = value
 
-	case diamdict.Float32, diamdict.Float64:
+	case DiameterTypeFloat32, DiameterTypeFloat64:
 		var value, error = toFloat64(value)
 		if error != nil {
 			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 		}
 		avp.Value = value
 
-	case diamdict.Grouped:
+	case DiameterTypeGrouped:
 		if value == nil {
 			avp.Value = make([]DiameterAVP, 0)
 		} else {
@@ -839,7 +829,7 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 			avp.Value = groupedValue
 		}
 
-	case diamdict.Address, diamdict.IPv4Address, diamdict.IPv6Address:
+	case DiameterTypeAddress, DiameterTypeIPv4Address, DiameterTypeIPv6Address:
 		// Address and string are allowed
 		var addressValue, ok = value.(net.IP)
 		if !ok {
@@ -857,7 +847,7 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 			avp.Value = addressValue
 		}
 
-	case diamdict.Time:
+	case DiameterTypeTime:
 		// Time and string are allowed
 		var timeValue, ok = value.(time.Time)
 		if !ok {
@@ -874,28 +864,28 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 			avp.Value = timeValue
 		}
 
-	case diamdict.UTF8String:
+	case DiameterTypeUTF8String:
 		var stringValue, ok = value.(string)
 		if !ok {
 			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 		}
 		avp.Value = stringValue
 
-	case diamdict.DiamIdent:
+	case DiameterTypeDiamIdent:
 		var stringValue, ok = value.(string)
 		if !ok {
 			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 		}
 		avp.Value = stringValue
 
-	case diamdict.DiameterURI:
+	case DiameterTypeDiameterURI:
 		var stringValue, ok = value.(string)
 		if !ok {
 			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 		}
 		avp.Value = stringValue
 
-	case diamdict.Enumerated:
+	case DiameterTypeEnumerated:
 		// Both number and string are allowed
 		var int64Value, error = toInt64(value)
 		if error != nil {
@@ -915,14 +905,14 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 			avp.Value = int64Value
 		}
 
-	case diamdict.IPFilterRule:
+	case DiameterTypeIPFilterRule:
 		var stringValue, ok = value.(string)
 		if !ok {
 			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 		}
 		avp.Value = stringValue
 
-	case diamdict.IPv6Prefix:
+	case DiameterTypeIPv6Prefix:
 		var stringValue, ok = value.(string)
 		if !ok {
 			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
@@ -939,57 +929,11 @@ func NewAVP(name string, value interface{}) (*DiameterAVP, error) {
 	return &avp, nil
 }
 
-func toInt64(value interface{}) (int64, error) {
-
-	switch v := value.(type) {
-	case int:
-		return int64(v), nil
-	case int8:
-		return int64(v), nil
-	case int16:
-		return int64(v), nil
-	case int32:
-		return int64(v), nil
-	case int64:
-		return int64(v), nil
-	case uint:
-		return int64(v), nil
-	case uint8:
-		return int64(v), nil
-	case uint16:
-		return int64(v), nil
-	case uint32:
-		return int64(v), nil
-	case uint64:
-		return int64(v), nil
-	case float32:
-		// Needed for unmarshaling JSON
-		return int64(v), nil
-	case float64:
-		// Needed for unmarshaling JSON
-		return int64(v), nil
-	default:
-		return 0, fmt.Errorf("cannot convert %T to int64", value)
-	}
-}
-
-func toFloat64(value interface{}) (float64, error) {
-
-	switch v := value.(type) {
-	case float32:
-		return float64(v), nil
-	case float64:
-		return float64(v), nil
-	default:
-		return 0, fmt.Errorf("cannot convert %T to float64", value)
-	}
-}
-
 // If grouped, checks that the embedded AVPs are in the dictionary
 func (avp *DiameterAVP) Check() error {
 
 	// Do something only if grouped
-	if avp.DictItem.DiameterType == diamdict.Grouped {
+	if avp.DictItem.DiameterType == DiameterTypeGrouped {
 		avps := avp.Value.([]DiameterAVP)
 		group := avp.DictItem.Group
 
@@ -1025,7 +969,7 @@ func (avp *DiameterAVP) Check() error {
 func (avp *DiameterAVP) AddAVP(gavp DiameterAVP) *DiameterAVP {
 	var groupedValue, ok = avp.Value.([]DiameterAVP)
 	if !ok {
-		config.GetLogger().Error("value is not of type grouped")
+		GetLogger().Error("value is not of type grouped")
 		return avp
 	}
 	// TODO: verify allowed in dictionary
@@ -1035,7 +979,7 @@ func (avp *DiameterAVP) AddAVP(gavp DiameterAVP) *DiameterAVP {
 
 // Adds a new AVP to the Grouped AVP, specified using name and value. Does nothing if the current value is not grouped
 func (avp *DiameterAVP) Add(name string, value interface{}) *DiameterAVP {
-	avp, err := NewAVP(name, value)
+	avp, err := NewDiameterAVP(name, value)
 	if err != nil {
 		avp.AddAVP(*avp)
 	}
@@ -1046,7 +990,7 @@ func (avp *DiameterAVP) Add(name string, value interface{}) *DiameterAVP {
 func (avp *DiameterAVP) DeleteAll(name string) *DiameterAVP {
 	var groupedValue, ok = avp.Value.([]DiameterAVP)
 	if !ok {
-		config.GetLogger().Error("value is not of type grouped")
+		GetLogger().Error("value is not of type grouped")
 		return avp
 	}
 
@@ -1081,7 +1025,7 @@ func (avp *DiameterAVP) GetAVP(name string) (DiameterAVP, error) {
 func (avp *DiameterAVP) GetAllAVP(name string) []DiameterAVP {
 	var groupedValue, ok = avp.Value.([]DiameterAVP)
 	if !ok {
-		config.GetLogger().Error("value is not of type grouped")
+		GetLogger().Error("value is not of type grouped")
 		return nil
 	}
 	avpList := make([]DiameterAVP, 0)
@@ -1102,13 +1046,13 @@ func (avp *DiameterAVP) ToMap() map[string]interface{} {
 	theMap := map[string]interface{}{}
 
 	switch avp.DictItem.DiameterType {
-	case diamdict.None, diamdict.OctetString, diamdict.UTF8String, diamdict.Enumerated, diamdict.DiamIdent, diamdict.DiameterURI, diamdict.Address, diamdict.IPv4Address, diamdict.IPv6Address, diamdict.IPv6Prefix, diamdict.Time, diamdict.IPFilterRule:
+	case DiameterTypeNone, DiameterTypeOctetString, DiameterTypeUTF8String, DiameterTypeEnumerated, DiameterTypeDiamIdent, DiameterTypeDiameterURI, DiameterTypeAddress, DiameterTypeIPv4Address, DiameterTypeIPv6Address, DiameterTypeIPv6Prefix, DiameterTypeTime, DiameterTypeIPFilterRule:
 		theMap[avp.Name] = avp.GetString()
-	case diamdict.Integer32, diamdict.Integer64, diamdict.Unsigned32, diamdict.Unsigned64:
+	case DiameterTypeInteger32, DiameterTypeInteger64, DiameterTypeUnsigned32, DiameterTypeUnsigned64:
 		theMap[avp.Name] = avp.GetInt()
-	case diamdict.Float32, diamdict.Float64:
+	case DiameterTypeFloat32, DiameterTypeFloat64:
 		theMap[avp.Name] = avp.GetFloat()
-	case diamdict.Grouped:
+	case DiameterTypeGrouped:
 		// Grouped AVP. The value is an array of JSON
 		targetGroup := make([]map[string]interface{}, 0)
 		avpGroup := avp.Value.([]DiameterAVP)
@@ -1138,7 +1082,7 @@ func FromMap(avpMap map[string]interface{}) (DiameterAVP, error) {
 		switch avpValue := avpMap[name].(type) {
 		case []interface{}:
 			// AVP is Grouped
-			groupedAVP, e1 := NewAVP(name, nil)
+			groupedAVP, e1 := NewDiameterAVP(name, nil)
 			if e1 != nil {
 				return DiameterAVP{}, fmt.Errorf("could not create AVP with name %s", name)
 			}
@@ -1152,7 +1096,7 @@ func FromMap(avpMap map[string]interface{}) (DiameterAVP, error) {
 			}
 			return *groupedAVP, nil
 		default:
-			avp, err := NewAVP(name, avpValue)
+			avp, err := NewDiameterAVP(name, avpValue)
 			return *avp, err
 		}
 	}

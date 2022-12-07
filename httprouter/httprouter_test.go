@@ -9,10 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/instrumentation"
-	"github.com/francistor/igor/radiuscodec"
 	"github.com/francistor/igor/router"
 
 	"golang.org/x/net/http2"
@@ -21,10 +19,10 @@ import (
 // This message handler parses the Igor1-Command, which may specify
 // whether to introduce a small delay (value "Slow") or a big one (value "VerySlow")
 // A User-Name attribute with the value "TestUserNameEcho" is added to the answer
-func diameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-	answer := diamcodec.NewDiameterAnswer(request)
+func diameterHandler(request *core.DiameterMessage) (*core.DiameterMessage, error) {
+	answer := core.NewDiameterAnswer(request)
 	answer.Add("User-Name", "EchoLocal")
-	answer.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
+	answer.Add("Result-Code", core.DIAMETER_SUCCESS)
 
 	command := request.GetStringAVP("Igor-Command")
 	switch command {
@@ -40,8 +38,8 @@ func diameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMes
 }
 
 // The most basic handler ever. Returns an empty response to the received message
-func radiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-	resp := radiuscodec.NewRadiusResponse(request, true)
+func radiusHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
+	resp := core.NewRadiusResponse(request, true)
 	resp.Add("User-Name", "EchoLocal")
 
 	command := request.GetStringAVP("Igor-Command")
@@ -63,8 +61,8 @@ func TestMain(m *testing.M) {
 	bootstrapFile := "resources/searchRules.json"
 
 	// Initialize policy
-	config.InitPolicyConfigInstance(bootstrapFile, "testServer", true)
-	config.InitPolicyConfigInstance(bootstrapFile, "testSuperServer", false)
+	core.InitPolicyConfigInstance(bootstrapFile, "testServer", true)
+	core.InitPolicyConfigInstance(bootstrapFile, "testSuperServer", false)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())
@@ -80,7 +78,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	httpRouter := NewHttpRouter("testServer", drouter, rrouter)
 
 	// Get the base url for requests
-	httpRouterURL := fmt.Sprintf("https://localhost:%d", config.GetPolicyConfigInstance("testServer").HttpRouterConf().BindPort)
+	httpRouterURL := fmt.Sprintf("https://localhost:%d", core.GetPolicyConfigInstance("testServer").HttpRouterConf().BindPort)
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -123,7 +121,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error routing radius: %s", err)
 	}
-	radiusAnswer := radiuscodec.RadiusPacket{}
+	radiusAnswer := core.RadiusPacket{}
 	if json.Unmarshal(jRadiusAnswer, &radiusAnswer) != nil {
 		t.Fatalf("error decoding radius response: %s", err)
 	}
@@ -175,7 +173,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error routing radius: %s", err)
 	}
-	diameterAnswer := diamcodec.DiameterMessage{}
+	diameterAnswer := core.DiameterMessage{}
 	if json.Unmarshal(jDiameterAnswer, &diameterAnswer) != nil {
 		t.Fatalf("error decoding diameter response: %s", err)
 	}

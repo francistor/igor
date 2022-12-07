@@ -8,20 +8,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/httphandler"
 	"github.com/francistor/igor/instrumentation"
-	"github.com/francistor/igor/radiuscodec"
 )
 
 // This message handler parses the Igor1-Command, which may specify
 // whether to introduce a small delay (value "Slow") or a big one (value "VerySlow")
 // A User-Name attribute with the value "TestUserNameEcho" is added to the answer
-func localDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-	answer := diamcodec.NewDiameterAnswer(request)
+func localDiameterHandler(request *core.DiameterMessage) (*core.DiameterMessage, error) {
+	answer := core.NewDiameterAnswer(request)
 	answer.Add("User-Name", "EchoLocal")
-	answer.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
+	answer.Add("Result-Code", core.DIAMETER_SUCCESS)
 
 	command := request.GetStringAVP("Igor-Command")
 	switch command {
@@ -37,16 +35,16 @@ func localDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.Diamet
 }
 
 // The most basic handler ever. Returns an empty response to the received message
-func localRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-	hl := config.NewHandlerLogger()
+func localRadiusHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
+	hl := core.NewHandlerLogger()
 	l := hl.L
 
-	defer func(l *config.HandlerLogger) {
+	defer func(l *core.HandlerLogger) {
 		l.WriteLog()
 	}(hl)
 
 	l.Infof("started localRadiusHandler for request %s", request)
-	resp := radiuscodec.NewRadiusResponse(request, true)
+	resp := core.NewRadiusResponse(request, true)
 	resp.Add("User-Name", "EchoLocal")
 
 	command := request.GetStringAVP("Igor-Command")
@@ -62,17 +60,17 @@ func localRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusP
 	return resp, nil
 }
 
-func httpDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-	answer := diamcodec.NewDiameterAnswer(request)
-	answer.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
+func httpDiameterHandler(request *core.DiameterMessage) (*core.DiameterMessage, error) {
+	answer := core.NewDiameterAnswer(request)
+	answer.Add("Result-Code", core.DIAMETER_SUCCESS)
 	answer.Add("User-Name", "EchoHTTP")
 
 	return answer, nil
 }
 
 // The most basic handler ever. Returns an empty response to the received message
-func httpRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-	resp := radiuscodec.NewRadiusResponse(request, true)
+func httpRadiusHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
+	resp := core.NewRadiusResponse(request, true)
 	resp.Add("User-Name", "EchoHTTP")
 
 	return resp, nil
@@ -81,12 +79,12 @@ func httpRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPa
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
-	config.InitPolicyConfigInstance("resources/searchRules.json", "testServer", true)
-	config.InitPolicyConfigInstance("resources/searchRules.json", "testClient", false)
-	config.InitPolicyConfigInstance("resources/searchRules.json", "testSuperServer", false)
-	config.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", false)
-	config.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", false)
-	config.InitHttpHandlerConfigInstance("resources/searchRules.json", "testServer", false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", true)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClient", false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testSuperServer", false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", false)
+	core.InitHttpHandlerConfigInstance("resources/searchRules.json", "testServer", false)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())
@@ -227,17 +225,17 @@ func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 
 	// Build request
-	request, err := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
+	request, err := core.NewDiameterRequest("TestApplication", "TestRequest")
 	if err != nil {
 		t.Fatalf("NewDiameterRequest error %s", err)
 	}
-	request.AddOriginAVPs(config.GetPolicyConfig())
+	request.AddOriginAVPs(core.GetPolicyConfig())
 	request.Add("Destination-Realm", "igorsuperserver")
 	request.Add("User-Name", "TestUserNameRequest")
 	response, err := client.RouteDiameterRequest(request, time.Duration(1000*time.Millisecond))
 	if err != nil {
 		t.Fatalf("route message returned error %s", err)
-	} else if response.GetIntAVP("Result-Code") != diamcodec.DIAMETER_SUCCESS {
+	} else if response.GetIntAVP("Result-Code") != core.DIAMETER_SUCCESS {
 		t.Fatalf("Result-Code not succes %d", response.GetIntAVP("Result-Code"))
 	} else if response.GetStringAVP("User-Name") != "EchoHTTP" {
 		t.Fatalf("Echoed User-Name incorrect %s", response.GetStringAVP("User-Name"))
@@ -272,16 +270,16 @@ func TestDiameterRouteMessagetoLocal(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 
 	// Build request
-	request, err := diamcodec.NewDiameterRequest("Gx", "Credit-Control")
+	request, err := core.NewDiameterRequest("Gx", "Credit-Control")
 	if err != nil {
 		t.Fatalf("NewDiameterRequest error %s", err)
 	}
-	request.AddOriginAVPs(config.GetPolicyConfig())
+	request.AddOriginAVPs(core.GetPolicyConfig())
 	request.Add("Destination-Realm", "igorsuperserver")
 	response, err := client.RouteDiameterRequest(request, time.Duration(1000*time.Millisecond))
 	if err != nil {
 		t.Fatalf("route message returned error %s", err)
-	} else if response.GetIntAVP("Result-Code") != diamcodec.DIAMETER_SUCCESS {
+	} else if response.GetIntAVP("Result-Code") != core.DIAMETER_SUCCESS {
 		t.Fatalf("Result-Code not success %d", response.GetIntAVP("Result-Code"))
 	} else if response.GetStringAVP("User-Name") != "EchoLocal" {
 		t.Fatalf("Echoed User-Name incorrect %s", response.GetStringAVP("User-Name"))
@@ -301,16 +299,16 @@ func TestDiameterRequestCancellation(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 
 	// Build request that will be sent to superserver
-	request, err := diamcodec.NewDiameterRequest("NASREQ", "AA")
+	request, err := core.NewDiameterRequest("NASREQ", "AA")
 	if err != nil {
 		t.Fatalf("NewDiameterRequest error %s", err)
 	}
-	request.AddOriginAVPs(config.GetPolicyConfig())
+	request.AddOriginAVPs(core.GetPolicyConfig())
 	request.Add("Destination-Realm", "igorsuperserver")
 	request.Add("Igor-Command", "VerySlow")
 
 	var handlerCalled int32
-	server.RouteDiameterRequestAsync(request, 200*time.Second, func(m *diamcodec.DiameterMessage, err error) {
+	server.RouteDiameterRequestAsync(request, 200*time.Second, func(m *core.DiameterMessage, err error) {
 		if err != nil {
 			atomic.StoreInt32(&handlerCalled, 1)
 		}
@@ -338,7 +336,7 @@ func TestRouteParamRadiusPacket(t *testing.T) {
 	rchan := make(chan interface{}, 1)
 	req := RoutableRadiusRequest{
 		Destination:       "igor-server-ne-group",
-		Packet:            radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST),
+		Packet:            core.NewRadiusRequest(core.ACCESS_REQUEST),
 		RChan:             rchan,
 		PerRequestTimeout: 1 * time.Second,
 		Tries:             3, // 1 will go to ne-server, 2 will go to igor-server, 3 will go again to ne-server
@@ -363,7 +361,7 @@ func TestRadiusRouteToHTTP(t *testing.T) {
 	client := NewRadiusRouter("testClient", localRadiusHandler).Start()
 
 	// Generate request
-	req := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
+	req := core.NewRadiusRequest(core.ACCESS_REQUEST)
 	req.Add("User-Name", "myUserName")
 
 	// Send to named group
@@ -397,7 +395,7 @@ func TestRadiusHandleLocal(t *testing.T) {
 	client := NewRadiusRouter("testClient", localRadiusHandler).Start()
 
 	// Generate request
-	req := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
+	req := core.NewRadiusRequest(core.ACCESS_REQUEST)
 	req.Add("User-Name", "myUserName")
 
 	// No destination: handle locally
@@ -426,7 +424,7 @@ func TestRadiusTimeout(t *testing.T) {
 	server := NewRadiusRouter("testServer", localRadiusHandler).Start()
 
 	// Generate request
-	req := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
+	req := core.NewRadiusRequest(core.ACCESS_REQUEST)
 	req.Add("User-Name", "myUserName")
 
 	// Send to first server of named group (non existing) twice
@@ -522,12 +520,12 @@ func TestRadiusRequestCancellation(t *testing.T) {
 	client := NewRadiusRouter("testClient", localRadiusHandler).Start()
 
 	// Generate request
-	req := radiuscodec.NewRadiusRequest(radiuscodec.ACCESS_REQUEST)
+	req := core.NewRadiusRequest(core.ACCESS_REQUEST)
 	req.Add("User-Name", "myUserName")
 
 	// Send the packet nowhere
 	var handlerCalled int32
-	client.RouteRadiusRequestAsync("127.0.0.1:7777", req, 200*time.Second, 1, 1, "", func(resp *radiuscodec.RadiusPacket, err error) {
+	client.RouteRadiusRequestAsync("127.0.0.1:7777", req, 200*time.Second, 1, 1, "", func(resp *core.RadiusPacket, err error) {
 		if err != nil {
 			atomic.StoreInt32(&handlerCalled, 1)
 		}

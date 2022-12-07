@@ -3,25 +3,23 @@ package handler
 import (
 	"encoding/json"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/diamcodec"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 )
 
 // The most basic handler ever. Returns an empty response to the received message
-func EmptyDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
-	hl := config.NewHandlerLogger()
+func EmptyDiameterHandler(request *core.DiameterMessage) (*core.DiameterMessage, error) {
+	hl := core.NewHandlerLogger()
 	l := hl.L
 
-	defer func(l *config.HandlerLogger) {
+	defer func(l *core.HandlerLogger) {
 		l.WriteLog()
 	}(hl)
 
 	l.Infof("%s", "Starting EmptyDiameterHandler")
 	l.Infof("%s %s", "request", request)
 
-	response := diamcodec.NewDiameterAnswer(request)
-	response.Add("Result-Code", diamcodec.DIAMETER_SUCCESS)
+	response := core.NewDiameterAnswer(request)
+	response.Add("Result-Code", core.DIAMETER_SUCCESS)
 
 	l.Infof("%s %s", "response", request)
 
@@ -29,24 +27,24 @@ func EmptyDiameterHandler(request *diamcodec.DiameterMessage) (*diamcodec.Diamet
 }
 
 // The most basic handler ever. Returns an empty response to the received message
-func EmptyRadiusHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-	hl := config.NewHandlerLogger()
+func EmptyRadiusHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
+	hl := core.NewHandlerLogger()
 
-	defer func(l *config.HandlerLogger) {
+	defer func(l *core.HandlerLogger) {
 		l.WriteLog()
 	}(hl)
 
-	resp := radiuscodec.NewRadiusResponse(request, true)
+	resp := core.NewRadiusResponse(request, true)
 
 	return resp, nil
 }
 
 // Used to test all possible attribute types
-func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
-	hl := config.NewHandlerLogger()
+func TestRadiusAttributesHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
+	hl := core.NewHandlerLogger()
 	l := hl.L
 
-	defer func(l *config.HandlerLogger) {
+	defer func(l *core.HandlerLogger) {
 		l.WriteLog()
 	}(hl)
 
@@ -82,9 +80,9 @@ func TestRadiusAttributesHandler(request *radiuscodec.RadiusPacket) (*radiuscode
 				]
 				`
 
-	resp := radiuscodec.NewRadiusResponse(request, true)
+	resp := core.NewRadiusResponse(request, true)
 
-	var responseAVPs []radiuscodec.RadiusAVP
+	var responseAVPs []core.RadiusAVP
 	err := json.Unmarshal([]byte(jAVPs), &responseAVPs)
 	if err != nil {
 		l.Errorf("%s", err.Error())

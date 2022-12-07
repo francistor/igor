@@ -1,4 +1,4 @@
-package radiuscodec
+package core
 
 import (
 	"bytes"
@@ -10,8 +10,6 @@ import (
 	"net"
 	"strings"
 	"time"
-
-	"github.com/francistor/igor/config"
 
 	"golang.org/x/exp/slices"
 )
@@ -351,8 +349,8 @@ func (rp *RadiusPacket) Add(name string, value interface{}) *RadiusPacket {
 		return rp
 	}
 
-	if avp, err := NewAVP(name, value); err != nil {
-		config.GetLogger().Errorf("avp %s could not be added: %v, due to %s", name, value, err)
+	if avp, err := NewRadiusAVP(name, value); err != nil {
+		GetLogger().Errorf("avp %s could not be added: %v, due to %s", name, value, err)
 		return rp
 	} else {
 		rp.AVPs = append(rp.AVPs, *avp)
@@ -367,8 +365,8 @@ func (rp *RadiusPacket) Merge(name string, value interface{}) *RadiusPacket {
 		return rp
 	}
 
-	if avp, err := NewAVP(name, value); err != nil {
-		config.GetLogger().Errorf("avp %s could not be merged: %v, due to %s", name, value, err)
+	if avp, err := NewRadiusAVP(name, value); err != nil {
+		GetLogger().Errorf("avp %s could not be merged: %v, due to %s", name, value, err)
 		return rp
 	} else {
 		return rp.MergeAVP(avp)
@@ -381,8 +379,8 @@ func (rp *RadiusPacket) Replace(name string, value interface{}) *RadiusPacket {
 	if value == nil {
 		return rp
 	}
-	if avp, err := NewAVP(name, value); err != nil {
-		config.GetLogger().Errorf("avp %s could not be replaced: %v, due to %s", name, value, err)
+	if avp, err := NewRadiusAVP(name, value); err != nil {
+		GetLogger().Errorf("avp %s could not be replaced: %v, due to %s", name, value, err)
 		return rp
 	} else {
 		return rp.ReplaceAVP(avp)

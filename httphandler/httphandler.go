@@ -10,11 +10,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/francistor/igor/config"
 	"github.com/francistor/igor/constants"
-	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/instrumentation"
-	"github.com/francistor/igor/radiuscodec"
 )
 
 // Receives Radius & Diameter requests via HTTP2, in JSON format, and processes them with the provided handlers
@@ -24,7 +22,7 @@ import (
 
 type HttpHandler struct {
 	// Holds the configuration instance for this Handler
-	ci *config.HttpHandlerConfigurationManager
+	ci *core.HttpHandlerConfigurationManager
 
 	// Holds the httpserver
 	httpServer *http.Server
@@ -34,7 +32,7 @@ type HttpHandler struct {
 }
 
 // Creates a new DiameterHandler object
-func NewHttpHandler(instanceName string, diameterHandler diamcodec.MessageHandler, radiusHandler radiuscodec.RadiusPacketHandler) HttpHandler {
+func NewHttpHandler(instanceName string, diameterHandler core.MessageHandler, radiusHandler core.RadiusPacketHandler) HttpHandler {
 
 	// If using the default mux (not done here. Just in case...)
 	// https://stackoverflow.com/questions/40786526/resetting-http-handlers-in-golang-for-unit-testing
@@ -43,9 +41,9 @@ func NewHttpHandler(instanceName string, diameterHandler diamcodec.MessageHandle
 	mux.HandleFunc("/diameterRequest", getDiameterRequestHandler(diameterHandler))
 	mux.HandleFunc("/radiusRequest", getRadiusRequestHandler(radiusHandler))
 
-	ci := config.GetHttpHandlerConfigInstance(instanceName)
+	ci := core.GetHttpHandlerConfigInstance(instanceName)
 	bindAddrPort := fmt.Sprintf("%s:%d", ci.HttpHandlerConf().BindAddress, ci.HttpHandlerConf().BindPort)
-	config.GetLogger().Infof("handler listening in %s", bindAddrPort)
+	core.GetLogger().Infof("handler listening in %s", bindAddrPort)
 
 	h := HttpHandler{
 		ci: ci,
@@ -93,10 +91,10 @@ func (dh *HttpHandler) Close() {
 }
 
 // Given a Diameter Handler function, builds a http handler that unserializes, executes the handler and serializes the response
-func getDiameterRequestHandler(handlerFunc diamcodec.MessageHandler) func(w http.ResponseWriter, req *http.Request) {
+func getDiameterRequestHandler(handlerFunc core.MessageHandler) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		logger := config.GetLogger()
+		logger := core.GetLogger()
 
 		// Get the Diameter Request
 		jRequest, err := io.ReadAll(req.Body)
@@ -107,7 +105,7 @@ func getDiameterRequestHandler(handlerFunc diamcodec.MessageHandler) func(w http
 			instrumentation.PushHttpHandlerExchange(req.RequestURI, constants.NETWORK_ERROR)
 			return
 		}
-		var request diamcodec.DiameterMessage
+		var request core.DiameterMessage
 		if err = json.Unmarshal(jRequest, &request); err != nil {
 			logger.Error("error unmarshalling request %s", err)
 			w.WriteHeader(http.StatusBadRequest)
@@ -140,10 +138,10 @@ func getDiameterRequestHandler(handlerFunc diamcodec.MessageHandler) func(w http
 }
 
 // Given a Diameter Handler function, builds an http handler that unserializes, executes the handler and serializes the response
-func getRadiusRequestHandler(handlerFunc radiuscodec.RadiusPacketHandler) func(w http.ResponseWriter, req *http.Request) {
+func getRadiusRequestHandler(handlerFunc core.RadiusPacketHandler) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		logger := config.GetLogger()
+		logger := core.GetLogger()
 
 		// Get the Radius Request
 		jRequest, err := io.ReadAll(req.Body)
@@ -154,7 +152,7 @@ func getRadiusRequestHandler(handlerFunc radiuscodec.RadiusPacketHandler) func(w
 			instrumentation.PushHttpHandlerExchange(req.RequestURI, constants.NETWORK_ERROR)
 			return
 		}
-		var request radiuscodec.RadiusPacket
+		var request core.RadiusPacket
 		if err = json.Unmarshal(jRequest, &request); err != nil {
 			logger.Error("error unmarshalling request %s", err)
 			w.WriteHeader(http.StatusBadRequest)

@@ -4,8 +4,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/francistor/igor/diamcodec"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 )
 
 const (
@@ -78,7 +77,7 @@ func (w *FileCDRWriter) eventLoop() {
 
 		switch v := p.(type) {
 
-		case *radiuscodec.RadiusPacket:
+		case *core.RadiusPacket:
 
 			_, err := w.file.WriteString(w.formatter.GetRadiusCDRString(v))
 
@@ -86,7 +85,7 @@ func (w *FileCDRWriter) eventLoop() {
 				panic("file write error. Filename: " + w.file.Name() + "error: " + err.Error())
 			}
 
-		case *diamcodec.DiameterMessage:
+		case *core.DiameterMessage:
 
 			_, err := w.file.WriteString(w.formatter.GetDiameterCDRString(v))
 
@@ -101,12 +100,12 @@ func (w *FileCDRWriter) eventLoop() {
 }
 
 // Writes the Radius CDR to file
-func (w *FileCDRWriter) WriteRadiusCDR(rp *radiuscodec.RadiusPacket) {
+func (w *FileCDRWriter) WriteRadiusCDR(rp *core.RadiusPacket) {
 	w.packetChan <- rp
 }
 
 // Writes the Radius Diameter to file
-func (w *FileCDRWriter) WriteDiameterCDR(dm *diamcodec.DiameterMessage) {
+func (w *FileCDRWriter) WriteDiameterCDR(dm *core.DiameterMessage) {
 	w.packetChan <- dm
 }
 

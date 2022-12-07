@@ -1,11 +1,10 @@
 package cdrwriter
 
 import (
-	"github.com/francistor/igor/diamcodec"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 )
 
 type CDRFormatter interface {
-	GetRadiusCDRString(rp *radiuscodec.RadiusPacket) string
-	GetDiameterCDRString(dm *diamcodec.DiameterMessage) string
+	GetRadiusCDRString(rp *core.RadiusPacket) string
+	GetDiameterCDRString(dm *core.DiameterMessage) string
 }

@@ -4,7 +4,7 @@ import (
 	"flag"
 	"time"
 
-	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/handler"
 	"github.com/francistor/igor/router"
 )
@@ -20,10 +20,10 @@ func main() {
 	flag.Parse()
 
 	// Initialize the Config Object
-	config.InitPolicyConfigInstance(*bootPtr, *instancePtr, true)
+	core.InitPolicyConfigInstance(*bootPtr, *instancePtr, true)
 
 	// Get logger
-	logger := config.GetLogger()
+	logger := core.GetLogger()
 
 	// Start Diameter
 	_ = router.NewDiameterRouter(*instancePtr, handler.EmptyDiameterHandler).Start()

@@ -10,10 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/handler"
-	"github.com/francistor/igor/radiuscodec"
 
 	"golang.org/x/net/http2"
 )
@@ -79,10 +77,10 @@ func TestMain(m *testing.M) {
 	// Initialize the Config Object as done in main.go
 	bootstrapFile := "resources/searchRules.json"
 	instanceName := "testServer"
-	config.InitHttpHandlerConfigInstance(bootstrapFile, instanceName, true)
+	core.InitHttpHandlerConfigInstance(bootstrapFile, instanceName, true)
 
 	// TODO: Needed to generate answers with origin diameter server name
-	config.InitPolicyConfigInstance(bootstrapFile, instanceName, false)
+	core.InitPolicyConfigInstance(bootstrapFile, instanceName, false)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())
@@ -117,12 +115,12 @@ func TestBasicHandlers(t *testing.T) {
 		t.Fatalf("got status code %d", httpResp.StatusCode)
 	}
 
-	var diameterAnswer diamcodec.DiameterMessage
+	var diameterAnswer core.DiameterMessage
 	err = json.Unmarshal(jsonAnswer, &diameterAnswer)
 	if err != nil {
 		t.Fatalf("unmarshal error for diameter message: %s", err)
 	}
-	if diameterAnswer.GetIntAVP("Result-Code") != diamcodec.DIAMETER_SUCCESS {
+	if diameterAnswer.GetIntAVP("Result-Code") != core.DIAMETER_SUCCESS {
 		t.Fatalf("answer was not DIAMETER_SUCCESS")
 	}
 
@@ -142,12 +140,12 @@ func TestBasicHandlers(t *testing.T) {
 		t.Fatalf("got status code %d", httpResp.StatusCode)
 	}
 
-	var radiusResponse radiuscodec.RadiusPacket
+	var radiusResponse core.RadiusPacket
 	err = json.Unmarshal(jsonAnswer, &radiusResponse)
 	if err != nil {
 		t.Fatalf("unmarshal error for radius message: %s", err)
 	}
-	if radiusResponse.Code != radiuscodec.ACCESS_ACCEPT {
+	if radiusResponse.Code != core.ACCESS_ACCEPT {
 		t.Log(radiusResponse)
 		t.Fatalf("response code was not ACCESS_ACCEPT")
 	}

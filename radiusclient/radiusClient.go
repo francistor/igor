@@ -5,8 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 )
 
 const (
@@ -34,7 +33,7 @@ type ClientRadiusRequestMsg struct {
 	originPort int
 
 	// The packet to send
-	packet *radiuscodec.RadiusPacket
+	packet *core.RadiusPacket
 
 	// Timeout
 	timeout time.Duration
@@ -60,7 +59,7 @@ type ClientRadiusRequestMsg struct {
 type RadiusClient struct {
 
 	// Configuration instance
-	ci *config.PolicyConfigurationManager
+	ci *core.PolicyConfigurationManager
 
 	// Receives events from the RadiusClientSockets and from the external world
 	controlChannel chan interface{}
@@ -83,7 +82,7 @@ type RadiusClient struct {
 }
 
 // Creates a new instance of the Radius Client
-func NewRadiusClient(ci *config.PolicyConfigurationManager) *RadiusClient {
+func NewRadiusClient(ci *core.PolicyConfigurationManager) *RadiusClient {
 
 	rc := RadiusClient{
 		ci:              ci,
@@ -143,7 +142,7 @@ func (r *RadiusClient) eventLoop() {
 
 				// Check if we are completely finished
 				if r.status == StatusTerminated && len(r.clientSockets) == 0 {
-					config.GetLogger().Info("last socket -> radius client closed")
+					core.GetLogger().Info("last socket -> radius client closed")
 					close(r.doneChannel)
 				}
 
@@ -153,7 +152,7 @@ func (r *RadiusClient) eventLoop() {
 
 				// If no clients, we are done
 				if len(r.clientSockets) == 0 {
-					config.GetLogger().Info("no sockets -> radius client closed")
+					core.GetLogger().Info("no sockets -> radius client closed")
 					close(r.doneChannel)
 				} else {
 					// Terminate all radius client sockets. Will terminate when all sockets are down
@@ -185,7 +184,7 @@ func (r *RadiusClient) eventLoop() {
 				var rcs *RadiusClientSocket
 				var found bool
 				if rcs, found = r.clientSockets[v.originPort]; !found {
-					rcs = NewRadiusClientSocket(r.ci, r.controlChannel, config.GetPolicyConfig().RadiusServerConf().BindAddress, v.originPort)
+					rcs = NewRadiusClientSocket(r.ci, r.controlChannel, core.GetPolicyConfig().RadiusServerConf().BindAddress, v.originPort)
 					r.clientSockets[v.originPort] = rcs
 				}
 
@@ -200,7 +199,7 @@ func (r *RadiusClient) eventLoop() {
 }
 
 // Send the radius packet to the target socket and receive the answer or error in the specified channel
-func (r *RadiusClient) RadiusExchange(endpoint string, originPort int, packet *radiuscodec.RadiusPacket, timeout time.Duration, serverTries int, secret string, rchan chan interface{}) {
+func (r *RadiusClient) RadiusExchange(endpoint string, originPort int, packet *core.RadiusPacket, timeout time.Duration, serverTries int, secret string, rchan chan interface{}) {
 
 	// Will be Done() after processing the message
 	r.wg.Add(1)

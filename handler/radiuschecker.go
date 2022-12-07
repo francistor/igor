@@ -6,8 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 )
 
 /////////////////////////////////////////////////////////////////////////////
@@ -43,7 +42,7 @@ type RadiusPacketCheck struct {
 type RadiusPacketChecks map[string]RadiusPacketCheck
 
 // Check whether the radius packet is conformant to the RadiusAVPCheck specification
-func (cs RadiusPacketChecks) CheckPacket(key string, packet *radiuscodec.RadiusPacket) bool {
+func (cs RadiusPacketChecks) CheckPacket(key string, packet *core.RadiusPacket) bool {
 	if check, ok := cs[key]; !ok {
 		return false
 	} else {
@@ -52,7 +51,7 @@ func (cs RadiusPacketChecks) CheckPacket(key string, packet *radiuscodec.RadiusP
 }
 
 // Check whether the radius packet is conformant to the RadiusAVPCheck specification
-func (c *RadiusPacketCheck) CheckPacket(packet *radiuscodec.RadiusPacket) bool {
+func (c *RadiusPacketCheck) CheckPacket(packet *core.RadiusPacket) bool {
 	if len(c.Leaf) > 0 {
 		// Check is a Leaf
 		var value string
@@ -112,14 +111,14 @@ func (c *RadiusPacketCheck) CheckPacket(packet *radiuscodec.RadiusPacket) bool {
 // ["attribute", "check-type", "value to check (optional)"]
 //
 // that is, it can be a two or three element array, or an object containing a condition and nested check objects
-func NewRadiusPacketChecks(configObjectName string, ci *config.PolicyConfigurationManager) (RadiusPacketChecks, error) {
+func NewRadiusPacketChecks(configObjectName string, ci *core.PolicyConfigurationManager) (RadiusPacketChecks, error) {
 
 	checks := make(RadiusPacketChecks)
 
 	// If we pass nil as last parameter, use the default configuration manager
-	var myCi *config.PolicyConfigurationManager
+	var myCi *core.PolicyConfigurationManager
 	if ci == nil {
-		myCi = config.GetPolicyConfig()
+		myCi = core.GetPolicyConfig()
 	} else {
 		myCi = ci
 	}

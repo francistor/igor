@@ -7,9 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/instrumentation"
-	"github.com/francistor/igor/radiuscodec"
 )
 
 // Sent to the parent RadiusClient when the connection and the eventloop are terminated, due
@@ -87,7 +86,7 @@ type RequestContext struct {
 type RadiusClientSocket struct {
 
 	// Configuration instance
-	ci *config.PolicyConfigurationManager
+	ci *core.PolicyConfigurationManager
 
 	// The port used
 	port int
@@ -124,7 +123,7 @@ type RadiusClientSocket struct {
 }
 
 // Creation function
-func NewRadiusClientSocket(ci *config.PolicyConfigurationManager, controlChannel chan interface{}, bindAddress string, originPort int) *RadiusClientSocket {
+func NewRadiusClientSocket(ci *core.PolicyConfigurationManager, controlChannel chan interface{}, bindAddress string, originPort int) *RadiusClientSocket {
 
 	// Bind socket
 	socket, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", bindAddress, originPort))
@@ -151,7 +150,7 @@ func NewRadiusClientSocket(ci *config.PolicyConfigurationManager, controlChannel
 
 // Starts the closing process
 func (rcs *RadiusClientSocket) SetDown() {
-	config.GetLogger().Debugf("client socket for %s terminating", rcs.socket.LocalAddr().String())
+	core.GetLogger().Debugf("client socket for %s terminating", rcs.socket.LocalAddr().String())
 
 	rcs.eventLoopChannel <- SetDownCommandMsg{}
 }
@@ -174,7 +173,7 @@ func (rcs *RadiusClientSocket) Close() {
 
 	close(rcs.eventLoopChannel)
 
-	config.GetLogger().Debugf("RadiusClientSocket closed")
+	core.GetLogger().Debugf("RadiusClientSocket closed")
 }
 
 // Actor model event loop. All interaction with RadiusClientSocket takes place by
@@ -229,11 +228,11 @@ func (rcs *RadiusClientSocket) eventLoop() {
 			radiusId := v.packetBytes[1]
 			if epReqMap, ok := rcs.requestsMap[endpoint]; !ok {
 				instrumentation.PushRadiusClientResponseStalled(endpoint, code)
-				config.GetLogger().Debugf("unsolicited or stalled response from endpoint %s", endpoint)
+				core.GetLogger().Debugf("unsolicited or stalled response from endpoint %s", endpoint)
 				continue
 			} else if requestContext, ok := epReqMap[radiusId]; !ok {
 				instrumentation.PushRadiusClientResponseStalled(endpoint, code)
-				config.GetLogger().Debugf("unsolicited or stalled response from endpoint %s and id %d", endpoint, radiusId)
+				core.GetLogger().Debugf("unsolicited or stalled response from endpoint %s and id %d", endpoint, radiusId)
 				continue
 			} else {
 
@@ -253,9 +252,9 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				delete(epReqMap, radiusId)
 
 				// Check authenticator
-				if !radiuscodec.ValidateResponseAuthenticator(v.packetBytes, requestContext.authenticator, requestContext.secret) {
+				if !core.ValidateResponseAuthenticator(v.packetBytes, requestContext.authenticator, requestContext.secret) {
 					instrumentation.PushRadiusClientResponseDrop(endpoint, code)
-					config.GetLogger().Warnf("bad authenticator from %s", endpoint)
+					core.GetLogger().Warnf("bad authenticator from %s", endpoint)
 
 					// Send the answer to the requester
 					requestContext.rchan <- fmt.Errorf("bad authenticator")
@@ -264,10 +263,10 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				}
 
 				// Decode the packet
-				radiusPacket, err := radiuscodec.RadiusPacketFromBytes(v.packetBytes, requestContext.secret)
+				radiusPacket, err := core.RadiusPacketFromBytes(v.packetBytes, requestContext.secret)
 				if err != nil {
 					instrumentation.PushRadiusClientResponseDrop(endpoint, code)
-					config.GetLogger().Errorf("error decoding packet from %s %s", endpoint, err)
+					core.GetLogger().Errorf("error decoding packet from %s %s", endpoint, err)
 					// Send the answer to the requester
 					requestContext.rchan <- fmt.Errorf("could not decode packet")
 					close(requestContext.rchan)
@@ -275,7 +274,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				}
 
 				instrumentation.PushRadiusClientResponse(endpoint, string(radiusPacket.Code))
-				config.GetLogger().Debugf("<- Client received RadiusPacket %s\n", radiusPacket)
+				core.GetLogger().Debugf("<- Client received RadiusPacket %s\n", radiusPacket)
 
 				// Send the answer to the requester
 				requestContext.rchan <- radiusPacket
@@ -287,7 +286,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 
 			radiusId, err := rcs.getNextRadiusId(v.endpoint, v.radiusId)
 			if err != nil {
-				config.GetLogger().Errorf("could not get an id: %s", err)
+				core.GetLogger().Errorf("could not get an id: %s", err)
 				v.rchan <- err
 				close(v.rchan)
 
@@ -298,7 +297,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 
 			packetBytes, err := v.packet.ToBytes(v.secret, radiusId)
 			if err != nil {
-				config.GetLogger().Errorf("error marshaling packet: %s", err)
+				core.GetLogger().Errorf("error marshaling packet: %s", err)
 				v.rchan <- err
 				close(v.rchan)
 
@@ -310,7 +309,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 			remoteAddr, _ := net.ResolveUDPAddr("udp", v.endpoint)
 			_, err = rcs.socket.WriteTo(packetBytes, remoteAddr)
 			if err != nil {
-				config.GetLogger().Errorf("error writing packet or socket closed: %v", err)
+				core.GetLogger().Errorf("error writing packet or socket closed: %v", err)
 				v.rchan <- err
 				close(v.rchan)
 
@@ -357,7 +356,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 			}
 
 			instrumentation.PushRadiusClientRequest(v.endpoint, string(v.packet.Code))
-			config.GetLogger().Debugf("-> Client sent RadiusPacket with Identifier %d - %s\n", radiusId, v.packet)
+			core.GetLogger().Debugf("-> Client sent RadiusPacket with Identifier %d - %s\n", radiusId, v.packet)
 
 			// Corresponding to the Add(1) in SendRadiusRequest
 			rcs.wg.Done()
@@ -365,10 +364,10 @@ func (rcs *RadiusClientSocket) eventLoop() {
 		case CancelRequestMsg:
 
 			if epMap, found := rcs.requestsMap[v.endpoint]; !found {
-				config.GetLogger().Debugf("tried to cancel not existing request %s:%d", v.endpoint, v.radiusId)
+				core.GetLogger().Debugf("tried to cancel not existing request %s:%d", v.endpoint, v.radiusId)
 				continue
 			} else if reqCtx, found := epMap[v.radiusId]; !found {
-				config.GetLogger().Debugf("tried to cancel not existing request %s:%d", v.endpoint, v.radiusId)
+				core.GetLogger().Debugf("tried to cancel not existing request %s:%d", v.endpoint, v.radiusId)
 				continue
 			} else {
 				reqCtx.rchan <- fmt.Errorf("timeout")
@@ -418,7 +417,7 @@ func (rcs *RadiusClientSocket) SendRadiusRequest(request ClientRadiusRequestMsg)
 	}
 
 	code := request.packet.Code
-	if code != radiuscodec.ACCESS_REQUEST && code != radiuscodec.ACCOUNTING_REQUEST && code != radiuscodec.COA_REQUEST && code != radiuscodec.DISCONNECT_REQUEST {
+	if code != core.ACCESS_REQUEST && code != core.ACCOUNTING_REQUEST && code != core.COA_REQUEST && code != core.DISCONNECT_REQUEST {
 		request.rchan <- fmt.Errorf("code is not for request, but %d", code)
 		close(request.rchan)
 		return

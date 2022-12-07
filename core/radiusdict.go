@@ -1,4 +1,4 @@
-package radiusdict
+package core
 
 import (
 	"encoding/json"
@@ -6,30 +6,30 @@ import (
 )
 
 const (
-	None        = 0
-	String      = 1
-	Octets      = 2
-	Address     = 3
-	Integer     = 4
-	Time        = 5
-	IPv6Address = 6
-	IPv6Prefix  = 7
-	InterfaceId = 8
-	Integer64   = 9
+	RadiusTypeNone        = 0
+	RadiusTypeString      = 1
+	RadiusTypeOctets      = 2
+	RadiusTypeAddress     = 3
+	RadiusTypeInteger     = 4
+	RadiusTypeTime        = 5
+	RadiusTypeIPv6Address = 6
+	RadiusTypeIPv6Prefix  = 7
+	RadiusTypeInterfaceId = 8
+	RadiusTypeInteger64   = 9
 )
 
-var UnknownDictItem = AVPDictItem{
+var UnknownRadiusDictItem = RadiusAVPDictItem{
 	Name: "UNKNOWN",
 }
 
 // VendorId and code of AVP in a single attribute
-type AVPCode struct {
+type RadiusAVPCode struct {
 	VendorId uint32
 	Code     byte
 }
 
 // Diameter Dictionary elements
-type AVPDictItem struct {
+type RadiusAVPDictItem struct {
 	VendorId   uint32
 	Code       byte
 	Name       string
@@ -50,17 +50,17 @@ type RadiusDict struct {
 	VendorByName map[string]uint32
 
 	// Map of avp code to name. Name is <vendorName>-<attributeName>
-	AVPByCode map[AVPCode]*AVPDictItem
+	AVPByCode map[RadiusAVPCode]*RadiusAVPDictItem
 
 	// Map of avp name to code
-	AVPByName map[string]*AVPDictItem
+	AVPByName map[string]*RadiusAVPDictItem
 }
 
 // Returns an empty dictionary item if the code is not found
 // The user may decide to go on with an UNKNOWN dictionary item when the error is returned
-func (rd *RadiusDict) GetFromCode(code AVPCode) (*AVPDictItem, error) {
+func (rd *RadiusDict) GetFromCode(code RadiusAVPCode) (*RadiusAVPDictItem, error) {
 	if di, found := rd.AVPByCode[code]; !found {
-		return &UnknownDictItem, fmt.Errorf("%v not found in dictionary", code)
+		return &UnknownRadiusDictItem, fmt.Errorf("%v not found in dictionary", code)
 	} else {
 		return di, nil
 	}
@@ -68,16 +68,16 @@ func (rd *RadiusDict) GetFromCode(code AVPCode) (*AVPDictItem, error) {
 
 // Returns an empty dictionary item if the code is not found
 // The user may decide to go on with an UNKNOWN dictionary item when the error is returned
-func (rd *RadiusDict) GetFromName(name string) (*AVPDictItem, error) {
+func (rd *RadiusDict) GetFromName(name string) (*RadiusAVPDictItem, error) {
 	if di, found := rd.AVPByName[name]; !found {
-		return &UnknownDictItem, fmt.Errorf("%v not found in dictionary", name)
+		return &UnknownRadiusDictItem, fmt.Errorf("%v not found in dictionary", name)
 	} else {
 		return di, nil
 	}
 }
 
 // Returns a Diameter Dictionary object from its serialized representation
-func NewDictionaryFromJSON(data []byte) *RadiusDict {
+func NewRadiusDictionaryFromJSON(data []byte) *RadiusDict {
 
 	// Unmarshall from JSON
 	var jDict jRadiusDict
@@ -97,8 +97,8 @@ func NewDictionaryFromJSON(data []byte) *RadiusDict {
 	}
 
 	// Build the AVP maps
-	dict.AVPByCode = make(map[AVPCode]*AVPDictItem)
-	dict.AVPByName = make(map[string]*AVPDictItem)
+	dict.AVPByCode = make(map[RadiusAVPCode]*RadiusAVPDictItem)
+	dict.AVPByName = make(map[string]*RadiusAVPDictItem)
 	for _, vendorAVPs := range jDict.Avps {
 		vendorId := vendorAVPs.VendorId
 		vendorName := dict.VendorById[vendorId]
@@ -106,7 +106,7 @@ func NewDictionaryFromJSON(data []byte) *RadiusDict {
 		// For a specific vendor
 		for _, attr := range vendorAVPs.Attributes {
 			avpDictItem := attr.toAVPDictItem(vendorId, vendorName)
-			dict.AVPByCode[AVPCode{vendorId, attr.Code}] = &avpDictItem
+			dict.AVPByCode[RadiusAVPCode{vendorId, attr.Code}] = &avpDictItem
 			dict.AVPByName[avpDictItem.Name] = &avpDictItem
 		}
 	}
@@ -144,37 +144,37 @@ type jRadiusDict struct {
 }
 
 // Builds a cooked AVPDictItem from the raw Json representation
-func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
+func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) RadiusAVPDictItem {
 
 	// Sanity check
 	var radiusType int
 	switch javp.Type {
 	case "None":
-		radiusType = None
+		radiusType = RadiusTypeNone
 	case "String":
-		radiusType = String
+		radiusType = RadiusTypeString
 	case "Octets":
-		radiusType = Octets
+		radiusType = RadiusTypeOctets
 	case "Address":
-		radiusType = Address
+		radiusType = RadiusTypeAddress
 	case "Integer":
-		radiusType = Integer
+		radiusType = RadiusTypeInteger
 	case "Time":
-		radiusType = Time
+		radiusType = RadiusTypeTime
 	case "IPv6Address":
-		radiusType = IPv6Address
+		radiusType = RadiusTypeIPv6Address
 	case "IPv6Prefix":
-		radiusType = IPv6Prefix
+		radiusType = RadiusTypeIPv6Prefix
 	case "InterfaceId":
-		radiusType = InterfaceId
+		radiusType = RadiusTypeInterfaceId
 	case "Integer64":
-		radiusType = Integer64
+		radiusType = RadiusTypeInteger64
 
 	default:
 		panic(javp.Type + " is not a valid RadiusType")
 	}
 
-	if (javp.Encrypted || javp.Salted) && radiusType != Octets {
+	if (javp.Encrypted || javp.Salted) && radiusType != RadiusTypeOctets {
 		panic("encrypted not octets found in dictionary")
 	}
 
@@ -191,7 +191,7 @@ func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
 		namePrefix = vs + "-"
 	}
 
-	return AVPDictItem{
+	return RadiusAVPDictItem{
 		VendorId:   v,
 		Code:       javp.Code,
 		Name:       namePrefix + javp.Name,

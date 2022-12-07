@@ -1,4 +1,4 @@
-package radiuscodec
+package core
 
 import (
 	"bytes"
@@ -13,15 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/radiusdict"
 )
 
-// Magical reference date is Mon Jan 2 15:04:05 MST 2006
-// Time AVP is the number of seconds since 1/1/1900
-var zeroTime, _ = time.Parse("2006-01-02T15:04:05 MST", "1970-01-01T00:00:00 UTC")
-var timeFormatString = "2006-01-02T15:04:05 MST"
 var ipv6PrefixRegex = regexp.MustCompile(`[0-9a-zA-z:.]+/[0-9]+`)
 
 type RadiusAVP struct {
@@ -36,7 +29,7 @@ type RadiusAVP struct {
 	Value interface{}
 
 	// Dictionary item
-	DictItem *radiusdict.AVPDictItem
+	DictItem *RadiusAVPDictItem
 }
 
 // AVP Header is
@@ -111,7 +104,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 
 	// Get the relevant info from the dictionary
 	// If not in the dictionary, will get some defaults
-	avp.DictItem, _ = config.GetRDict().GetFromCode(radiusdict.AVPCode{VendorId: avp.VendorId, Code: avp.Code})
+	avp.DictItem, _ = GetRDict().GetFromCode(RadiusAVPCode{VendorId: avp.VendorId, Code: avp.Code})
 	avp.Name = avp.DictItem.Name
 
 	// Extract tag if necessary
@@ -139,7 +132,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 
 	// Parse according to type
 	switch avp.DictItem.RadiusType {
-	case radiusdict.None, radiusdict.Octets:
+	case RadiusTypeNone, RadiusTypeOctets:
 
 		avpBytes := make([]byte, int(dataLen))
 		if n, err := io.ReadAtLeast(reader, avpBytes, int(dataLen)); err != nil {
@@ -157,7 +150,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 
 		return currentIndex + int64(dataLen), nil
 
-	case radiusdict.String:
+	case RadiusTypeString:
 		avpBytes := make([]byte, int(dataLen))
 		if n, err := io.ReadAtLeast(reader, avpBytes, int(dataLen)); err != nil {
 			return currentIndex + int64(n), err
@@ -167,7 +160,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 
 		return currentIndex + int64(dataLen), err
 
-	case radiusdict.Integer:
+	case RadiusTypeInteger:
 		if !avp.DictItem.Tagged {
 			var value int32
 			if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
@@ -191,7 +184,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 			return currentIndex + 2, err
 		}
 
-	case radiusdict.Address:
+	case RadiusTypeAddress:
 		if dataLen != 4 {
 			return currentIndex, fmt.Errorf("address type is not 4 bytes long")
 		}
@@ -203,7 +196,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		avp.Value = net.IP(avpBytes)
 		return currentIndex + 4, nil
 
-	case radiusdict.IPv6Address:
+	case RadiusTypeIPv6Address:
 		if dataLen != 16 {
 			return currentIndex, fmt.Errorf("ipv6address type is not 16 bytes long")
 		}
@@ -214,15 +207,15 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		avp.Value = net.IP(avpBytes)
 		return currentIndex + 16, nil
 
-	case radiusdict.Time:
+	case RadiusTypeTime:
 		var value uint32
 		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
 			return currentIndex, err
 		}
-		avp.Value = zeroTime.Add(time.Second * time.Duration(value))
+		avp.Value = zeroRadiusTime.Add(time.Second * time.Duration(value))
 		return currentIndex + 4, nil
 
-	case radiusdict.IPv6Prefix:
+	case RadiusTypeIPv6Prefix:
 		// Radius Type IPv6 prefix. Encoded as 1 byte padding, 1 byte prefix length, and 16 bytes with prefix.
 		var dummy byte
 		var prefixLen byte
@@ -241,7 +234,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 
 		return currentIndex + 18, err
 
-	case radiusdict.InterfaceId:
+	case RadiusTypeInterfaceId:
 		// 8 octets
 		if dataLen != 8 {
 			return currentIndex, fmt.Errorf("interfaceid type is not 8 bytes long")
@@ -257,7 +250,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 
 		return currentIndex + 8, err
 
-	case radiusdict.Integer64:
+	case RadiusTypeInteger64:
 		var value int64
 		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
 			return currentIndex, err
@@ -349,7 +342,7 @@ func (avp *RadiusAVP) ToWriter(buffer io.Writer, authenticator [16]byte, secret 
 	// Write data
 	switch avp.DictItem.RadiusType {
 
-	case radiusdict.None, radiusdict.Octets:
+	case RadiusTypeNone, RadiusTypeOctets:
 		var octetsValue, ok = avp.Value.([]byte)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling radius type %d and value %T %v", avp.DictItem.RadiusType, avp.Value, avp.Value)
@@ -367,7 +360,7 @@ func (avp *RadiusAVP) ToWriter(buffer io.Writer, authenticator [16]byte, secret 
 		}
 		bytesWritten += len(octetsValue)
 
-	case radiusdict.String:
+	case RadiusTypeString:
 		var stringValue, ok = avp.Value.(string)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling radius type %d and value %T %v", avp.DictItem.RadiusType, avp.Value, avp.Value)
@@ -377,7 +370,7 @@ func (avp *RadiusAVP) ToWriter(buffer io.Writer, authenticator [16]byte, secret 
 		}
 		bytesWritten += len(stringValue)
 
-	case radiusdict.Integer:
+	case RadiusTypeInteger:
 		var value, ok = avp.Value.(int64)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling radius type %d and value %T %v", avp.DictItem.RadiusType, avp.Value, avp.Value)
@@ -402,7 +395,7 @@ func (avp *RadiusAVP) ToWriter(buffer io.Writer, authenticator [16]byte, secret 
 			bytesWritten += 2
 		}
 
-	case radiusdict.Address:
+	case RadiusTypeAddress:
 		var ipAddress, ok = avp.Value.(net.IP)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling radius type %d and value %T %v", avp.DictItem.RadiusType, avp.Value, avp.Value)
@@ -418,7 +411,7 @@ func (avp *RadiusAVP) ToWriter(buffer io.Writer, authenticator [16]byte, secret 
 		}
 		bytesWritten += 4
 
-	case radiusdict.IPv6Address:
+	case RadiusTypeIPv6Address:
 		var ipAddress, ok = avp.Value.(net.IP)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling radius type %d and value %T %v", avp.DictItem.RadiusType, avp.Value, avp.Value)
@@ -434,17 +427,17 @@ func (avp *RadiusAVP) ToWriter(buffer io.Writer, authenticator [16]byte, secret 
 		}
 		bytesWritten += 16
 
-	case radiusdict.Time:
+	case RadiusTypeTime:
 		var timeValue, ok = avp.Value.(time.Time)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling radius type %d and value %T %v", avp.DictItem.RadiusType, avp.Value, avp.Value)
 		}
-		if err = binary.Write(buffer, binary.BigEndian, uint32(timeValue.Sub(zeroTime).Seconds())); err != nil {
+		if err = binary.Write(buffer, binary.BigEndian, uint32(timeValue.Sub(zeroRadiusTime).Seconds())); err != nil {
 			return int64(bytesWritten), err
 		}
 		bytesWritten += 4
 
-	case radiusdict.IPv6Prefix:
+	case RadiusTypeIPv6Prefix:
 		var ipv6Prefix, ok = avp.Value.(string)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling radius type %d and value %T %v", avp.DictItem.RadiusType, avp.Value, avp.Value)
@@ -474,7 +467,7 @@ func (avp *RadiusAVP) ToWriter(buffer io.Writer, authenticator [16]byte, secret 
 			return int64(bytesWritten), fmt.Errorf("error marshaling radius type %d and value %T %v", avp.DictItem.RadiusType, avp.Value, avp.Value)
 		}
 
-	case radiusdict.InterfaceId:
+	case RadiusTypeInterfaceId:
 		var interfaceIdValue, ok = avp.Value.([]byte)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling radius type %d and value %T %v", avp.DictItem.RadiusType, avp.Value, avp.Value)
@@ -487,7 +480,7 @@ func (avp *RadiusAVP) ToWriter(buffer io.Writer, authenticator [16]byte, secret 
 		}
 		bytesWritten += len(interfaceIdValue)
 
-	case radiusdict.Integer64:
+	case RadiusTypeInteger64:
 		var value, ok = avp.Value.(int64)
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling radius type %d and value %T %v", avp.DictItem.RadiusType, avp.Value, avp.Value)
@@ -524,7 +517,7 @@ func (avp *RadiusAVP) Len() byte {
 
 	switch avp.DictItem.RadiusType {
 
-	case radiusdict.None, radiusdict.Octets:
+	case RadiusTypeNone, RadiusTypeOctets:
 		dataSize = len(avp.Value.([]byte))
 
 		// Add the padding that will be introduced by the Encrypt function
@@ -537,28 +530,28 @@ func (avp *RadiusAVP) Len() byte {
 			dataSize += 2
 		}
 
-	case radiusdict.String:
+	case RadiusTypeString:
 		dataSize = len(avp.Value.(string))
 
-	case radiusdict.Integer:
+	case RadiusTypeInteger:
 		dataSize = 4
 
-	case radiusdict.Address:
+	case RadiusTypeAddress:
 		dataSize = 4
 
-	case radiusdict.Time:
+	case RadiusTypeTime:
 		dataSize = 4
 
-	case radiusdict.IPv6Address:
+	case RadiusTypeIPv6Address:
 		dataSize = 16
 
-	case radiusdict.IPv6Prefix:
+	case RadiusTypeIPv6Prefix:
 		dataSize = 18
 
-	case radiusdict.InterfaceId:
+	case RadiusTypeInterfaceId:
 		dataSize = 8
 
-	case radiusdict.Integer64:
+	case RadiusTypeInteger64:
 		dataSize = 8
 	}
 
@@ -583,7 +576,7 @@ func (avp *RadiusAVP) GetOctets() []byte {
 
 	var value, ok = avp.Value.([]byte)
 	if !ok {
-		config.GetLogger().Errorf("cannot convert %T %v to []byte", avp.Value, avp.Value)
+		GetLogger().Errorf("cannot convert %T %v to []byte", avp.Value, avp.Value)
 		return nil
 	}
 
@@ -595,12 +588,12 @@ func (avp *RadiusAVP) GetString() string {
 
 	switch avp.DictItem.RadiusType {
 
-	case radiusdict.None, radiusdict.Octets, radiusdict.InterfaceId:
+	case RadiusTypeNone, RadiusTypeOctets, RadiusTypeInterfaceId:
 		// Treat as octetString
 		var octetsValue, _ = avp.Value.([]byte)
 		return fmt.Sprintf("%x", octetsValue)
 
-	case radiusdict.Integer, radiusdict.Integer64:
+	case RadiusTypeInteger, RadiusTypeInteger64:
 		var intValue, _ = avp.Value.(int64)
 		if stringValue, ok := avp.DictItem.EnumCodes[int(intValue)]; ok {
 			return stringValue
@@ -608,15 +601,15 @@ func (avp *RadiusAVP) GetString() string {
 			return fmt.Sprintf("%d", intValue)
 		}
 
-	case radiusdict.String, radiusdict.IPv6Prefix:
+	case RadiusTypeString, RadiusTypeIPv6Prefix:
 		var stringValue, _ = avp.Value.(string)
 		return stringValue
 
-	case radiusdict.Address, radiusdict.IPv6Address:
+	case RadiusTypeAddress, RadiusTypeIPv6Address:
 		var addressValue, _ = avp.Value.(net.IP)
 		return addressValue.String()
 
-	case radiusdict.Time:
+	case RadiusTypeTime:
 		var timeValue, _ = avp.Value.(time.Time)
 		return timeValue.Format(timeFormatString)
 	}
@@ -649,11 +642,11 @@ func (avp *RadiusAVP) GetPasswordString() (string, error) {
 func (avp *RadiusAVP) GetInt() int64 {
 
 	switch avp.DictItem.RadiusType {
-	case radiusdict.Integer, radiusdict.Integer64:
+	case RadiusTypeInteger, RadiusTypeInteger64:
 
 		return avp.Value.(int64)
 	default:
-		config.GetLogger().Errorf("cannot convert value to int64 %T %v", avp.Value, avp.Value)
+		GetLogger().Errorf("cannot convert value to int64 %T %v", avp.Value, avp.Value)
 		return 0
 	}
 }
@@ -663,7 +656,7 @@ func (avp *RadiusAVP) GetDate() time.Time {
 
 	var value, ok = avp.Value.(time.Time)
 	if !ok {
-		config.GetLogger().Errorf("cannot convert %T %v to time", avp.Value, avp.Value)
+		GetLogger().Errorf("cannot convert %T %v to time", avp.Value, avp.Value)
 		return time.Time{}
 	}
 
@@ -674,7 +667,7 @@ func (avp *RadiusAVP) GetDate() time.Time {
 func (avp *RadiusAVP) GetIPAddress() net.IP {
 	var value, ok = avp.Value.(net.IP)
 	if !ok {
-		config.GetLogger().Errorf("cannot convert %T %v to ip address", avp.Value, avp.Value)
+		GetLogger().Errorf("cannot convert %T %v to ip address", avp.Value, avp.Value)
 		return net.IP{}
 	}
 
@@ -686,7 +679,7 @@ func (avp *RadiusAVP) SetTag(tag byte) *RadiusAVP {
 	if avp.DictItem.Tagged {
 		avp.Tag = tag
 	} else {
-		config.GetLogger().Errorf("tried to set tag to %s attribute", avp.DictItem.Name)
+		GetLogger().Errorf("tried to set tag to %s attribute", avp.DictItem.Name)
 	}
 
 	return avp
@@ -699,10 +692,10 @@ func (avp *RadiusAVP) GetTag() byte {
 
 // Creates a new AVP with the specified name and value
 // Will return an error if the name is not found in the dictionary
-func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
+func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 	var avp = RadiusAVP{}
 
-	di, e := config.GetRDict().GetFromName(name)
+	di, e := GetRDict().GetFromName(name)
 	if e != nil {
 		return &avp, fmt.Errorf("%s not found in dictionary", name)
 	}
@@ -732,7 +725,7 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 
 	var err error
 	switch avp.DictItem.RadiusType {
-	case radiusdict.Octets, radiusdict.InterfaceId:
+	case RadiusTypeOctets, RadiusTypeInterfaceId:
 		if isString {
 			avp.Value, err = hex.DecodeString(stringValue)
 			if err != nil {
@@ -746,7 +739,7 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 			avp.Value = octetsValue
 		}
 
-	case radiusdict.Integer, radiusdict.Integer64:
+	case RadiusTypeInteger, RadiusTypeInteger64:
 
 		if isString {
 			// Try dictionary
@@ -766,14 +759,14 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 			}
 		}
 
-	case radiusdict.String:
+	case RadiusTypeString:
 		if isString {
 			avp.Value = stringValue
 		} else {
 			return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
 		}
 
-	case radiusdict.Address, radiusdict.IPv6Address:
+	case RadiusTypeAddress, RadiusTypeIPv6Address:
 
 		if isString {
 			addressValue := net.ParseIP(stringValue)
@@ -791,7 +784,7 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 			}
 		}
 
-	case radiusdict.Time:
+	case RadiusTypeTime:
 		if isString {
 			avp.Value, err = time.Parse(timeFormatString, stringValue)
 			if err != nil {
@@ -805,7 +798,7 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 			avp.Value = timeValue
 		}
 
-	case radiusdict.IPv6Prefix:
+	case RadiusTypeIPv6Prefix:
 		if isString {
 			if !ipv6PrefixRegex.Match([]byte(stringValue)) {
 				return &RadiusAVP{}, fmt.Errorf("ipv6 prefix %s does not match expected format", stringValue)
@@ -820,40 +813,6 @@ func NewAVP(name string, value interface{}) (*RadiusAVP, error) {
 	}
 
 	return &avp, nil
-}
-
-func toInt64(value interface{}) (int64, error) {
-
-	switch v := value.(type) {
-	case int:
-		return int64(v), nil
-	case int8:
-		return int64(v), nil
-	case int16:
-		return int64(v), nil
-	case int32:
-		return int64(v), nil
-	case int64:
-		return int64(v), nil
-	case uint:
-		return int64(v), nil
-	case uint8:
-		return int64(v), nil
-	case uint16:
-		return int64(v), nil
-	case uint32:
-		return int64(v), nil
-	case uint64:
-		return int64(v), nil
-	case float32:
-		// Needed for unmarshaling JSON
-		return int64(v), nil
-	case float64:
-		// Needed for unmarshaling JSON
-		return int64(v), nil
-	default:
-		return 0, fmt.Errorf("cannot convert %T to int64", value)
-	}
 }
 
 /*
@@ -1017,10 +976,10 @@ func (avp *RadiusAVP) ToMap() map[string]interface{} {
 
 	switch avp.DictItem.RadiusType {
 
-	case radiusdict.None, radiusdict.Octets, radiusdict.String, radiusdict.InterfaceId, radiusdict.Address, radiusdict.IPv6Address, radiusdict.IPv6Prefix, radiusdict.Time:
+	case RadiusTypeNone, RadiusTypeOctets, RadiusTypeString, RadiusTypeInterfaceId, RadiusTypeAddress, RadiusTypeIPv6Address, RadiusTypeIPv6Prefix, RadiusTypeTime:
 		theMap[avp.Name] = avp.GetTaggedString()
 
-	case radiusdict.Integer, radiusdict.Integer64:
+	case RadiusTypeInteger, RadiusTypeInteger64:
 		// Try dictionary, if not found use integer value
 		var intValue, _ = avp.Value.(int64)
 		if stringValue, ok := avp.DictItem.EnumCodes[int(intValue)]; ok {
@@ -1041,7 +1000,7 @@ func AVPFromMap(avpMap map[string]interface{}) (RadiusAVP, error) {
 
 	// There will be only one entry
 	for name := range avpMap {
-		avp, err := NewAVP(name, avpMap[name])
+		avp, err := NewRadiusAVP(name, avpMap[name])
 		return *avp, err
 	}
 

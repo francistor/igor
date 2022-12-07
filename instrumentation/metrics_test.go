@@ -5,8 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/core"
 )
 
 // Initializer of the test suite.
@@ -15,7 +14,7 @@ func TestMain(m *testing.M) {
 	// Initialization
 	bootstrapFile := "resources/searchRules.json"
 	instanceName := "testClient"
-	config.InitPolicyConfigInstance(bootstrapFile, instanceName, true)
+	core.InitPolicyConfigInstance(bootstrapFile, instanceName, true)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())
@@ -26,10 +25,10 @@ func TestDiameterMetrics(t *testing.T) {
 	MS.ResetMetrics()
 	time.Sleep(100 * time.Millisecond)
 
-	diameterRequest, _ := diamcodec.NewDiameterRequest("TestApplication", "TestRequest")
-	diameterRequest.AddOriginAVPs(config.GetPolicyConfig())
-	diameterAnswer := diamcodec.NewDiameterAnswer(diameterRequest)
-	diameterAnswer.AddOriginAVPs(config.GetPolicyConfig())
+	diameterRequest, _ := core.NewDiameterRequest("TestApplication", "TestRequest")
+	diameterRequest.AddOriginAVPs(core.GetPolicyConfig())
+	diameterAnswer := core.NewDiameterAnswer(diameterRequest)
+	diameterAnswer.AddOriginAVPs(core.GetPolicyConfig())
 
 	// Generate some metrics
 	PushPeerDiameterRequestReceived("testPeer", diameterRequest)

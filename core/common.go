@@ -1,4 +1,4 @@
-package diamcodec
+package core
 
 import (
 	"fmt"
@@ -8,6 +8,26 @@ import (
 	"sync/atomic"
 	"time"
 )
+
+// Magical reference date is Mon Jan 2 15:04:05 MST 2006
+// Time AVP is the number of seconds since 1/1/1900
+var zeroRadiusTime, _ = time.Parse("2006-01-02T15:04:05 MST", "1970-01-01T00:00:00 UTC")
+var zeroDiameterTime, _ = time.Parse("2006-01-02T15:04:05 MST", "1900-01-01T00:00:00 UTC")
+var timeFormatString = "2006-01-02T15:04:05 MST"
+
+func GetAuthenticator() [16]byte {
+	var authenticator [16]byte
+	rand.Seed(time.Now().UnixNano())
+	rand.Read(authenticator[:])
+	return authenticator
+}
+
+func GetSalt() [2]byte {
+	salt := make([]byte, 2)
+	rand.Seed(time.Now().UnixNano())
+	rand.Read(salt)
+	return [2]byte{salt[0], salt[1]}
+}
 
 // Utilities to generate HopByHopIds and EndToEndIds based
 // as specified in the Diameter RFC
@@ -82,4 +102,50 @@ func writeStateId(stateId int) int {
 	}
 
 	return stateId
+}
+
+func toInt64(value interface{}) (int64, error) {
+
+	switch v := value.(type) {
+	case int:
+		return int64(v), nil
+	case int8:
+		return int64(v), nil
+	case int16:
+		return int64(v), nil
+	case int32:
+		return int64(v), nil
+	case int64:
+		return int64(v), nil
+	case uint:
+		return int64(v), nil
+	case uint8:
+		return int64(v), nil
+	case uint16:
+		return int64(v), nil
+	case uint32:
+		return int64(v), nil
+	case uint64:
+		return int64(v), nil
+	case float32:
+		// Needed for unmarshaling JSON
+		return int64(v), nil
+	case float64:
+		// Needed for unmarshaling JSON
+		return int64(v), nil
+	default:
+		return 0, fmt.Errorf("cannot convert %T to int64", value)
+	}
+}
+
+func toFloat64(value interface{}) (float64, error) {
+
+	switch v := value.(type) {
+	case float32:
+		return float64(v), nil
+	case float64:
+		return float64(v), nil
+	default:
+		return 0, fmt.Errorf("cannot convert %T to float64", value)
+	}
 }

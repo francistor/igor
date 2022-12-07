@@ -1,13 +1,8 @@
-package config
-
-import (
-	"github.com/francistor/igor/diamdict"
-	"github.com/francistor/igor/radiusdict"
-)
+package core
 
 // These global variables have to be initialized using initDictionaries
-var diameterDict *diamdict.DiameterDict
-var radiusDict *radiusdict.RadiusDict
+var diameterDict *DiameterDict
+var radiusDict *RadiusDict
 
 // Loads the Radius and Diameter dictionaries
 func initDictionaries(cm *ConfigurationManager) {
@@ -15,11 +10,11 @@ func initDictionaries(cm *ConfigurationManager) {
 	// Load dictionaries
 
 	// Diameter
-	diamDictJSON, err := cm.GetBytesConfigObject("diameterDictionary.json")
+	coreJSON, err := cm.GetBytesConfigObject("diameterDictionary.json")
 	if err != nil {
 		panic("Could not read diameterDictionary.json")
 	}
-	diameterDict = diamdict.NewDictionaryFromJSON([]byte(diamDictJSON))
+	diameterDict = NewDiameterDictionaryFromJSON([]byte(coreJSON))
 
 	// Radius
 	radiusDictJSON, err := cm.GetBytesConfigObject("radiusDictionary.json")
@@ -27,18 +22,18 @@ func initDictionaries(cm *ConfigurationManager) {
 		panic("Could not read radiusDictionary.json")
 	}
 
-	radiusDict = radiusdict.NewDictionaryFromJSON([]byte(radiusDictJSON))
+	radiusDict = NewRadiusDictionaryFromJSON([]byte(radiusDictJSON))
 }
 
 // Used globally to get access to the diameter dictionary
-func GetDDict() *diamdict.DiameterDict {
+func GetDDict() *DiameterDict {
 	if diameterDict == nil {
 		panic("uninitialized radius dictionary. Use initDictionaries first")
 	}
 	return diameterDict
 }
 
-func GetRDict() *radiusdict.RadiusDict {
+func GetRDict() *RadiusDict {
 	if diameterDict == nil {
 		panic("uninitialized radius dictionary. Use initDictionaries first")
 	}

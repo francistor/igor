@@ -7,8 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 )
 
 func TestMain(m *testing.M) {
@@ -17,14 +16,14 @@ func TestMain(m *testing.M) {
 	bootFile := "resources/searchRules.json"
 	instanceName := "testConfig"
 
-	config.InitPolicyConfigInstance(bootFile, instanceName, true)
+	core.InitPolicyConfigInstance(bootFile, instanceName, true)
 
 	os.Exit(m.Run())
 }
 
 func TestRadiusUserFile(t *testing.T) {
 
-	ruf, err := NewRadiusUserFile("radiusUserFile.json", config.GetPolicyConfigInstance("testConfig"))
+	ruf, err := NewRadiusUserFile("radiusUserFile.json", core.GetPolicyConfigInstance("testConfig"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,12 +50,12 @@ func TestRadiusUserFile(t *testing.T) {
 }
 
 func TestMergeUserFileEntry(t *testing.T) {
-	ruf1, err := NewRadiusUserFile("radiusUserFileHighPriority.json", config.GetPolicyConfigInstance("testConfig"))
+	ruf1, err := NewRadiusUserFile("radiusUserFileHighPriority.json", core.GetPolicyConfigInstance("testConfig"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ruf2, err := NewRadiusUserFile("radiusUserFileHighPriority.json", config.GetPolicyConfigInstance("testConfig"))
+	ruf2, err := NewRadiusUserFile("radiusUserFileHighPriority.json", core.GetPolicyConfigInstance("testConfig"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,12 +117,12 @@ func TestRadiusChecks(t *testing.T) {
 	}`
 
 	// Read JSON to Radius Packet
-	rp := radiuscodec.RadiusPacket{}
+	rp := core.RadiusPacket{}
 	if err := json.Unmarshal([]byte(jsonPacket), &rp); err != nil {
 		t.Fatalf("unmarshal error for radius packet: %s", err)
 	}
 
-	radiusChecks, err := NewRadiusPacketChecks("radiusChecks.json", config.GetPolicyConfigInstance("testConfig"))
+	radiusChecks, err := NewRadiusPacketChecks("radiusChecks.json", core.GetPolicyConfigInstance("testConfig"))
 	if err != nil {
 		t.Fatalf("error parsing radiusCheck.json: %s", err.Error())
 	}
@@ -180,7 +179,7 @@ func TestRadiusFilters(t *testing.T) {
 	}`
 
 	// Read JSON to Radius Packet
-	rp := radiuscodec.RadiusPacket{}
+	rp := core.RadiusPacket{}
 	if err := json.Unmarshal([]byte(jsonPacket), &rp); err != nil {
 		t.Fatalf("unmarshal error for radius packet: %s", err)
 	}
@@ -214,8 +213,8 @@ func PrettyPrintJSON(j []byte) string {
 }
 
 // Helper to look for AVP in an slice
-func findAttributes(v []radiuscodec.RadiusAVP, name string) []radiuscodec.RadiusAVP {
-	avps := make([]radiuscodec.RadiusAVP, 0)
+func findAttributes(v []core.RadiusAVP, name string) []core.RadiusAVP {
+	avps := make([]core.RadiusAVP, 0)
 	for _, avp := range v {
 		if avp.Name == name {
 			avps = append(avps, avp)
@@ -232,10 +231,10 @@ func TestTemplatedConfigObject(t *testing.T) {
 	}
 	// To avoid warning
 	var v CParam
-	println(v)
+	fmt.Println(v)
 
-	var o = config.NewTemplatedConfigObject[RadiusUserFile, CParam]("template.txt", "templateParameters.json")
-	if err := o.Update(&config.GetPolicyConfig().CM); err != nil {
+	var o = core.NewTemplatedConfigObject[RadiusUserFile, CParam]("template.txt", "templateParameters.json")
+	if err := o.Update(&core.GetPolicyConfig().CM); err != nil {
 		t.Fatalf("could not get templated configuration object: %s", err)
 	}
 

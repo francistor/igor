@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/francistor/igor/config"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/instrumentation"
 	"github.com/francistor/igor/router"
 )
@@ -27,7 +27,7 @@ const (
 
 type HttpRouter struct {
 	// Holds the configuration instance for this Handler
-	ci *config.PolicyConfigurationManager
+	ci *core.PolicyConfigurationManager
 
 	// Holds the httpserver
 	httpServer *http.Server
@@ -47,9 +47,9 @@ func NewHttpRouter(instanceName string, diameterRouter *router.DiameterRouter, r
 		mux.HandleFunc("/routeRadiusRequest", getRadiusRouteHandler(radiusRouter))
 	}
 
-	ci := config.GetPolicyConfigInstance(instanceName)
+	ci := core.GetPolicyConfigInstance(instanceName)
 	bindAddrPort := fmt.Sprintf("%s:%d", ci.HttpRouterConf().BindAddress, ci.HttpRouterConf().BindPort)
-	config.GetLogger().Infof("HTTP Router listening in %s", bindAddrPort)
+	core.GetLogger().Infof("HTTP Router listening in %s", bindAddrPort)
 
 	h := HttpRouter{
 		ci: ci,
@@ -98,7 +98,7 @@ func (dh *HttpRouter) Close() {
 func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		logger := config.GetLogger()
+		logger := core.GetLogger()
 
 		// Get the Routable Diameter Request
 		jRequest, err := io.ReadAll(req.Body)
@@ -153,7 +153,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		logger := config.GetLogger()
+		logger := core.GetLogger()
 
 		// Get the Radius Request
 		jRequest, err := io.ReadAll(req.Body)

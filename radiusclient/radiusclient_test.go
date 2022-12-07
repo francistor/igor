@@ -5,15 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/radiusserver"
 )
 
 // Simple handler that generates a success response with the same attributes as in the request
-func echoHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, error) {
+func echoHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
 
-	response := radiuscodec.NewRadiusResponse(request, true)
+	response := core.NewRadiusResponse(request, true)
 	for i := range request.AVPs {
 		response.AddAVP(&request.AVPs[i])
 	}
@@ -29,7 +28,7 @@ func echoHandler(request *radiuscodec.RadiusPacket) (*radiuscodec.RadiusPacket, 
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
-	config.InitPolicyConfigInstance("resources/searchRules.json", "testServer", true)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", true)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())
@@ -37,11 +36,11 @@ func TestMain(m *testing.M) {
 
 func TestRadiusClientSocket(t *testing.T) {
 	// Get the configuration
-	pci := config.GetPolicyConfigInstance("testServer")
+	pci := core.GetPolicyConfigInstance("testServer")
 	serverConf := pci.RadiusServerConf()
 
 	// Instantiate a radius server
-	rs := radiusserver.NewRadiusServer(config.GetPolicyConfigInstance("testServer"), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
+	rs := radiusserver.NewRadiusServer(core.GetPolicyConfigInstance("testServer"), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
 
 	// Wait fo the server to be created
 	time.Sleep(100 * time.Millisecond)
@@ -51,7 +50,7 @@ func TestRadiusClientSocket(t *testing.T) {
 	rcs := NewRadiusClientSocket(pci, cchan, "127.0.0.1", 18120)
 
 	// Create a request radius packet
-	request := radiuscodec.NewRadiusRequest(1)
+	request := core.NewRadiusRequest(1)
 	request.Add("User-Name", "myUserName")
 
 	// Create channel for the request
@@ -70,7 +69,7 @@ func TestRadiusClientSocket(t *testing.T) {
 	switch v := response.(type) {
 	case error:
 		t.Fatalf("received error response: %s", v)
-	case *radiuscodec.RadiusPacket:
+	case *core.RadiusPacket:
 		if v.GetStringAVP("User-Name") != "myUserName" {
 			t.Fatal("User-Name attribute not found in response")
 		}
@@ -96,7 +95,7 @@ func TestRadiusClientSocket(t *testing.T) {
 	response = <-rchan2
 	switch v := response.(type) {
 	case error:
-	case *radiuscodec.RadiusPacket:
+	case *core.RadiusPacket:
 		t.Fatalf("did not get a timeout")
 	default:
 		t.Fatalf("got %v", v)
@@ -125,7 +124,7 @@ func TestRadiusClientSocket(t *testing.T) {
 
 func TestRadiusClientSocketClose(t *testing.T) {
 	// Get the configuration
-	pci := config.GetPolicyConfigInstance("testServer")
+	pci := core.GetPolicyConfigInstance("testServer")
 
 	// Create the RadiusClientSocket
 	cchan := make(chan interface{})
@@ -148,11 +147,11 @@ func TestRadiusClientSocketClose(t *testing.T) {
 
 func TestRadiusClientOnly(t *testing.T) {
 	// Get the configuration
-	pci := config.GetPolicyConfigInstance("testServer")
+	pci := core.GetPolicyConfigInstance("testServer")
 	serverConf := pci.RadiusServerConf()
 
 	// Instantiate a radius server
-	rs := radiusserver.NewRadiusServer(config.GetPolicyConfigInstance("testServer"), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
+	rs := radiusserver.NewRadiusServer(core.GetPolicyConfigInstance("testServer"), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
 
 	// Wait fo the server to be created
 	time.Sleep(100 * time.Millisecond)
@@ -161,7 +160,7 @@ func TestRadiusClientOnly(t *testing.T) {
 	rc := NewRadiusClient(pci)
 
 	// Create a request radius packet
-	request := radiuscodec.NewRadiusRequest(1)
+	request := core.NewRadiusRequest(1)
 	request.Add("User-Name", "myUserName")
 
 	// Create channel for the request
@@ -174,7 +173,7 @@ func TestRadiusClientOnly(t *testing.T) {
 	switch v := response1.(type) {
 	case error:
 		t.Fatalf("received error response: %s", v)
-	case *radiuscodec.RadiusPacket:
+	case *core.RadiusPacket:
 		if v.GetStringAVP("User-Name") != "myUserName" {
 			t.Fatal("User-Name attribute not found in response")
 		}
@@ -190,7 +189,7 @@ func TestRadiusClientOnly(t *testing.T) {
 	response2 := <-rchan2
 	switch v := response2.(type) {
 	case error:
-	case *radiuscodec.RadiusPacket:
+	case *core.RadiusPacket:
 		t.Fatalf("did not get a timeout")
 	default:
 		t.Fatalf("got %v", v)
@@ -207,7 +206,7 @@ func TestRadiusClientOnly(t *testing.T) {
 	response4 := <-rchan4
 	switch v := response4.(type) {
 	case error:
-	case *radiuscodec.RadiusPacket:
+	case *core.RadiusPacket:
 		t.Fatalf("did not get a cancellation")
 	default:
 		t.Fatalf("got %v", v)

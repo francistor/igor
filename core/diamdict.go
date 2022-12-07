@@ -1,7 +1,7 @@
-package diamdict
+package core
 
 /*
-Package diamdict impements helpers for reading and using the Diameter dictionary
+Helpers for reading and using the Diameter dictionary
 
 */
 
@@ -12,35 +12,35 @@ import (
 
 // One for each Diamter AVP Type
 const (
-	None         = 0
-	OctetString  = 1
-	Integer32    = 2
-	Integer64    = 3
-	Unsigned32   = 4
-	Unsigned64   = 5
-	Float32      = 6
-	Float64      = 7
-	Grouped      = 8
-	Address      = 9
-	Time         = 10
-	UTF8String   = 11
-	DiamIdent    = 12
-	DiameterURI  = 13
-	Enumerated   = 14
-	IPFilterRule = 15
+	DiameterTypeNone         = 0
+	DiameterTypeOctetString  = 1
+	DiameterTypeInteger32    = 2
+	DiameterTypeInteger64    = 3
+	DiameterTypeUnsigned32   = 4
+	DiameterTypeUnsigned64   = 5
+	DiameterTypeFloat32      = 6
+	DiameterTypeFloat64      = 7
+	DiameterTypeGrouped      = 8
+	DiameterTypeAddress      = 9
+	DiameterTypeTime         = 10
+	DiameterTypeUTF8String   = 11
+	DiameterTypeDiamIdent    = 12
+	DiameterTypeDiameterURI  = 13
+	DiameterTypeEnumerated   = 14
+	DiameterTypeIPFilterRule = 15
 
 	// Radius types
-	IPv4Address = 1001
-	IPv6Address = 1002
-	IPv6Prefix  = 1003
+	DiameterTypeIPv4Address = 1001
+	DiameterTypeIPv6Address = 1002
+	DiameterTypeIPv6Prefix  = 1003
 )
 
-var UnknownDictItem = AVPDictItem{
+var UnknownDiameterDictItem = DiameterAVPDictItem{
 	Name: "UNKNOWN",
 }
 
 // VendorId and code of AVP in a single attribute
-type AVPCode struct {
+type DiameterAVPCode struct {
 	VendorId uint32
 	Code     uint32
 }
@@ -53,7 +53,7 @@ type GroupedProperties struct {
 }
 
 // Diameter Dictionary elements
-type AVPDictItem struct {
+type DiameterAVPDictItem struct {
 	VendorId     uint32 // 3 bytes required according to RFC 6733
 	Code         uint32 // 3 bytes required according to RFC 6733
 	Name         string
@@ -92,10 +92,10 @@ type DiameterDict struct {
 	VendorByName map[string]uint32
 
 	// Map of avp code to name. Name is <vendorName>-<attributeName>
-	AVPByCode map[AVPCode]*AVPDictItem
+	AVPByCode map[DiameterAVPCode]*DiameterAVPDictItem
 
 	// Map of avp name to code
-	AVPByName map[string]*AVPDictItem
+	AVPByName map[string]*DiameterAVPDictItem
 
 	// Map of app names
 	AppByName map[string]*DiameterApplication
@@ -106,9 +106,9 @@ type DiameterDict struct {
 
 // Returns an empty dictionary item if the code is not found
 // The user may decide to go on with an UNKNOWN dictionary item when the error is returned
-func (dd *DiameterDict) GetAVPFromCode(code AVPCode) (*AVPDictItem, error) {
+func (dd *DiameterDict) GetAVPFromCode(code DiameterAVPCode) (*DiameterAVPDictItem, error) {
 	if di, found := dd.AVPByCode[code]; !found {
-		return &UnknownDictItem, fmt.Errorf("%v not found in dictionary", code)
+		return &UnknownDiameterDictItem, fmt.Errorf("%v not found in dictionary", code)
 	} else {
 		return di, nil
 	}
@@ -116,9 +116,9 @@ func (dd *DiameterDict) GetAVPFromCode(code AVPCode) (*AVPDictItem, error) {
 
 // Returns an empty dictionary item if the code is not found
 // The user may decide to go on with an UNKNOWN dictionary item when the error is returned
-func (dd *DiameterDict) GetAVPFromName(name string) (*AVPDictItem, error) {
+func (dd *DiameterDict) GetAVPFromName(name string) (*DiameterAVPDictItem, error) {
 	if di, found := dd.AVPByName[name]; !found {
-		return &UnknownDictItem, fmt.Errorf("%s not found in dictionary", name)
+		return &UnknownDiameterDictItem, fmt.Errorf("%s not found in dictionary", name)
 	} else {
 		return di, nil
 	}
@@ -143,7 +143,7 @@ func (dd *DiameterDict) GetCommand(appId uint32, commandCode uint32) (*DiameterC
 }
 
 // Returns a Diameter Dictionary object from its serialized representation
-func NewDictionaryFromJSON(data []byte) *DiameterDict {
+func NewDiameterDictionaryFromJSON(data []byte) *DiameterDict {
 
 	// Unmarshall from JSON
 	var jDict jDiameterDict
@@ -163,8 +163,8 @@ func NewDictionaryFromJSON(data []byte) *DiameterDict {
 	}
 
 	// Build the AVP maps
-	dict.AVPByCode = make(map[AVPCode]*AVPDictItem)
-	dict.AVPByName = make(map[string]*AVPDictItem)
+	dict.AVPByCode = make(map[DiameterAVPCode]*DiameterAVPDictItem)
+	dict.AVPByName = make(map[string]*DiameterAVPDictItem)
 	for _, vendorAVPs := range jDict.Avps {
 		vendorId := vendorAVPs.VendorId
 		vendorName := dict.VendorById[vendorId]
@@ -172,7 +172,7 @@ func NewDictionaryFromJSON(data []byte) *DiameterDict {
 		// For a specific vendor
 		for _, attr := range vendorAVPs.Attributes {
 			avpDictItem := attr.toAVPDictItem(vendorId, vendorName)
-			dict.AVPByCode[AVPCode{vendorId, attr.Code}] = &avpDictItem
+			dict.AVPByCode[DiameterAVPCode{vendorId, attr.Code}] = &avpDictItem
 			dict.AVPByName[avpDictItem.Name] = &avpDictItem
 		}
 	}
@@ -227,49 +227,49 @@ type jDiameterDict struct {
 	Applications []DiameterApplication
 }
 
-func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
+func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) DiameterAVPDictItem {
 	var diameterType int
 	switch javp.Type {
 	case "None":
-		diameterType = None
+		diameterType = DiameterTypeNone
 	case "OctetString":
-		diameterType = OctetString
+		diameterType = DiameterTypeOctetString
 	case "Integer32":
-		diameterType = Integer32
+		diameterType = DiameterTypeInteger32
 	case "Integer64":
-		diameterType = Integer64
+		diameterType = DiameterTypeInteger64
 	case "Unsigned32":
-		diameterType = Unsigned32
+		diameterType = DiameterTypeUnsigned32
 	case "Unsigned64":
-		diameterType = Unsigned64
+		diameterType = DiameterTypeUnsigned64
 	case "Float32":
-		diameterType = Float32
+		diameterType = DiameterTypeFloat32
 	case "Float64":
-		diameterType = Float64
+		diameterType = DiameterTypeFloat64
 	case "Grouped":
-		diameterType = Grouped
+		diameterType = DiameterTypeGrouped
 	case "Address":
-		diameterType = Address
+		diameterType = DiameterTypeAddress
 	case "Time":
-		diameterType = Time
+		diameterType = DiameterTypeTime
 	case "UTF8String":
-		diameterType = UTF8String
+		diameterType = DiameterTypeUTF8String
 	case "DiamIdent":
-		diameterType = DiamIdent
+		diameterType = DiameterTypeDiamIdent
 	case "DiameterURI":
-		diameterType = DiameterURI
+		diameterType = DiameterTypeDiameterURI
 	case "Enumerated":
-		diameterType = Enumerated
+		diameterType = DiameterTypeEnumerated
 	case "IPFilterRule":
-		diameterType = IPFilterRule
+		diameterType = DiameterTypeIPFilterRule
 
 	// Radius types
 	case "IPv4Address":
-		diameterType = IPv4Address
+		diameterType = DiameterTypeIPv4Address
 	case "IPv6Address":
-		diameterType = IPv6Address
+		diameterType = DiameterTypeIPv6Address
 	case "IPv6Prefix":
-		diameterType = IPv6Prefix
+		diameterType = DiameterTypeIPv6Prefix
 	default:
 		panic(javp.Type + " is not a valid DiameterType")
 	}
@@ -287,7 +287,7 @@ func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) AVPDictItem {
 		namePrefix = vs + "-"
 	}
 
-	return AVPDictItem{
+	return DiameterAVPDictItem{
 		VendorId:     v,
 		Code:         javp.Code,
 		Name:         namePrefix + javp.Name,

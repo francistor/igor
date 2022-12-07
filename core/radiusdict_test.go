@@ -1,4 +1,4 @@
-package radiusdict
+package core
 
 import (
 	"os"
@@ -9,10 +9,10 @@ func TestRadiusDict(t *testing.T) {
 
 	// Read the full Radius Dictionary
 	jsonDict, _ := os.ReadFile(os.Getenv("IGOR_BASE") + "resources/radiusDictionary.json")
-	radiusDict := NewDictionaryFromJSON(jsonDict)
+	radiusDict := NewRadiusDictionaryFromJSON(jsonDict)
 
 	// Basic type
-	avp := radiusDict.AVPByCode[AVPCode{0, 1}]
+	avp := radiusDict.AVPByCode[RadiusAVPCode{0, 1}]
 	if avp.Name != "User-Name" {
 		t.Errorf("Code {0, 1} Name was not User-Name")
 	}
@@ -33,7 +33,7 @@ func TestRadiusDict(t *testing.T) {
 	}
 
 	// Encrypted type
-	avp = radiusDict.AVPByCode[AVPCode{0, 2}]
+	avp = radiusDict.AVPByCode[RadiusAVPCode{0, 2}]
 	if avp.Name != "User-Password" {
 		t.Errorf("Code {0, 2} Name was not User-Password")
 	}
@@ -46,7 +46,7 @@ func TestRadiusDict(t *testing.T) {
 	if avp.Name != "Service-Type" {
 		t.Errorf("Service-Type Name was not Service-Type")
 	}
-	if avp.RadiusType != Integer {
+	if avp.RadiusType != RadiusTypeInteger {
 		t.Errorf("Service-Type Type was not type Integer")
 	}
 	if avp.VendorId != 0 {
@@ -63,7 +63,7 @@ func TestRadiusDict(t *testing.T) {
 	}
 
 	// VendorId
-	avp = radiusDict.AVPByCode[AVPCode{9, 1}]
+	avp = radiusDict.AVPByCode[RadiusAVPCode{9, 1}]
 	if avp.Name != "Cisco-AVPair" {
 		t.Errorf("Code {9, 1} Name was not Cisco-AVPair but %s", avp.Name)
 	}
@@ -81,7 +81,7 @@ func TestRadiusDict(t *testing.T) {
 		}
 	}
 
-	avp, err = radiusDict.GetFromCode(AVPCode{30001, 10})
+	avp, err = radiusDict.GetFromCode(RadiusAVPCode{30001, 10})
 	if err != nil {
 		t.Errorf("Igor code 10 not found")
 	} else {
@@ -97,7 +97,7 @@ func TestRadiusDict(t *testing.T) {
 func TestUnknownRadiusAVP(t *testing.T) {
 	// Read the full Radius Dictionary
 	jsonDict, _ := os.ReadFile(os.Getenv("IGOR_BASE") + "resources/radiusDictionary.json")
-	radiusDict := NewDictionaryFromJSON(jsonDict)
+	radiusDict := NewRadiusDictionaryFromJSON(jsonDict)
 
 	avp, err := radiusDict.GetFromName("Igor-Nothing")
 	if err == nil {

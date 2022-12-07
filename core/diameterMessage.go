@@ -1,4 +1,4 @@
-package diamcodec
+package core
 
 import (
 	"bytes"
@@ -9,9 +9,6 @@ import (
 	"net"
 	"strings"
 	"time"
-
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/diamdict"
 
 	"golang.org/x/exp/slices"
 )
@@ -121,7 +118,7 @@ func (dm *DiameterMessage) ReadFrom(reader io.Reader) (n int64, err error) {
 	}
 	currentIndex += 4
 
-	diameterApplication, ok := config.GetDDict().AppByCode[dm.ApplicationId]
+	diameterApplication, ok := GetDDict().AppByCode[dm.ApplicationId]
 	if ok {
 		dm.ApplicationName = diameterApplication.Name
 		dm.CommandName = diameterApplication.CommandByCode[dm.CommandCode].Name
@@ -175,19 +172,19 @@ func DiameterMessageFromBytes(inputBytes []byte) (DiameterMessage, uint32, error
 func (m *DiameterMessage) Tidy() *DiameterMessage {
 
 	if m.ApplicationId == 0 && m.ApplicationName != "" {
-		m.ApplicationId = config.GetDDict().AppByName[m.ApplicationName].Code
+		m.ApplicationId = GetDDict().AppByName[m.ApplicationName].Code
 	}
 
 	if m.ApplicationId != 0 && m.ApplicationName == "" {
-		m.ApplicationName = config.GetDDict().AppByCode[m.ApplicationId].Name
+		m.ApplicationName = GetDDict().AppByCode[m.ApplicationId].Name
 	}
 
 	if m.CommandCode == 0 && m.CommandName != "" {
-		m.CommandCode = config.GetDDict().AppByCode[m.ApplicationId].CommandByName[m.CommandName].Code
+		m.CommandCode = GetDDict().AppByCode[m.ApplicationId].CommandByName[m.CommandName].Code
 	}
 
 	if m.CommandCode != 0 && m.CommandName == "" {
-		m.CommandName = config.GetDDict().AppByCode[m.ApplicationId].CommandByCode[m.CommandCode].Name
+		m.CommandName = GetDDict().AppByCode[m.ApplicationId].CommandByCode[m.CommandCode].Name
 	}
 
 	return m
@@ -302,12 +299,12 @@ func (dm *DiameterMessage) Len() int {
 // Checks that the attributes for this command are conforming to the dictionary specification
 func (m *DiameterMessage) CheckAttributes() error {
 
-	command, err := config.GetDDict().GetCommand(m.ApplicationId, m.CommandCode)
+	command, err := GetDDict().GetCommand(m.ApplicationId, m.CommandCode)
 	if err != nil {
 		return err
 	}
 
-	var attrSpec map[string]diamdict.GroupedProperties
+	var attrSpec map[string]GroupedProperties
 	if m.IsRequest {
 		attrSpec = command.Request
 	} else {
@@ -355,10 +352,10 @@ func (m *DiameterMessage) Add(name string, value interface{}) *DiameterMessage {
 		return m
 	}
 
-	avp, error := NewAVP(name, value)
+	avp, error := NewDiameterAVP(name, value)
 
 	if error != nil {
-		config.GetLogger().Errorf("avp could not be added %s: %v, %s", name, value, error)
+		GetLogger().Errorf("avp could not be added %s: %v, %s", name, value, error)
 		return m
 	}
 
@@ -492,7 +489,7 @@ func (m *DiameterMessage) GetDateAVP(avpName string) time.Time {
 }
 
 // Helper function to add Origin-Host and Origin-Realm attributes
-func (dm *DiameterMessage) AddOriginAVPs(ci *config.PolicyConfigurationManager) *DiameterMessage {
+func (dm *DiameterMessage) AddOriginAVPs(ci *PolicyConfigurationManager) *DiameterMessage {
 	// Add mandatory parameters
 	dm.Add("Origin-Host", ci.DiameterServerConf().DiameterHost)
 	dm.Add("Origin-Realm", ci.DiameterServerConf().DiameterRealm)
@@ -509,7 +506,7 @@ func NewDiameterRequest(appName string, commandName string) (*DiameterMessage, e
 	diameterMessage := DiameterMessage{IsRequest: true}
 
 	// Find element in dictionary
-	appDict, ok := config.GetDDict().AppByName[appName]
+	appDict, ok := GetDDict().AppByName[appName]
 	if !ok {
 		return &diameterMessage, fmt.Errorf("application %s not found", appName)
 	}

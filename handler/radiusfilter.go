@@ -4,8 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 )
 
 /////////////////////////////////////////////////////////////////////////////
@@ -23,17 +22,17 @@ type AVPFilter struct {
 type AVPFilters map[string]*AVPFilter
 
 // Creates a copy of the radius packet with the attributes filtered as specified in the filter for the passed key
-func (fs AVPFilters) FilteredPacket(packet *radiuscodec.RadiusPacket, key string) (*radiuscodec.RadiusPacket, error) {
+func (fs AVPFilters) FilteredPacket(packet *core.RadiusPacket, key string) (*core.RadiusPacket, error) {
 	if filter, ok := fs[key]; !ok {
-		return &radiuscodec.RadiusPacket{}, fmt.Errorf("%s filter not found", key)
+		return &core.RadiusPacket{}, fmt.Errorf("%s filter not found", key)
 	} else {
 		return filter.FilteredPacket(packet), nil
 	}
 }
 
 // Copy the radius packet with the attributes modified as defined in the specified filter
-func (f *AVPFilter) FilteredPacket(packet *radiuscodec.RadiusPacket) *radiuscodec.RadiusPacket {
-	var rp *radiuscodec.RadiusPacket
+func (f *AVPFilter) FilteredPacket(packet *core.RadiusPacket) *core.RadiusPacket {
+	var rp *core.RadiusPacket
 	if len(f.Allow) > 0 {
 		rp = packet.Copy(f.Allow, nil)
 	} else if len(f.Remove) > 0 {
@@ -53,14 +52,14 @@ func (f *AVPFilter) FilteredPacket(packet *radiuscodec.RadiusPacket) *radiuscode
 }
 
 // Returns an object representing the configured AVPFilters
-func NewAVPFilters(configObjectName string, ci *config.PolicyConfigurationManager) (AVPFilters, error) {
+func NewAVPFilters(configObjectName string, ci *core.PolicyConfigurationManager) (AVPFilters, error) {
 
 	filters := make(AVPFilters)
 
 	// If we pass nil as last parameter, use the default
-	var myCi *config.PolicyConfigurationManager
+	var myCi *core.PolicyConfigurationManager
 	if ci == nil {
-		myCi = config.GetPolicyConfig()
+		myCi = core.GetPolicyConfig()
 	} else {
 		myCi = ci
 	}

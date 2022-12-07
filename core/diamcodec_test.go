@@ -1,44 +1,29 @@
-package diamcodec
+package core
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/francistor/igor/config"
 )
 
-// Initialization
-var bootstrapFile = "resources/searchRules.json"
-var instanceName = "testClient"
-
-// Initializer of the test suite.
-func TestMain(m *testing.M) {
-	config.InitPolicyConfigInstance(bootstrapFile, instanceName, true)
-
-	// Execute the tests and exit
-	os.Exit(m.Run())
-}
-
-func TestAVPNotFound(t *testing.T) {
-	var _, err = NewAVP("Unknown AVP", []byte("hello, world!"))
+func TestDiameterAVPNotFound(t *testing.T) {
+	var _, err = NewDiameterAVP("Unknown AVP", []byte("hello, world!"))
 	if err == nil {
 		t.Errorf("Unknown AVP was created")
 	}
 }
 
-func TestOctetsAVP(t *testing.T) {
+func TestOctetsDiameterAVP(t *testing.T) {
 
 	var password = "'my-password!"
 
 	// Create avp
-	avp, err := NewAVP("User-Password", []byte(password))
+	avp, err := NewDiameterAVP("User-Password", []byte(password))
 	if err != nil {
 		t.Errorf("error creating Octets AVP: %v", err)
 		return
@@ -58,12 +43,12 @@ func TestOctetsAVP(t *testing.T) {
 	}
 }
 
-func TestUTF8StringAVP(t *testing.T) {
+func TestUTF8StringDiameterAVP(t *testing.T) {
 
 	var theString = "%Hola España. 'Quiero €"
 
 	// Create avp
-	avp, err := NewAVP("User-Name", theString)
+	avp, err := NewDiameterAVP("User-Name", theString)
 	if err != nil {
 		t.Errorf("error creating UTFString AVP %v", err)
 		return
@@ -80,12 +65,12 @@ func TestUTF8StringAVP(t *testing.T) {
 	}
 }
 
-func TestInt32AVP(t *testing.T) {
+func TestInt32DiameterAVP(t *testing.T) {
 
 	var theInt int32 = -65535*16384 - 1000 // 2^31 - 1000
 
 	// Create avp
-	avp, err := NewAVP("Igor-myInteger32", theInt)
+	avp, err := NewDiameterAVP("Igor-myInteger32", theInt)
 	if err != nil {
 		t.Errorf("error creating Int32 AVP %v", err)
 		return
@@ -108,11 +93,11 @@ func TestInt32AVP(t *testing.T) {
 	}
 }
 
-func TestInt64AVP(t *testing.T) {
+func TestInt64DiameterAVP(t *testing.T) {
 
 	var theInt int64 = -65535*65535*65534*16384 - 999 // - 2 ^ 62 - 999
 	// Create avp
-	avp, err := NewAVP("Igor-myInteger64", theInt)
+	avp, err := NewDiameterAVP("Igor-myInteger64", theInt)
 	if err != nil {
 		t.Errorf("error creating Int64 AVP %v", err)
 		return
@@ -136,12 +121,12 @@ func TestInt64AVP(t *testing.T) {
 	}
 }
 
-func TestUnsignedInt32AVP(t *testing.T) {
+func TestUnsignedInt32DiameterAVP(t *testing.T) {
 
 	var theInt uint32 = 65535 * 40001
 
 	// Create avp
-	avp, err := NewAVP("Igor-myUnsigned32", int64(theInt))
+	avp, err := NewDiameterAVP("Igor-myUnsigned32", int64(theInt))
 	if err != nil {
 		t.Errorf("error creating UInt32 AVP %v", err)
 		return
@@ -164,13 +149,13 @@ func TestUnsignedInt32AVP(t *testing.T) {
 	}
 }
 
-func TestUnsignedInt64AVP(t *testing.T) {
+func TestUnsignedInt64DiameterAVP(t *testing.T) {
 
 	// Due to a limitaton of the implementation, it is inernally stored as a signed int64
 	var theInt int64 = 65535 * 65535 * 65535 * 16001
 
 	// Create avp
-	avp, err := NewAVP("Igor-myUnsigned64", theInt)
+	avp, err := NewDiameterAVP("Igor-myUnsigned64", theInt)
 	if err != nil {
 		t.Errorf("error creating UInt64 AVP %v", err)
 		return
@@ -193,12 +178,12 @@ func TestUnsignedInt64AVP(t *testing.T) {
 	}
 }
 
-func TestFloat32AVP(t *testing.T) {
+func TestFloat32DiameterAVP(t *testing.T) {
 
 	var theFloat float32 = 6.03e23
 
 	// Create avp
-	avp, err := NewAVP("Igor-myFloat32", theFloat)
+	avp, err := NewDiameterAVP("Igor-myFloat32", theFloat)
 	if err != nil {
 		t.Errorf("error creating Float32 AVP %v", err)
 		return
@@ -218,12 +203,12 @@ func TestFloat32AVP(t *testing.T) {
 	}
 }
 
-func TestFloat64AVP(t *testing.T) {
+func TestFloat64DiameterAVP(t *testing.T) {
 
 	var theFloat float64 = 6.03e23
 
 	// Create avp
-	avp, err := NewAVP("Igor-myFloat64", float64(theFloat))
+	avp, err := NewDiameterAVP("Igor-myFloat64", float64(theFloat))
 	if err != nil {
 		t.Errorf("error creating Float64 AVP %v", err)
 		return
@@ -243,7 +228,7 @@ func TestFloat64AVP(t *testing.T) {
 	}
 }
 
-func TestAddressAVP(t *testing.T) {
+func TestAddressDiameterAVP(t *testing.T) {
 
 	var ipv4Address = "1.2.3.4"
 	var ipv6Address = "bebe:cafe::0"
@@ -252,7 +237,7 @@ func TestAddressAVP(t *testing.T) {
 
 	// IPv4
 	// Create avp
-	avp, err := NewAVP("Igor-myAddress", ipv4Address)
+	avp, err := NewDiameterAVP("Igor-myAddress", ipv4Address)
 	if err != nil {
 		t.Errorf("error creating IPv4 Address AVP: %v", err)
 		return
@@ -270,7 +255,7 @@ func TestAddressAVP(t *testing.T) {
 
 	// IPv6
 	// Create avp
-	avp, err = NewAVP("Igor-myAddress", ipv6Address)
+	avp, err = NewDiameterAVP("Igor-myAddress", ipv6Address)
 	if err != nil {
 		t.Errorf("error creating IPv6 Address AVP: %v", err)
 	}
@@ -286,23 +271,23 @@ func TestAddressAVP(t *testing.T) {
 	}
 
 	// Using IP addresses as value
-	avp, _ = NewAVP("Igor-myAddress", net.ParseIP(ipv4Address))
+	avp, _ = NewDiameterAVP("Igor-myAddress", net.ParseIP(ipv4Address))
 	if avp.GetString() != net.ParseIP(ipv4Address).String() {
 		t.Errorf("IPv4 AVP does not match value (created as ipaddr) %s %s", avp.GetString(), net.ParseIP(ipv4Address).String())
 	}
 
-	avp, _ = NewAVP("Igor-myAddress", net.ParseIP(ipv6Address))
+	avp, _ = NewDiameterAVP("Igor-myAddress", net.ParseIP(ipv6Address))
 	if avp.GetString() != net.ParseIP(ipv6Address).String() {
 		t.Errorf("IPv6 AVP does not match value (created as ipaddr) %s %s", avp.GetString(), net.ParseIP(ipv6Address).String())
 	}
 }
 
-func TestIPv4Address(t *testing.T) {
+func TestIPv4AddressDiameterAVP(t *testing.T) {
 
 	var ipv4Address = "1.2.3.4"
 
 	// Create avp from string
-	avp, err := NewAVP("Igor-myIPv4Address", ipv4Address)
+	avp, err := NewDiameterAVP("Igor-myIPv4Address", ipv4Address)
 	if err != nil {
 		t.Errorf("error creating IPv4 Address AVP %v", err)
 		return
@@ -319,17 +304,17 @@ func TestIPv4Address(t *testing.T) {
 	}
 
 	// Create avp from address
-	avp, _ = NewAVP("Igor-myIPv4Address", net.ParseIP(ipv4Address))
+	avp, _ = NewDiameterAVP("Igor-myIPv4Address", net.ParseIP(ipv4Address))
 	if avp.GetIPAddress().String() != net.ParseIP(ipv4Address).String() {
 		t.Errorf("IPv4 AVP does not match value (created as ipaddr) %s", avp.GetIPAddress())
 	}
 }
 
-func TestIPv6Address(t *testing.T) {
+func TestIPv6AddressDiameterAVP(t *testing.T) {
 	var ipv6Address = "bebe:cafe::0"
 
 	// Create avp from string
-	avp, err := NewAVP("Igor-myIPv6Address", ipv6Address)
+	avp, err := NewDiameterAVP("Igor-myIPv6Address", ipv6Address)
 	if err != nil {
 		t.Errorf("error creating IPv6 Address AVP %v", err)
 		return
@@ -346,24 +331,28 @@ func TestIPv6Address(t *testing.T) {
 	}
 
 	// Create avp from IP address
-	avp, _ = NewAVP("Igor-myIPv6Address", net.ParseIP(ipv6Address))
+	avp, _ = NewDiameterAVP("Igor-myIPv6Address", net.ParseIP(ipv6Address))
 	if avp.GetString() != net.ParseIP(ipv6Address).String() {
 		t.Errorf("IPv6 AVP does not match value (created as ipaddr) %s", avp.GetString())
 	}
 }
 
-func TestTimeAVP(t *testing.T) {
-	var theTime, _ = time.Parse("02/01/2006 15:04:05 UTC", "26/11/1966 03:21:54 UTC")
+func TestTimeDiameterAVP(t *testing.T) {
 	var theStringTime = "1966-11-26T03:21:54 UTC"
+	var theTime, _ = time.Parse(timeFormatString, theStringTime)
 
 	// Create avp from string
-	avp, err := NewAVP("Igor-myTime", theStringTime)
+	avp, err := NewDiameterAVP("Igor-myTime", theStringTime)
 	if err != nil {
 		t.Errorf("error creating Time Address AVP %v", err)
 		return
 	}
-	if avp.GetDate() != theTime {
-		t.Errorf("Time AVP does not match value")
+
+	// Serialize and unserialize
+	binaryAVP, _ := avp.MarshalBinary()
+	recoveredAVP, _, _ := DiameterAVPFromBytes(binaryAVP)
+	if recoveredAVP.GetDate() != theTime {
+		t.Errorf("Time AVP does not match value %s - %s", recoveredAVP.GetDate(), theTime)
 	}
 }
 
@@ -372,7 +361,7 @@ func TestDiamIdentAVP(t *testing.T) {
 	var theString = "domain.name"
 
 	// Create avp
-	avp, err := NewAVP("Igor-myDiameterIdentity", theString)
+	avp, err := NewDiameterAVP("Igor-myDiameterIdentity", theString)
 	if err != nil {
 		t.Errorf("error creating Diameter Identity AVP %v", err)
 		return
@@ -394,7 +383,7 @@ func TestDiamURIAVP(t *testing.T) {
 	var theString = "domain.name"
 
 	// Create avp
-	avp, err := NewAVP("Igor-myDiameterURI", theString)
+	avp, err := NewDiameterAVP("Igor-myDiameterURI", theString)
 	if err != nil {
 		t.Errorf("error creating Diameter URI AVP %v", err)
 		return
@@ -411,12 +400,12 @@ func TestDiamURIAVP(t *testing.T) {
 	}
 }
 
-func TestIPFilterRuleIAVP(t *testing.T) {
+func TestIPFilterRuleDiameterAVP(t *testing.T) {
 
 	var theString = "deny 1.2.3.4"
 
 	// Create avp
-	avp, err := NewAVP("Igor-myIPFilterRule", theString)
+	avp, err := NewDiameterAVP("Igor-myIPFilterRule", theString)
 	if err != nil {
 		t.Errorf("error creating IP Filter Rule AVP %v", err)
 		return
@@ -433,12 +422,12 @@ func TestIPFilterRuleIAVP(t *testing.T) {
 	}
 }
 
-func TestIPv6PrefixAVP(t *testing.T) {
+func TestIPv6PrefixDiameterAVP(t *testing.T) {
 
 	var thePrefix = "bebe:cafe::/16"
 
 	// Create avp
-	avp, err := NewAVP("Igor-myIPv6Prefix", thePrefix)
+	avp, err := NewDiameterAVP("Igor-myIPv6Prefix", thePrefix)
 	if err != nil {
 		t.Errorf("error creating IPv6 prefix AVP %v", err)
 		return
@@ -455,12 +444,12 @@ func TestIPv6PrefixAVP(t *testing.T) {
 	}
 }
 
-func TestEnumeratedAVP(t *testing.T) {
+func TestEnumeratedDiameterAVP(t *testing.T) {
 
 	var theString = "zero"
 	var theNumber int64 = 0
 
-	avp, err := NewAVP("Igor-myEnumerated", "zero")
+	avp, err := NewDiameterAVP("Igor-myEnumerated", "zero")
 	if err != nil {
 		t.Errorf("error creating Enumerated AVP: %v", err)
 		return
@@ -472,7 +461,7 @@ func TestEnumeratedAVP(t *testing.T) {
 		t.Errorf("Enumerated AVP does not match number value")
 	}
 
-	avp, err = NewAVP("Igor-myEnumerated", theNumber)
+	avp, err = NewDiameterAVP("Igor-myEnumerated", theNumber)
 	if err != nil {
 		t.Errorf("error creating Enumerated AVP: %v", err)
 		return
@@ -485,17 +474,17 @@ func TestEnumeratedAVP(t *testing.T) {
 	}
 }
 
-func TestGroupedAVP(t *testing.T) {
+func TestGroupedDiameterAVP(t *testing.T) {
 
 	var theInt int64 = 99
 	var theString = "theString"
 
 	// Create grouped AVP
-	avpl0, _ := NewAVP("Igor-myGroupedInGrouped", nil)
-	avpl1, _ := NewAVP("Igor-myGrouped", nil)
+	avpl0, _ := NewDiameterAVP("Igor-myGroupedInGrouped", nil)
+	avpl1, _ := NewDiameterAVP("Igor-myGrouped", nil)
 
-	avpInt, _ := NewAVP("Igor-myInteger32", theInt)
-	avpString, _ := NewAVP("Igor-myString", theString)
+	avpInt, _ := NewDiameterAVP("Igor-myInteger32", theInt)
+	avpString, _ := NewDiameterAVP("Igor-myString", theString)
 
 	avpl1.AddAVP(*avpInt).AddAVP(*avpString)
 	avpl0.AddAVP(*avpl1)
@@ -532,7 +521,7 @@ func TestGroupedAVP(t *testing.T) {
 func TestSerializationError(t *testing.T) {
 
 	// Generate an AVP
-	avp, err := NewAVP("Igor-myOctetString", "0A0B0C0c765654")
+	avp, err := NewDiameterAVP("Igor-myOctetString", "0A0B0C0c765654")
 	theBytes, _ := avp.MarshalBinary()
 
 	if err != nil {
@@ -547,17 +536,17 @@ func TestSerializationError(t *testing.T) {
 
 	// Simulate we read an AVP not in the dictionary
 	// It should create an AVP with name UNKNOWN
-	newavp, _, _ := DiameterAVPFromBytes(theBytesUnknown)
-	if newavp.VendorId != 11*256*256*256+12*256*256+13*256+14 {
+	NewDiameterAVP, _, _ := DiameterAVPFromBytes(theBytesUnknown)
+	if NewDiameterAVP.VendorId != 11*256*256*256+12*256*256+13*256+14 {
 		t.Errorf("unknown vendor Id was not unmarshalled")
 	}
-	if newavp.DictItem.Name != "UNKNOWN" {
+	if NewDiameterAVP.DictItem.Name != "UNKNOWN" {
 		t.Errorf("unknown AVP not named UNKNOWN")
 	}
 
 	// We should be able to serialize the unknown AVP
 	// The vendorId should be the same
-	otherBytes, marshalError := newavp.MarshalBinary()
+	otherBytes, marshalError := NewDiameterAVP.MarshalBinary()
 	if marshalError != nil {
 		t.Errorf("error serializing unknown avp: %s", marshalError)
 	}
@@ -575,7 +564,7 @@ func TestSerializationError(t *testing.T) {
 
 }
 
-func TestJSONAVP(t *testing.T) {
+func TestJSONDiameterAVP(t *testing.T) {
 
 	var javp = `{
 		"Igor-myTestAllGrouped": [
@@ -619,8 +608,8 @@ func TestJSONAVP(t *testing.T) {
 	}
 
 	// Marshal again
-	jNewAVP, _ := json.Marshal(&avp)
-	if !strings.Contains(string(jNewAVP), "bebe:cafe::0/128") {
+	jNewDiameterAVP, _ := json.Marshal(&avp)
+	if !strings.Contains(string(jNewDiameterAVP), "bebe:cafe::0/128") {
 		t.Errorf("part of the expected JSON content was not found")
 	}
 
@@ -639,7 +628,7 @@ func TestJSONAVP(t *testing.T) {
 
 func TestDiameterMessage(t *testing.T) {
 
-	var ci = config.GetPolicyConfig()
+	var ci = GetPolicyConfig()
 
 	diameterMessage, err := NewDiameterRequest("TestApplication", "TestRequest")
 	diameterMessage.AddOriginAVPs(ci)
@@ -647,15 +636,15 @@ func TestDiameterMessage(t *testing.T) {
 		t.Errorf("could not create diameter request for application TestAppliciaton and command TestRequest")
 		return
 	}
-	sessionIdAVP, _ := NewAVP("Session-Id", "my-session-id")
-	originHostAVP, _ := NewAVP("Origin-Host", "server.igorserver")
-	originRealmAVP, _ := NewAVP("Origin-Realm", "igorserver")
-	destinationHostAVP, _ := NewAVP("Destination-Host", "server.igorserver")
-	destinationRealmAVP, _ := NewAVP("Destination-Realm", "igorserver")
-	groupedInGroupedAVP, _ := NewAVP("Igor-myGroupedInGrouped", nil)
-	groupedAVP, _ := NewAVP("Igor-myGrouped", nil)
-	intAVP, _ := NewAVP("Igor-myInteger32", 1)
-	stringAVP, _ := NewAVP("Igor-myString", "hello")
+	sessionIdAVP, _ := NewDiameterAVP("Session-Id", "my-session-id")
+	originHostAVP, _ := NewDiameterAVP("Origin-Host", "server.igorserver")
+	originRealmAVP, _ := NewDiameterAVP("Origin-Realm", "igorserver")
+	destinationHostAVP, _ := NewDiameterAVP("Destination-Host", "server.igorserver")
+	destinationRealmAVP, _ := NewDiameterAVP("Destination-Realm", "igorserver")
+	groupedInGroupedAVP, _ := NewDiameterAVP("Igor-myGroupedInGrouped", nil)
+	groupedAVP, _ := NewDiameterAVP("Igor-myGrouped", nil)
+	intAVP, _ := NewDiameterAVP("Igor-myInteger32", 1)
+	stringAVP, _ := NewDiameterAVP("Igor-myString", "hello")
 	groupedAVP.AddAVP(*intAVP)
 	groupedAVP.AddAVP(*stringAVP)
 	groupedInGroupedAVP.AddAVP(*groupedAVP)
@@ -800,7 +789,7 @@ func TestDiameterMessageAllAttributeTypes(t *testing.T) {
 	if recoveredMessage.GetStringAVP("Igor-myTestAllGrouped.Igor-myEnumerated") != "two" {
 		t.Errorf("Error recovering Enumerated. Got <%s> instead of <two>", recoveredMessage.GetStringAVP("Igor-myTestAllGrouped.Igor-myEnumerated"))
 	}
-	targetTime, _ := time.Parse("2006-01-02T15:04:05 MST", "1966-11-26T03:34:08 UTC")
+	targetTime, _ := time.Parse(timeFormatString, "1966-11-26T03:34:08 UTC")
 	if recoveredMessage.GetDateAVP("Igor-myTestAllGrouped.Igor-myTime") != targetTime {
 		t.Errorf("Error recovering date. Got <%v> instead of <1966-11-26T03:34:08 UTC>", recoveredMessage.GetDateAVP("Igor-myTestAllGrouped.Igor-myTime"))
 	}
@@ -997,7 +986,7 @@ func TestCheckDiameterMessage(t *testing.T) {
 		t.Fatalf("unmarshal error for diameter message: %s", err)
 	}
 	diameterMessage.Tidy()
-	diameterMessage.AddOriginAVPs(config.GetPolicyConfigInstance("testClient"))
+	diameterMessage.AddOriginAVPs(GetPolicyConfigInstance("testConfig"))
 
 	// Initially, the message is valid
 	err = diameterMessage.CheckAttributes()
@@ -1023,8 +1012,8 @@ func TestCheckDiameterMessage(t *testing.T) {
 
 	// Check error in grouped attribute. the Subscription-Id-Type will be missing
 	diameterMessage.DeleteAllAVP("Subscription-Id")
-	sidData, _ := NewAVP("Subscription-Id-Data", "the subscriptionId")
-	savp, _ := NewAVP("Subscription-Id", []DiameterAVP{*sidData})
+	sidData, _ := NewDiameterAVP("Subscription-Id-Data", "the subscriptionId")
+	savp, _ := NewDiameterAVP("Subscription-Id", []DiameterAVP{*sidData})
 	err = savp.Check()
 	if err == nil {
 		t.Fatal("missing attribute in Group not detected after Check()")
@@ -1036,8 +1025,8 @@ func TestCheckDiameterMessage(t *testing.T) {
 	}
 
 	// Add missing attribute
-	sidType, _ := NewAVP("Subscription-Id-Type", "EndUserE164")
-	savp, _ = NewAVP("Subscription-Id", []DiameterAVP{*sidData, *sidType})
+	sidType, _ := NewDiameterAVP("Subscription-Id-Type", "EndUserE164")
+	savp, _ = NewDiameterAVP("Subscription-Id", []DiameterAVP{*sidData, *sidType})
 	err = savp.Check()
 	if err != nil {
 		t.Fatal("error checking subscription-id grouped attribute")

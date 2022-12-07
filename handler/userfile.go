@@ -4,8 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 )
 
 /////////////////////////////////////////////////////////////////////////////
@@ -41,7 +40,7 @@ func (p Properties) String() string {
 	return sb.String()
 }
 
-type AVPItems []radiuscodec.RadiusAVP
+type AVPItems []core.RadiusAVP
 
 // Merges Radius Items. The new with higher priority
 func (lp AVPItems) OverrideWith(hp AVPItems) AVPItems {
@@ -91,11 +90,11 @@ type RadiusUserFile map[string]RadiusUserFileEntry
 //		replyItems: [<AVP>],
 //		nonOverridableReplyItems: [<AVP>] -- typically for Cisco-AVPair
 //		oobReplyItems: [<AVP>]			   -- Service definition queries from BNG
-func NewRadiusUserFile(configObjectName string, ci *config.PolicyConfigurationManager) (RadiusUserFile, error) {
+func NewRadiusUserFile(configObjectName string, ci *core.PolicyConfigurationManager) (RadiusUserFile, error) {
 	// If we pass nil as last parameter, use the default
-	var myCi *config.PolicyConfigurationManager
+	var myCi *core.PolicyConfigurationManager
 	if ci == nil {
-		myCi = config.GetPolicyConfig()
+		myCi = core.GetPolicyConfig()
 	} else {
 		myCi = ci
 	}

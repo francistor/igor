@@ -1,36 +1,23 @@
-package radiuscodec
+package core
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/francistor/igor/config"
 )
 
 // Initialization
-var bootstrapFile = "resources/searchRules.json"
-var instanceName = "testServer"
 
 var authenticator = [16]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0F}
 var secret = "mysecret"
 
-// Initializer of the test suite.
-func TestMain(m *testing.M) {
-	config.InitPolicyConfigInstance(bootstrapFile, instanceName, true)
-
-	// Execute the tests and exit
-	os.Exit(m.Run())
-}
-
 func TestAVPNotFound(t *testing.T) {
-	var _, err = NewAVP("Unknown AVP", []byte("hello, world!"))
+	var _, err = NewRadiusAVP("Unknown AVP", []byte("hello, world!"))
 	if err == nil {
 		t.Errorf("Unknown AVP was created")
 	}
@@ -43,7 +30,7 @@ func TestPasswordAVP(t *testing.T) {
 	//var password = "0"
 
 	// Create avp
-	avp, err := NewAVP("User-Password", []byte(password))
+	avp, err := NewRadiusAVP("User-Password", []byte(password))
 	if err != nil {
 		t.Errorf("error creating AVP: %v", err)
 		return
@@ -71,7 +58,7 @@ func TestStringAVP(t *testing.T) {
 	var theValue = "this-is the string!"
 
 	// Create avp
-	avp, err := NewAVP("User-Name", theValue)
+	avp, err := NewRadiusAVP("User-Name", theValue)
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return
@@ -93,7 +80,7 @@ func TestVendorStringAVP(t *testing.T) {
 	var theValue = "this is the string!"
 
 	// Create avp
-	avp, err := NewAVP("Igor-StringAttribute", theValue)
+	avp, err := NewRadiusAVP("Igor-StringAttribute", theValue)
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return
@@ -115,7 +102,7 @@ func TestVendorIntegerAVP(t *testing.T) {
 	var theValue = 2
 
 	// Create avp
-	avp, err := NewAVP("Igor-IntegerAttribute", theValue)
+	avp, err := NewRadiusAVP("Igor-IntegerAttribute", theValue)
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return
@@ -140,7 +127,7 @@ func TestVendorTaggedAVP(t *testing.T) {
 	var theValue = "myString"
 
 	// Create avp
-	avp, err := NewAVP("Igor-TaggedStringAttribute", theValue+":1")
+	avp, err := NewRadiusAVP("Igor-TaggedStringAttribute", theValue+":1")
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return
@@ -162,7 +149,7 @@ func TestVendorIPv6AddressAVP(t *testing.T) {
 	var theValue = "bebe:cafe::0"
 
 	// Create avp
-	avp, err := NewAVP("Igor-IPv6AddressAttribute", theValue)
+	avp, err := NewRadiusAVP("Igor-IPv6AddressAttribute", theValue)
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return
@@ -185,7 +172,7 @@ func TestIPv6PrefixAVP(t *testing.T) {
 	var theValue = "bebe:cafe::0/16"
 
 	// Create avp
-	avp, err := NewAVP("Framed-IPv6-Prefix", theValue)
+	avp, err := NewRadiusAVP("Framed-IPv6-Prefix", theValue)
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return
@@ -208,12 +195,11 @@ func TestIPv6PrefixAVP(t *testing.T) {
 
 func TestVendorTimeAVP(t *testing.T) {
 
-	var timeFormatString = "2006-01-02T15:04:05 MST"
 	var theValue = "2020-09-06T21:08:09 UTC"
 	var timeValue, err = time.Parse(timeFormatString, theValue)
 
 	// Create avp
-	avp, err := NewAVP("Igor-TimeAttribute", theValue)
+	avp, err := NewRadiusAVP("Igor-TimeAttribute", theValue)
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return
@@ -236,7 +222,7 @@ func TestInterfaceIdAVP(t *testing.T) {
 	var theValue = []byte{0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04}
 
 	// Create avp
-	avp, err := NewAVP("Framed-Interface-Id", theValue)
+	avp, err := NewRadiusAVP("Framed-Interface-Id", theValue)
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return
@@ -259,7 +245,7 @@ func TestVendorInteger64AVP(t *testing.T) {
 	var theValue = -9000
 
 	// Create avp
-	avp, err := NewAVP("Igor-Integer64Attribute", theValue)
+	avp, err := NewRadiusAVP("Igor-Integer64Attribute", theValue)
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return
@@ -281,7 +267,7 @@ func TestTaggedAVP(t *testing.T) {
 	theValue := "this is a tagged attribute!"
 
 	// Create 0
-	avp, err := NewAVP("Igor-TaggedStringAttribute", theValue+":1")
+	avp, err := NewRadiusAVP("Igor-TaggedStringAttribute", theValue+":1")
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return
@@ -303,7 +289,7 @@ func TestSaltedAVP(t *testing.T) {
 	theValue := "this is a salted attribute! and a very long one indeed!"
 
 	// Create 0
-	avp, err := NewAVP("Igor-SaltedOctetsAttribute", []byte(theValue))
+	avp, err := NewRadiusAVP("Igor-SaltedOctetsAttribute", []byte(theValue))
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return

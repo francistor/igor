@@ -5,9 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/francistor/igor/diamcodec"
-	"github.com/francistor/igor/radiuscodec"
-	"github.com/francistor/igor/radiusdict"
+	"github.com/francistor/igor/core"
 )
 
 type CSVWriter struct {
@@ -40,14 +38,14 @@ func NewCSVWriter(fields []string, fieldSeparator string, attributeSeparator str
 }
 
 // Not implemented
-func (w *CSVWriter) GetDiameterCDRString(dm *diamcodec.DiameterMessage) string {
+func (w *CSVWriter) GetDiameterCDRString(dm *core.DiameterMessage) string {
 	panic("GetDiameterCDRString is not implemented by CSVWriter")
 }
 
 // Write CDR as list with separators
 // Special field names:
 // * %Timestamp% -> Datetime of CDR generation
-func (w *CSVWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) string {
+func (w *CSVWriter) GetRadiusCDRString(rp *core.RadiusPacket) string {
 	var builder strings.Builder
 
 	// Iterate through the fields in the spec
@@ -72,7 +70,7 @@ func (w *CSVWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) string {
 		if len(avps) > 0 {
 
 			radiusType := avps[0].DictItem.RadiusType
-			if (radiusType == radiusdict.Integer || radiusType == radiusdict.Integer64) && !w.parseInts {
+			if (radiusType == core.RadiusTypeInteger || radiusType == core.RadiusTypeInteger64) && !w.parseInts {
 				// Write as integer
 				for j := range avps {
 					builder.WriteString(fmt.Sprintf("%d", avps[j].GetInt()))
@@ -80,7 +78,7 @@ func (w *CSVWriter) GetRadiusCDRString(rp *radiuscodec.RadiusPacket) string {
 						builder.WriteString(w.attributeSeparator)
 					}
 				}
-			} else if radiusType == radiusdict.Time {
+			} else if radiusType == core.RadiusTypeTime {
 				// Write as string
 				if w.quoteStrings {
 					builder.WriteString("\"")

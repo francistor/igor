@@ -10,8 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/diamcodec"
+	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/diampeer"
 	"github.com/francistor/igor/instrumentation"
 
@@ -40,7 +39,7 @@ type DiameterRouter struct {
 	instanceName string
 
 	// Configuration instance object
-	ci *config.PolicyConfigurationManager
+	ci *core.PolicyConfigurationManager
 
 	// Stauts of the Router. May be StatusOperational or StatusClosed
 	status int32
@@ -77,15 +76,15 @@ type DiameterRouter struct {
 	http2Client http.Client
 
 	// Local handler
-	localHandler diamcodec.MessageHandler
+	localHandler core.MessageHandler
 }
 
 // Creates and runs a Router
-func NewDiameterRouter(instanceName string, handler diamcodec.MessageHandler) *DiameterRouter {
+func NewDiameterRouter(instanceName string, handler core.MessageHandler) *DiameterRouter {
 
 	router := DiameterRouter{
 		instanceName:         instanceName,
-		ci:                   config.GetPolicyConfigInstance(instanceName),
+		ci:                   core.GetPolicyConfigInstance(instanceName),
 		diameterPeersTable:   make(map[string]DiameterPeerWithStatus),
 		peerControlChannel:   make(chan interface{}, CONTROL_QUEUE_SIZE),
 		diameterRequestsChan: make(chan RoutableDiameterRequest, DIAMETER_REQUESTS_QUEUE_SIZE),
@@ -138,7 +137,7 @@ func (router *DiameterRouter) Close() {
 
 // Initialization and accept loop. NOT to be executed in a goroutine
 func (router *DiameterRouter) startAndAccept() {
-	logger := config.GetLogger()
+	logger := core.GetLogger()
 
 	// Server socket
 	serverConf := router.ci.DiameterServerConf()
@@ -192,7 +191,7 @@ func (router *DiameterRouter) startAndAccept() {
 				router.peerControlChannel,
 				connection,
 				// The handler injects me the message
-				func(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
+				func(request *core.DiameterMessage) (*core.DiameterMessage, error) {
 					return router.RouteDiameterRequest(request, DEFAULT_REQUEST_TIMEOUT_SECONDS*time.Second)
 				},
 			)
@@ -210,7 +209,7 @@ func (router *DiameterRouter) startAndAccept() {
 // Actor model event loop
 func (router *DiameterRouter) eventLoop() {
 
-	logger := config.GetLogger()
+	logger := core.GetLogger()
 
 	for {
 	messageHandler:
@@ -403,7 +402,7 @@ func (router *DiameterRouter) eventLoop() {
 
 					// Send to the handler asynchronously
 					logger.Debugf("Selected Handler: %s", destinationURLs[0])
-					go func(rchan chan interface{}, diameterRequest *diamcodec.DiameterMessage, url string) {
+					go func(rchan chan interface{}, diameterRequest *core.DiameterMessage, url string) {
 
 						// Make sure the response channel is closed
 						defer close(rchan)
@@ -422,7 +421,7 @@ func (router *DiameterRouter) eventLoop() {
 
 				} else {
 					// Handle locally
-					go func(rchan chan interface{}, diameterRequest *diamcodec.DiameterMessage) {
+					go func(rchan chan interface{}, diameterRequest *core.DiameterMessage) {
 
 						// Make sure the response channel is closed
 						defer func() {
@@ -452,7 +451,7 @@ func (router *DiameterRouter) eventLoop() {
 }
 
 // Sends a DiameterMessage and returns the answer. Blocking
-func (router *DiameterRouter) RouteDiameterRequest(request *diamcodec.DiameterMessage, timeout time.Duration) (*diamcodec.DiameterMessage, error) {
+func (router *DiameterRouter) RouteDiameterRequest(request *core.DiameterMessage, timeout time.Duration) (*core.DiameterMessage, error) {
 	responseChannel := make(chan interface{}, 1)
 
 	routableRequest := RoutableDiameterRequest{
@@ -469,8 +468,8 @@ func (router *DiameterRouter) RouteDiameterRequest(request *diamcodec.DiameterMe
 	r := <-responseChannel
 	switch v := r.(type) {
 	case error:
-		return &diamcodec.DiameterMessage{}, v
-	case *diamcodec.DiameterMessage:
+		return &core.DiameterMessage{}, v
+	case *core.DiameterMessage:
 		return v, nil
 	}
 
@@ -478,7 +477,7 @@ func (router *DiameterRouter) RouteDiameterRequest(request *diamcodec.DiameterMe
 }
 
 // Same as RouteDiameterRequest but non blocking: executes the handler asyncrhronously
-func (router *DiameterRouter) RouteDiameterRequestAsync(request *diamcodec.DiameterMessage, timeout time.Duration, handler func(*diamcodec.DiameterMessage, error)) {
+func (router *DiameterRouter) RouteDiameterRequestAsync(request *core.DiameterMessage, timeout time.Duration, handler func(*core.DiameterMessage, error)) {
 	rchan := make(chan interface{}, 1)
 
 	routableRequest := RoutableDiameterRequest{
@@ -497,7 +496,7 @@ func (router *DiameterRouter) RouteDiameterRequestAsync(request *diamcodec.Diame
 		switch v := r.(type) {
 		case error:
 			handler(nil, v)
-		case *diamcodec.DiameterMessage:
+		case *core.DiameterMessage:
 			handler(v, nil)
 		default:
 			panic("got an answer that was not error or pointer to diameter message")
@@ -533,7 +532,7 @@ func (router *DiameterRouter) updatePeersTable() {
 		if peerConfig.ConnectionPolicy == "active" {
 			// Create a new one of not existing or there was no backing peer (possibly because got down)
 			if !found || p.peer == nil {
-				diamPeer := diampeer.NewActiveDiameterPeer(router.instanceName, router.peerControlChannel, peerConfig, func(request *diamcodec.DiameterMessage) (*diamcodec.DiameterMessage, error) {
+				diamPeer := diampeer.NewActiveDiameterPeer(router.instanceName, router.peerControlChannel, peerConfig, func(request *core.DiameterMessage) (*core.DiameterMessage, error) {
 					return router.RouteDiameterRequest(request, DEFAULT_REQUEST_TIMEOUT_SECONDS*time.Second)
 				})
 				router.diameterPeersTable[peerConfig.DiameterHost] = DiameterPeerWithStatus{peer: diamPeer, isEngaged: false, lastStatusChange: time.Now()}

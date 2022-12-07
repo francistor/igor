@@ -1,36 +1,9 @@
-package config
+package core
 
 import (
-	"encoding/json"
-	"net/http"
-	"os"
 	"strings"
 	"testing"
 )
-
-func httpServer() {
-	// Serve configuration
-	var fileHandler = http.FileServer(http.Dir(os.Getenv("IGOR_BASE") + "resources"))
-	http.Handle("/", fileHandler)
-	if err := http.ListenAndServe(":8100", nil); err != nil {
-		panic("could not start http server")
-	}
-}
-
-func TestMain(m *testing.M) {
-
-	// Initialize the Config Objects
-	bootFile := "resources/searchRules.json"
-	instanceName := "testConfig"
-
-	InitPolicyConfigInstance(bootFile, instanceName, true)
-	InitHttpHandlerConfigInstance(bootFile, instanceName, false)
-
-	// Start the server for configuration
-	go httpServer()
-
-	os.Exit(m.Run())
-}
 
 func TestHttpRetrieval(t *testing.T) {
 	txt, err := GetPolicyConfig().CM.GetBytesConfigObject("template_http.txt")
@@ -187,30 +160,5 @@ func TestHandlerLogger(t *testing.T) {
 	}
 	if !strings.Contains(logDump, "<info message>") {
 		t.Fatalf("missing handler logger message in info mode")
-	}
-}
-
-func TestParametricObject(t *testing.T) {
-	type CParam struct {
-		Speed   int
-		Message string
-	}
-
-	oBytes, err := GetBytesTemplatedConfigObject[CParam]("template.txt", "templateParameters.json", nil)
-	if err != nil {
-		t.Fatalf("error in getting templated config object %s", err)
-	}
-
-	var o map[string]interface{}
-	err = json.Unmarshal(oBytes, &o)
-	if err != nil {
-		t.Fatalf("error in unmarshaling templated config object %s", err)
-	}
-
-	okey1 := o["key1"].(map[string]interface{})
-	okey1Internet := okey1["internet"].(map[string]interface{})
-	okey1InternetReplyItems := okey1Internet["replyItems"].([]interface{})
-	if len(okey1InternetReplyItems) != 2 {
-		t.Fatalf("number of reply items is incorrect")
 	}
 }

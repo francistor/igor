@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/francistor/igor/config"
-	"github.com/francistor/igor/radiuscodec"
+	"github.com/francistor/igor/core"
 )
 
 // Initialization
@@ -19,7 +18,7 @@ var cdrDirectoryName = os.Getenv("IGOR_BASE") + "cdr"
 
 // Initializer of the test suite.
 func TestMain(m *testing.M) {
-	config.InitPolicyConfigInstance(bootstrapFile, instanceName, true)
+	core.InitPolicyConfigInstance(bootstrapFile, instanceName, true)
 
 	// Execute the tests
 	exitCode := m.Run()
@@ -210,7 +209,7 @@ func TestFileWriterRotation(t *testing.T) {
 }
 
 // Helper function
-func buildSimpleRadiusPacket(t *testing.T) radiuscodec.RadiusPacket {
+func buildSimpleRadiusPacket(t *testing.T) core.RadiusPacket {
 	jsonPacket := `{
 		"Code": 1,
 		"AVPs":[
@@ -233,7 +232,7 @@ func buildSimpleRadiusPacket(t *testing.T) radiuscodec.RadiusPacket {
 	}`
 
 	// Read JSON to Radius Packet
-	rp := radiuscodec.RadiusPacket{}
+	rp := core.RadiusPacket{}
 	if err := json.Unmarshal([]byte(jsonPacket), &rp); err != nil {
 		t.Fatalf("unmarshal error for radius packet: %s", err)
 	}
