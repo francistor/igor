@@ -167,6 +167,7 @@ type RadiusClient struct {
 	Secret           string
 	ClientClass      string
 	ClientProperties map[string]string
+	RadiusAttributes []RadiusAVP
 }
 
 // Holds the configuration of all Radius Clients, indexed by IP address

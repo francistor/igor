@@ -5,6 +5,9 @@
 		"clientClass": "unknown",
 		"clientProperties":{
 			"scope": "default"
-		}
+		},
+		"radiusAttributes":[
+			{"Session-Timeout": 120}
+		]
 	}
 }

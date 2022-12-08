@@ -103,6 +103,9 @@ func TestRadiusConfig(t *testing.T) {
 	if rc["127.0.0.1"].IPAddress != "127.0.0.1" {
 		t.Fatalf("IPAddress was not in the radius client object")
 	}
+	if rc["127.0.0.1"].RadiusAttributes[0].GetInt() != 120 {
+		t.Fatalf("Bad Session-Timeout radius attribute")
+	}
 
 	// Get Radius Servers configuration
 	rs := GetPolicyConfig().RadiusServers()
