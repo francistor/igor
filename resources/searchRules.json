@@ -9,8 +9,6 @@
         "__doc": "use loc=UTC if necessary",
         "url": "francisco:francisco@tcp(n2:3306)/PSBA?parseTime=true",
         "driver": "mysql",
-        "maxOpenConns": 10,
-        "maxIdleConns": 1
+        "maxOpenConns": 10
     }
 }
-

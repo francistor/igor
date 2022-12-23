@@ -37,20 +37,19 @@ type SearchRule struct {
 	Origin string
 }
 
-// The applicable Search Rules
+// The applicable Search Rules. Hold also the configuration for the configuration database
 type SearchRules struct {
 	Rules []SearchRule
 	Db    struct {
 		Url          string
 		Driver       string
 		MaxOpenConns int
-		MaxIdleConns int
 	}
 }
 
 // Basic objects and methods to manage configuration files without yet
 // interpreting them. To be embedded in a handlerConfig or policyConfig object
-// Multiple "instances" can coexist in a single executable
+// Multiple "instances" can coexist in a single executable (mainly for testing)
 type ConfigurationManager struct {
 
 	// Configuration objects are to be searched for in a path that contains
@@ -65,7 +64,7 @@ type ConfigurationManager struct {
 	// The contents of the bootstrapFile are parsed here
 	searchRules SearchRules
 
-	// Database Handle
+	// Database Handle for access to the configuration database
 	dbHandle *sql.DB
 }
 
@@ -232,7 +231,8 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 
 // Reads the bootstrap file and fills the search rules for the Configuration Manager.
 // To be called upon instantiation of the ConfigurationManager.
-// The bootstrap file is not subject to instance searching
+// The bootstrap file is not subject to instance searching rules: must reside in the specified location without
+// appending instance name
 func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	var shouldInitDB bool
 
@@ -245,7 +245,7 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	// Decode Search Rules and add them to the ConfigurationManager object
 	err = json.Unmarshal(rules, &c.searchRules)
 	if err != nil || len(c.searchRules.Rules) == 0 {
-		panic("could not decode the Search Rules")
+		panic("could not decode the Search Rules or empty file")
 	}
 
 	// Add the compiled regular expression for each rule and sanity check for base
@@ -256,8 +256,7 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 		origin := c.searchRules.Rules[i].Origin
 		if strings.HasPrefix(origin, "database") {
 			shouldInitDB = true
-			baseItems := strings.Split(c.searchRules.Rules[i].Origin, ":")
-			if len(baseItems) != 4 {
+			if len(strings.Split(c.searchRules.Rules[i].Origin, ":")) != 4 {
 				panic("bad format for database search rule: " + origin)
 			}
 		}
@@ -271,7 +270,6 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 				panic("could not create database object " + c.searchRules.Db.Driver)
 			}
 			c.dbHandle.SetMaxOpenConns(c.searchRules.Db.MaxOpenConns)
-			c.dbHandle.SetMaxIdleConns(c.searchRules.Db.MaxIdleConns)
 
 			err = c.dbHandle.Ping()
 			if err != nil {

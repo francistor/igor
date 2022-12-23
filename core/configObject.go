@@ -8,14 +8,14 @@ import (
 )
 
 // If the object implements this interface, this method will be executed after each
-// updatet, typically for cooking the derived attributes
+// update, typically for cooking the derived attributes
 type Initializable interface {
 	initialize() error
 }
 
 // Represents an object that will be populated from the configuration resources
 type ConfigObject[T any] struct {
-	o          T
+	o          *T
 	objectName string
 }
 
@@ -26,7 +26,7 @@ func NewConfigObject[T any](name string) *ConfigObject[T] {
 	return &co
 }
 
-// Reads the configuration from the associated resource and initializes it,
+// Reads the configuration from the associated resource and initializes it
 // if an initialize() method is defined
 func (co *ConfigObject[T]) Update(cm *ConfigurationManager) error {
 
@@ -39,7 +39,7 @@ func (co *ConfigObject[T]) Update(cm *ConfigurationManager) error {
 				return err
 			}
 		}
-		co.o = theObject
+		co.o = &theObject
 		return nil
 	}
 }
@@ -47,7 +47,7 @@ func (co *ConfigObject[T]) Update(cm *ConfigurationManager) error {
 // Provides access to the configuration object. Returns a copy, so the underlying
 // object may be modified safely
 func (co *ConfigObject[T]) Get() T {
-	return co.o
+	return *co.o
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -55,8 +55,12 @@ func (co *ConfigObject[T]) Get() T {
 // Represents an object that will be populated from the configuration resources
 // Those configuration resources are a template and a set of parameters for that template
 // T is the type of the template object, P is the type of the parameter object
+// The parametersObject is a map of strings to P.
+// For instance, T may be a RadiusUserFile, and P a struct holding parameters such as speed and timeouts
+// The end result will be a map of the keys in the ParametersObject to RadiusUserFile built from
+// the specified template and parameters replaced.
 type TemplatedConfigObject[T, P any] struct {
-	o                    map[string]T
+	o                    *map[string]T
 	templateObjectName   string
 	parametersObjectName string
 }
@@ -91,7 +95,7 @@ func (tco *TemplatedConfigObject[T, P]) Update(cm *ConfigurationManager) error {
 	}
 
 	// This object will hold the ouptut temporarily
-	tco.o = make(map[string]T)
+	var theMap = make(map[string]T)
 
 	// Apply the template to each key of the parameters
 	for k, p := range parametersSet {
@@ -103,23 +107,25 @@ func (tco *TemplatedConfigObject[T, P]) Update(cm *ConfigurationManager) error {
 		if err := json.Unmarshal([]byte(tmplRes.String()), &v); err != nil {
 			return err
 		}
-		tco.o[k] = v
+		theMap[k] = v
 	}
+
+	tco.o = &theMap
 
 	return nil
 }
 
 // Provides access to the configuration object.
 func (tco *TemplatedConfigObject[T, P]) Get() map[string]T {
-	return tco.o
+	return *tco.o
 }
 
 // Provides access to the configuration object.
 func (tco *TemplatedConfigObject[T, P]) GetKey(key string) (T, error) {
-	if co, found := tco.o[key]; !found {
+	var theMap = *tco.o
+	if co, found := theMap[key]; !found {
 		return co, fmt.Errorf("key %s not found", key)
 	} else {
 		return co, nil
 	}
-
 }

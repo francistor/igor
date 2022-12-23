@@ -32,7 +32,7 @@ func TestDatabaseObject(t *testing.T) {
 		t.Fatalf("could not read radiusclients.database: %s", err)
 	}
 
-	if rcEntries["RepublicaHW01"].Secret != "mysecret" {
+	if rcEntries["127.0.0.1"].Secret != "mysecret" {
 		t.Fatalf("bad content in radiusclients.database")
 	}
 }
