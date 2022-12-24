@@ -55,6 +55,7 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefau
 	if isDefault {
 		initLogger(&policyConfig.CM)
 		initDictionaries(&policyConfig.CM)
+		initMetricsServer(&policyConfig.CM)
 	}
 
 	// Load diameter configuraton

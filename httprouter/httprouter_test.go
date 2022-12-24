@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/francistor/igor/core"
-	"github.com/francistor/igor/instrumentation"
 	"github.com/francistor/igor/router"
 
 	"golang.org/x/net/http2"
@@ -65,7 +64,9 @@ func TestMain(m *testing.M) {
 	core.InitPolicyConfigInstance(bootstrapFile, "testSuperServer", false)
 
 	// Execute the tests and exit
-	os.Exit(m.Run())
+	exitCode := m.Run()
+	core.MS.Close()
+	os.Exit(exitCode)
 }
 
 func TestHttpRouterHandler(t *testing.T) {
@@ -181,15 +182,15 @@ func TestHttpRouterHandler(t *testing.T) {
 		t.Fatalf("radius response does not contain expected diameter attribute")
 	}
 
-	rrm := instrumentation.MS.HttpRouterQuery("HttpRouterExchanges", nil, []string{"Path"})
-	if v, ok := rrm[instrumentation.HttpRouterMetricKey{Path: "/routeRadiusRequest"}]; !ok {
+	rrm := core.MS.HttpRouterQuery("HttpRouterExchanges", nil, []string{"Path"})
+	if v, ok := rrm[core.HttpRouterMetricKey{Path: "/routeRadiusRequest"}]; !ok {
 		t.Fatalf("HttpRouterExchanges not found")
 	} else if v != 1 {
 		t.Fatalf("HttpRouterExchanges for radius is not 1")
 	}
 
-	drm := instrumentation.MS.HttpRouterQuery("HttpRouterExchanges", nil, []string{"Path"})
-	if v, ok := drm[instrumentation.HttpRouterMetricKey{Path: "/routeDiameterRequest"}]; !ok {
+	drm := core.MS.HttpRouterQuery("HttpRouterExchanges", nil, []string{"Path"})
+	if v, ok := drm[core.HttpRouterMetricKey{Path: "/routeDiameterRequest"}]; !ok {
 		t.Fatalf("HttpRouterExchanges not found")
 	} else if v != 1 {
 		t.Fatalf("HttpRouterExchanges for diameteris not 1")

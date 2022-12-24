@@ -1,9 +1,9 @@
-package instrumentation
+package core
 
 import (
+	"fmt"
+	"strings"
 	"time"
-
-	"github.com/francistor/igor/core"
 )
 
 // Used as key for diameter metrics, both in storage and as a way to specify queries,
@@ -18,8 +18,25 @@ type PeerDiameterMetricKey struct {
 	CM   string
 }
 
+type PeerDiameterMetrics map[PeerDiameterMetricKey]uint64
+
+// Builder for Prometheus format export
+func (pdm PeerDiameterMetrics) genPrometheusMetric(metricName string, helpString string) string {
+	var builder strings.Builder
+	if len(pdm) > 0 {
+		builder.WriteString(fmt.Sprintf("HELP %s %s\n", metricName, helpString))
+		builder.WriteString(fmt.Sprintf("TYPE %s counter\n", metricName))
+	}
+	for k, v := range pdm {
+		builder.WriteString(fmt.Sprintf("%s{peer=\"%s\",oh=\"%s\",or=\"%s\",dh=\"%s\",dr=\"%s\",ap=\"%s\",cm=\"%s\"} %d\n",
+			metricName, k.Peer, k.OH, k.OR, k.DH, k.DR, k.AP, k.CM, v))
+	}
+
+	return builder.String()
+}
+
 // Generates a PeerDiameterMetric from a specified Diameter Message
-func PeerDiameterMetricFromMessage(peerName string, diameterMessage *core.DiameterMessage) PeerDiameterMetricKey {
+func PeerDiameterMetricFromMessage(peerName string, diameterMessage *DiameterMessage) PeerDiameterMetricKey {
 
 	return PeerDiameterMetricKey{
 		Peer: peerName,
@@ -56,8 +73,8 @@ type PeerDiameterRequestReceivedEvent struct {
 }
 
 // Helper function to send a message to the instrumentation server when a diameter request is received
-func PushPeerDiameterRequestReceived(peerName string, diameterMessage *core.DiameterMessage) {
-	MS.InputChan <- PeerDiameterRequestReceivedEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
+func PushPeerDiameterRequestReceived(peerName string, diameterMessage *DiameterMessage) {
+	MS.metricEventChan <- PeerDiameterRequestReceivedEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
 }
 
 // Message sent to instrumentation server when a diameter answer is sent in a Peer
@@ -66,8 +83,8 @@ type PeerDiameterAnswerSentEvent struct {
 }
 
 // Helper function to send a message to the instrumentation server when a diameter answer is sent
-func PushPeerDiameterAnswerSent(peerName string, diameterMessage *core.DiameterMessage) {
-	MS.InputChan <- PeerDiameterAnswerSentEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
+func PushPeerDiameterAnswerSent(peerName string, diameterMessage *DiameterMessage) {
+	MS.metricEventChan <- PeerDiameterAnswerSentEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
 }
 
 // Diameter Client
@@ -78,8 +95,8 @@ type PeerDiameterRequestSentEvent struct {
 }
 
 // Helper function to send a message to the instrumentation server when a diameter request is sent to a Peer
-func PushPeerDiameterRequestSent(peerName string, diameterMessage *core.DiameterMessage) {
-	MS.InputChan <- PeerDiameterRequestSentEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
+func PushPeerDiameterRequestSent(peerName string, diameterMessage *DiameterMessage) {
+	MS.metricEventChan <- PeerDiameterRequestSentEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
 }
 
 // Message sent to instrumentation server when a diameter answer is received from a Peer
@@ -88,8 +105,8 @@ type PeerDiameterAnswerReceivedEvent struct {
 }
 
 // Helper function to send a message to the instrumentation server when a diameter answer is received from a Peer
-func PushPeerDiameterAnswerReceived(peerName string, diameterMessage *core.DiameterMessage) {
-	MS.InputChan <- PeerDiameterAnswerReceivedEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
+func PushPeerDiameterAnswerReceived(peerName string, diameterMessage *DiameterMessage) {
+	MS.metricEventChan <- PeerDiameterAnswerReceivedEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
 }
 
 // Message sent to instrumentation server when a diameter request timeout occurs
@@ -99,7 +116,7 @@ type PeerDiameterRequestTimeoutEvent struct {
 
 // Helper function to send a message to the instrumentation server when a diameter request timeout occurs
 func PushPeerDiameterRequestTimeout(key PeerDiameterMetricKey) {
-	MS.InputChan <- PeerDiameterRequestTimeoutEvent{Key: key}
+	MS.metricEventChan <- PeerDiameterRequestTimeoutEvent{Key: key}
 }
 
 // Message sent to instrumentation server when a diameter request timeout occurs
@@ -108,8 +125,8 @@ type PeerDiameterAnswerStalledEvent struct {
 }
 
 // Helper function to send a message to the instrumentation server when a diameter request timeout occurs
-func PushPeerDiameterAnswerStalled(peerName string, diameterMessage *core.DiameterMessage) {
-	MS.InputChan <- PeerDiameterAnswerStalledEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
+func PushPeerDiameterAnswerStalled(peerName string, diameterMessage *DiameterMessage) {
+	MS.metricEventChan <- PeerDiameterAnswerStalledEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
 }
 
 // Router
@@ -120,8 +137,8 @@ type RouterRouteNotFoundEvent struct {
 }
 
 // Helper function to send a message to the instrumentation server when a diameter request is discarded
-func PushRouterRouteNotFound(peerName string, diameterMessage *core.DiameterMessage) {
-	MS.InputChan <- RouterRouteNotFoundEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
+func PushRouterRouteNotFound(peerName string, diameterMessage *DiameterMessage) {
+	MS.metricEventChan <- RouterRouteNotFoundEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
 }
 
 // Message sent to instrumentation server when no diameter peer available
@@ -130,8 +147,8 @@ type RouterNoAvailablePeerEvent struct {
 }
 
 // Helper function to send a message to the instrumentation server when a diameter request is discarded
-func PushRouterNoAvailablePeer(peerName string, diameterMessage *core.DiameterMessage) {
-	MS.InputChan <- RouterNoAvailablePeerEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
+func PushRouterNoAvailablePeer(peerName string, diameterMessage *DiameterMessage) {
+	MS.metricEventChan <- RouterNoAvailablePeerEvent{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
 }
 
 type RouterHandlerError struct {
@@ -139,8 +156,8 @@ type RouterHandlerError struct {
 }
 
 // Helper function to send a message to the instrumentation server when the handler produced an error
-func PushRouterHandlerError(peerName string, diameterMessage *core.DiameterMessage) {
-	MS.InputChan <- RouterHandlerError{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
+func PushRouterHandlerError(peerName string, diameterMessage *DiameterMessage) {
+	MS.metricEventChan <- RouterHandlerError{Key: PeerDiameterMetricFromMessage(peerName, diameterMessage)}
 }
 
 // Instrumentation of Diameter Peers table
@@ -161,5 +178,5 @@ type DiameterPeersTableUpdatedEvent struct {
 }
 
 func PushDiameterPeersStatus(instanceName string, table DiameterPeersTable) {
-	MS.InputChan <- DiameterPeersTableUpdatedEvent{InstanceName: instanceName, Table: table}
+	MS.metricEventChan <- DiameterPeersTableUpdatedEvent{InstanceName: instanceName, Table: table}
 }

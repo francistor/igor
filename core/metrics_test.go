@@ -1,34 +1,24 @@
-package instrumentation
+package core
 
 import (
-	"os"
+	"crypto/tls"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
-
-	"github.com/francistor/igor/core"
 )
-
-// Initializer of the test suite.
-func TestMain(m *testing.M) {
-
-	// Initialization
-	bootstrapFile := "resources/searchRules.json"
-	instanceName := "testClient"
-	core.InitPolicyConfigInstance(bootstrapFile, instanceName, true)
-
-	// Execute the tests and exit
-	os.Exit(m.Run())
-}
 
 func TestDiameterMetrics(t *testing.T) {
 
 	MS.ResetMetrics()
 	time.Sleep(100 * time.Millisecond)
 
-	diameterRequest, _ := core.NewDiameterRequest("TestApplication", "TestRequest")
-	diameterRequest.AddOriginAVPs(core.GetPolicyConfig())
-	diameterAnswer := core.NewDiameterAnswer(diameterRequest)
-	diameterAnswer.AddOriginAVPs(core.GetPolicyConfig())
+	diameterRequest, _ := NewDiameterRequest("TestApplication", "TestRequest")
+	diameterRequest.AddOriginAVPs(GetPolicyConfig())
+	diameterAnswer := NewDiameterAnswer(diameterRequest)
+	diameterAnswer.AddOriginAVPs(GetPolicyConfig())
 
 	// Generate some metrics
 	PushPeerDiameterRequestReceived("testPeer", diameterRequest)
@@ -224,6 +214,89 @@ func TestRadiusMetrics(t *testing.T) {
 		t.Fatalf("RadiusClientResponsesDrop not found")
 	} else if v != 1 {
 		t.Fatalf("RadiusClientResponsesDrop is not 1")
+	}
+}
+
+func TestPrometheusMetrics(t *testing.T) {
+
+	MS.ResetMetrics()
+	time.Sleep(100 * time.Millisecond)
+
+	diameterRequest, _ := NewDiameterRequest("TestApplication", "TestRequest")
+	diameterRequest.AddOriginAVPs(GetPolicyConfig())
+	diameterAnswer := NewDiameterAnswer(diameterRequest)
+	diameterAnswer.AddOriginAVPs(GetPolicyConfig())
+
+	// Generate some metrics
+	PushPeerDiameterRequestReceived("testPeer", diameterRequest)
+	PushPeerDiameterRequestSent("testPeer", diameterRequest)
+	PushPeerDiameterRequestTimeout(PeerDiameterMetricFromMessage("testPeer", diameterRequest))
+	PushPeerDiameterAnswerReceived("testPeer", diameterAnswer)
+	PushPeerDiameterAnswerSent("testPeer", diameterAnswer)
+	PushPeerDiameterAnswerStalled("testPeer", diameterAnswer)
+	PushRouterRouteNotFound("testPeer", diameterRequest)
+	PushRouterHandlerError("testPeer", diameterRequest)
+	PushRouterNoAvailablePeer("testPeer", diameterRequest)
+
+	PushHttpClientExchange("https://localhost", "200")
+	PushHttpClientExchange("https://localhost", "200")
+
+	PushHttpHandlerExchange("500", "/DiameterRequest")
+	PushHttpHandlerExchange("300", "/DiameterRequest")
+	PushHttpHandlerExchange("300", "/RadiusRequest")
+
+	PushHttpRouterExchange("200", "/routeRadiusRequest")
+	PushHttpRouterExchange("200", "/routeDiameterRequest")
+	PushHttpRouterExchange("300", "/routeDiameterRequest")
+
+	PushRadiusServerRequest("127.0.0.1:1812", "1")
+	PushRadiusServerResponse("127.0.0.1:1812", "2")
+	PushRadiusServerDrop("127.0.0.1:1812", "1")
+	PushRadiusClientRequest("127.0.0.1:1812", "1")
+	PushRadiusClientResponse("127.0.0.1:1812", "2")
+	PushRadiusClientTimeout("127.0.0.1:1812", "1")
+	PushRadiusClientResponseStalled("127.0.0.1:1812", "1")
+	PushRadiusClientResponseDrop("127.0.0.1:1812", "1")
+
+	metrics, err := httpGet("https://localhost:9090/metrics")
+	if err != nil {
+		t.Fatalf("could not get metrics: %s", err)
+	}
+
+	if !strings.Contains(metrics, `diameter_requests_received{peer="testPeer",oh="server.igorserver",or="igorserver",dh="",dr="",ap="TestApplication",cm="TestRequest"} 1`) {
+		t.Fatal("diameter_requests_received not found")
+	}
+	if !strings.Contains(metrics, `radius_server_requests{endpoint="127.0.0.1:1812",code="1"} 1`) {
+		t.Fatal("radius_server_requests not found")
+	}
+
+	// TODO: add others
+}
+
+// Helper function
+func httpGet(location string) (string, error) {
+	// Create client with timeout
+	httpClient := http.Client{
+		Timeout: HTTP_TIMEOUT_SECONDS * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
+
+		},
+	}
+
+	// Location is a http URL
+	resp, err := httpClient.Get(location)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("got status code %d while retrieving %s", resp.StatusCode, location)
+	}
+	if body, err := io.ReadAll(resp.Body); err != nil {
+		return "", err
+	} else {
+		return string(body), nil
 	}
 
 }

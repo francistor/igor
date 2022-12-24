@@ -10,7 +10,6 @@ import (
 
 	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/httphandler"
-	"github.com/francistor/igor/instrumentation"
 )
 
 // This message handler parses the Igor1-Command, which may specify
@@ -134,12 +133,12 @@ func TestDiameterBasicSetup(t *testing.T) {
 
 	// Uncomment to debug
 	/*
-		j, _ := json.Marshal(instrumentation.MS.PeersTableQuery())
+		j, _ := json.Marshal(core.MS.PeersTableQuery())
 		fmt.Println(PrettyPrintJSON(j))
 	*/
 
 	// Get the current peer status
-	peerTables := instrumentation.MS.PeersTableQuery()
+	peerTables := core.MS.PeersTableQuery()
 
 	// The testClient Router will have an established connection
 	// to server.igor but not one to unreachableserver.igor
@@ -205,7 +204,6 @@ func TestDiameterBasicSetup(t *testing.T) {
 	b1.Close()
 
 	b2.Close()
-
 }
 
 // Client will send message to Server, which will handle using http
@@ -242,12 +240,12 @@ func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	cm := instrumentation.MS.HttpClientQuery("HttpClientExchanges", nil, []string{})
-	if cm[instrumentation.HttpClientMetricKey{}] != 1 {
+	cm := core.MS.HttpClientQuery("HttpClientExchanges", nil, []string{})
+	if cm[core.HttpClientMetricKey{}] != 1 {
 		t.Fatalf("Client Exchanges was not 1")
 	}
-	hm := instrumentation.MS.HttpHandlerQuery("HttpHandlerExchanges", nil, []string{})
-	if hm[instrumentation.HttpHandlerMetricKey{}] != 1 {
+	hm := core.MS.HttpHandlerQuery("HttpHandlerExchanges", nil, []string{})
+	if hm[core.HttpHandlerMetricKey{}] != 1 {
 		t.Fatalf("Handler Exchanges was not 1")
 	}
 
@@ -288,6 +286,7 @@ func TestDiameterRouteMessagetoLocal(t *testing.T) {
 	superServer.Close()
 	server.Close()
 	client.Close()
+
 }
 
 // Notice that http2 and local handlers do not get cancelled upon router termination
@@ -387,6 +386,7 @@ func TestRadiusRouteToHTTP(t *testing.T) {
 	server.Close()
 
 	httpHandler.Close()
+
 }
 
 func TestRadiusHandleLocal(t *testing.T) {
@@ -412,7 +412,7 @@ func TestRadiusHandleLocal(t *testing.T) {
 
 func TestRadiusTimeout(t *testing.T) {
 
-	instrumentation.MS.ResetMetrics()
+	core.MS.ResetMetrics()
 
 	// Start handler
 	httpHandler := httphandler.NewHttpHandler("testServer", httpDiameterHandler, httpRadiusHandler)
@@ -434,16 +434,16 @@ func TestRadiusTimeout(t *testing.T) {
 	}
 	time.Sleep(50 * time.Millisecond)
 	// Two packets will be sent. Server not in quarantine
-	requestsSentMetrics := instrumentation.MS.RadiusQuery("RadiusClientRequests", nil, nil)
-	if requestsSentMetrics[instrumentation.RadiusMetricKey{}] != 2 {
-		t.Fatalf("bad number of packets sent (could be due to network unavailable) %d", requestsSentMetrics[instrumentation.RadiusMetricKey{}])
+	requestsSentMetrics := core.MS.RadiusQuery("RadiusClientRequests", nil, nil)
+	if requestsSentMetrics[core.RadiusMetricKey{}] != 2 {
+		t.Fatalf("bad number of packets sent (could be due to network unavailable) %d", requestsSentMetrics[core.RadiusMetricKey{}])
 	}
-	serverTable := instrumentation.MS.RadiusServersTableQuery()
+	serverTable := core.MS.RadiusServersTableQuery()
 	if !findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
 		t.Fatal("non-existing-server is not available")
 	}
-	timeoutMetrics := instrumentation.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
-	if timeoutMetrics[instrumentation.RadiusMetricKey{}] != 2 {
+	timeoutMetrics := core.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
+	if timeoutMetrics[core.RadiusMetricKey{}] != 2 {
 		t.Fatal("bad number of timeouts (could be due to network unavailable)")
 	}
 
@@ -454,16 +454,16 @@ func TestRadiusTimeout(t *testing.T) {
 	}
 	time.Sleep(50 * time.Millisecond)
 	// Repeat. Four packets will be reported as sent. Sever in quarantine
-	requestsSentMetrics = instrumentation.MS.RadiusQuery("RadiusClientRequests", nil, nil)
-	if requestsSentMetrics[instrumentation.RadiusMetricKey{}] != 4 {
+	requestsSentMetrics = core.MS.RadiusQuery("RadiusClientRequests", nil, nil)
+	if requestsSentMetrics[core.RadiusMetricKey{}] != 4 {
 		t.Fatal("bad number of packets sent", err)
 	}
-	serverTable = instrumentation.MS.RadiusServersTableQuery()
+	serverTable = core.MS.RadiusServersTableQuery()
 	if findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
 		t.Fatal("non-existing-server is available")
 	}
-	timeoutMetrics = instrumentation.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
-	if timeoutMetrics[instrumentation.RadiusMetricKey{}] != 4 {
+	timeoutMetrics = core.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
+	if timeoutMetrics[core.RadiusMetricKey{}] != 4 {
 		t.Fatal("bad number of timeouts")
 	}
 
@@ -473,26 +473,26 @@ func TestRadiusTimeout(t *testing.T) {
 		t.Fatalf("request failed %s", err)
 	}
 	time.Sleep(50 * time.Millisecond)
-	requestsSentMetrics = instrumentation.MS.RadiusQuery("RadiusClientRequests", nil, nil)
-	if requestsSentMetrics[instrumentation.RadiusMetricKey{}] != 5 {
+	requestsSentMetrics = core.MS.RadiusQuery("RadiusClientRequests", nil, nil)
+	if requestsSentMetrics[core.RadiusMetricKey{}] != 5 {
 		t.Fatal("bad number of packets sent", err)
 	}
-	serverTable = instrumentation.MS.RadiusServersTableQuery()
+	serverTable = core.MS.RadiusServersTableQuery()
 	if findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
 		t.Fatal("non-existing-server is available")
 	}
-	timeoutMetrics = instrumentation.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
-	if timeoutMetrics[instrumentation.RadiusMetricKey{}] != 4 {
+	timeoutMetrics = core.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
+	if timeoutMetrics[core.RadiusMetricKey{}] != 4 {
 		t.Fatal("bad number of timeouts")
 	}
-	serverRequestsMetrics := instrumentation.MS.RadiusQuery("RadiusServerRequests", nil, []string{"Endpoint"})
-	if serverRequestsMetrics[instrumentation.RadiusMetricKey{Endpoint: "127.0.0.1"}] != 1 {
+	serverRequestsMetrics := core.MS.RadiusQuery("RadiusServerRequests", nil, []string{"Endpoint"})
+	if serverRequestsMetrics[core.RadiusMetricKey{Endpoint: "127.0.0.1"}] != 1 {
 		t.Fatalf("bad number of server requests %v", serverRequestsMetrics)
 	} else {
 		t.Log(serverRequestsMetrics)
 	}
-	serverResponsesMetrics := instrumentation.MS.RadiusQuery("RadiusServerResponses", nil, []string{"Endpoint"})
-	if serverResponsesMetrics[instrumentation.RadiusMetricKey{Endpoint: "127.0.0.1"}] != 1 {
+	serverResponsesMetrics := core.MS.RadiusQuery("RadiusServerResponses", nil, []string{"Endpoint"})
+	if serverResponsesMetrics[core.RadiusMetricKey{Endpoint: "127.0.0.1"}] != 1 {
 		t.Fatalf("bad number of server responses %v", serverResponsesMetrics)
 	}
 
@@ -501,8 +501,8 @@ func TestRadiusTimeout(t *testing.T) {
 	if err == nil {
 		t.Fatal("should get a timeout sending to non existing specific server")
 	}
-	timeoutMetrics = instrumentation.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
-	if timeoutMetrics[instrumentation.RadiusMetricKey{}] != 6 {
+	timeoutMetrics = core.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
+	if timeoutMetrics[core.RadiusMetricKey{}] != 6 {
 		t.Fatal("bad number of timeouts")
 	}
 
@@ -512,6 +512,7 @@ func TestRadiusTimeout(t *testing.T) {
 	server.Close()
 
 	httpHandler.Close()
+
 }
 
 func TestRadiusRequestCancellation(t *testing.T) {
@@ -546,24 +547,24 @@ func TestRadiusRequestCancellation(t *testing.T) {
 ///////////////////////////////////////////////////////////////////////////////////
 
 // Helper to navigate through peers
-func findPeer(diameterHost string, table instrumentation.DiameterPeersTable) instrumentation.DiameterPeersTableEntry {
+func findPeer(diameterHost string, table core.DiameterPeersTable) core.DiameterPeersTableEntry {
 	for _, tableEntry := range table {
 		if tableEntry.DiameterHost == diameterHost {
 			return tableEntry
 		}
 	}
 
-	return instrumentation.DiameterPeersTableEntry{}
+	return core.DiameterPeersTableEntry{}
 }
 
-func findRadiusServer(serverName string, table instrumentation.RadiusServersTable) instrumentation.RadiusServerTableEntry {
+func findRadiusServer(serverName string, table core.RadiusServersTable) core.RadiusServerTableEntry {
 	for _, tableEntry := range table {
 		if tableEntry.ServerName == serverName {
 			return tableEntry
 		}
 	}
 
-	return instrumentation.RadiusServerTableEntry{}
+	return core.RadiusServerTableEntry{}
 }
 
 // Helper to show JSON to humans

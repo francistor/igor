@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/francistor/igor/core"
-	"github.com/francistor/igor/instrumentation"
 	"github.com/francistor/igor/radiusclient"
 	"github.com/francistor/igor/radiusserver"
 
@@ -232,7 +231,7 @@ func (router *RadiusRouter) eventLoop() {
 
 			case SendRadiusTable:
 
-				instrumentation.PushRadiusServersTable(router.instanceName, router.parseRadiusServersTable())
+				core.PushRadiusServersTable(router.instanceName, router.parseRadiusServersTable())
 
 				// Sent after each radius request, to keep track of the status of the servers
 			case RadiusRequestResult:
@@ -582,12 +581,12 @@ func (router *RadiusRouter) buildRadiusServersTable() {
 	router.radiusServersTable = table
 }
 
-// For instrumentation
-func (router *RadiusRouter) parseRadiusServersTable() instrumentation.RadiusServersTable {
-	radiusServersTable := make([]instrumentation.RadiusServerTableEntry, 0)
+// For core.
+func (router *RadiusRouter) parseRadiusServersTable() core.RadiusServersTable {
+	radiusServersTable := make([]core.RadiusServerTableEntry, 0)
 
 	for serverName, rsws := range router.radiusServersTable {
-		entry := instrumentation.RadiusServerTableEntry{
+		entry := core.RadiusServerTableEntry{
 			ServerName:       serverName,
 			IsAvailable:      rsws.isAvailable,
 			UnavailableUntil: rsws.unavailableUntil,

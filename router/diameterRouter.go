@@ -12,7 +12,6 @@ import (
 
 	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/diampeer"
-	"github.com/francistor/igor/instrumentation"
 
 	"golang.org/x/net/http2"
 )
@@ -300,8 +299,8 @@ func (router *DiameterRouter) eventLoop() {
 					v.Sender.SetDown()
 				}
 
-				// Update the PeersTable in instrumentation
-				instrumentation.PushDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
+				// Update the PeersTable in core.
+				core.PushDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
 
 			case diampeer.PeerDownEvent:
 				// Closing may take time. Do it in the background
@@ -328,7 +327,7 @@ func (router *DiameterRouter) eventLoop() {
 					delete(router.diameterPeersTable, peer.DiameterHost)
 				}
 
-				instrumentation.PushDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
+				core.PushDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
 
 				// Check if we must exit
 				if atomic.LoadInt32(&router.status) == StatusTerminated {
@@ -354,7 +353,7 @@ func (router *DiameterRouter) eventLoop() {
 				false)
 
 			if err != nil {
-				instrumentation.PushRouterRouteNotFound("", rdr.Message)
+				core.PushRouterRouteNotFound("", rdr.Message)
 				rdr.RChan <- fmt.Errorf("request not sent: no route found")
 				close(rdr.RChan)
 			} else {
@@ -387,7 +386,7 @@ func (router *DiameterRouter) eventLoop() {
 					}
 
 					// If here, could not find a peer
-					instrumentation.PushRouterNoAvailablePeer("", rdr.Message)
+					core.PushRouterNoAvailablePeer("", rdr.Message)
 					rdr.RChan <- fmt.Errorf("resquest not sent: no engaged peer")
 					close(rdr.RChan)
 
@@ -409,6 +408,7 @@ func (router *DiameterRouter) eventLoop() {
 
 						if answer, err := HttpDiameterRequest(router.http2Client, url, diameterRequest); err != nil {
 							logger.Errorf("http handler %s returned error: %s", url, err.Error())
+							core.PushRouterHandlerError("", diameterRequest)
 							rchan <- err
 						} else {
 							// Add the Origin-Host and Origin-Realm, that are not set by the handler
@@ -431,6 +431,7 @@ func (router *DiameterRouter) eventLoop() {
 						answer, err := router.localHandler(diameterRequest)
 						if err != nil {
 							logger.Errorf("local handler returned error: %s", err.Error())
+							core.PushRouterHandlerError("", diameterRequest)
 							rchan <- err
 						} else {
 							// Add the Origin-Host and Origin-Realm, that are not set by the handler
@@ -544,13 +545,13 @@ func (router *DiameterRouter) updatePeersTable() {
 		}
 	}
 
-	instrumentation.PushDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
+	core.PushDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
 }
 
 // Generates the DiameterPeersTableEntry for instrumetation purposes, using the current
 // internal table and shuffling the fields as necessary to adjust the contents
-func (router *DiameterRouter) buildPeersStatusTable() instrumentation.DiameterPeersTable {
-	peerTable := make([]instrumentation.DiameterPeersTableEntry, 0)
+func (router *DiameterRouter) buildPeersStatusTable() core.DiameterPeersTable {
+	peerTable := make([]core.DiameterPeersTableEntry, 0)
 
 	for diameterHost, peerStatus := range router.diameterPeersTable {
 		var ipAddress string = ""
@@ -567,7 +568,7 @@ func (router *DiameterRouter) buildPeersStatusTable() instrumentation.DiameterPe
 			ipAddress = peerConfig.IPAddress
 			connectionPolicy = peerConfig.ConnectionPolicy
 		}
-		instrumentationEntry := instrumentation.DiameterPeersTableEntry{
+		instrumentationEntry := core.DiameterPeersTableEntry{
 			DiameterHost:     diameterHost,
 			IPAddress:        ipAddress,
 			ConnectionPolicy: connectionPolicy,

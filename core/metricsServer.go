@@ -1,4 +1,15 @@
-package instrumentation
+package core
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+)
 
 // Buffer for the channel to receive the events
 const INPUT_QUEUE_SIZE = 100
@@ -8,15 +19,16 @@ const QUERY_QUEUE_SIZE = 10
 
 type ResetMetricsEvent struct{}
 
-// The single instance of the metrics server
-var MS *MetricsServer = NewMetricsServer()
+// The single instance of the metrics server.
+var MS *MetricsServer
 
-type PeerDiameterMetrics map[PeerDiameterMetricKey]uint64
-type RadiusMetrics map[RadiusMetricKey]uint64
-type HttpClientMetrics map[HttpClientMetricKey]uint64
-type HttpHandlerMetrics map[HttpHandlerMetricKey]uint64
-type HttpRouterMetrics map[HttpRouterMetricKey]uint64
+type MetricsServerConfiguration struct {
+	BindAddress string
+	Port        int
+}
 
+// Specification of a query to the metrics server. Metrics server will listen for this type
+// of object in a channel
 type Query struct {
 
 	// Name of the metric to query
@@ -32,9 +44,24 @@ type Query struct {
 	RChan chan interface{}
 }
 
+// The Metrics servers holds the metrics and runs an event loop for getting the events and updating the statistics,
+// answering to queries and do graceful termination
 type MetricsServer struct {
-	InputChan chan interface{}
-	QueryChan chan Query
+
+	// To wait until termination
+	doneChan chan interface{}
+
+	// To signal closure
+	controlChan chan interface{}
+
+	// Events for metrics updating are received here
+	metricEventChan chan interface{}
+
+	// Queries are received here
+	queryChan chan Query
+
+	// HttpServer
+	metricsServer *http.Server
 
 	// Diameter Server
 	diameterRequestsReceived PeerDiameterMetrics
@@ -75,6 +102,57 @@ type MetricsServer struct {
 	// One PeerTable per instance
 	diameterPeersTables map[string]DiameterPeersTable
 	radiusServersTables map[string]RadiusServersTable
+}
+
+func NewMetricsServer(bindAddress string, port int) *MetricsServer {
+	server := MetricsServer{
+		doneChan:        make(chan interface{}, 1),
+		controlChan:     make(chan interface{}, 1),
+		metricEventChan: make(chan interface{}, INPUT_QUEUE_SIZE),
+		queryChan:       make(chan Query, QUERY_QUEUE_SIZE)}
+
+	// Initialize Metrics
+	server.resetMetrics()
+	server.diameterPeersTables = make(map[string]DiameterPeersTable, 1)
+	server.radiusServersTables = make(map[string]RadiusServersTable, 1)
+
+	// Start metrics server
+	go server.httpLoop(bindAddress, port)
+
+	// Start metrics processing loop
+	go server.metricServerLoop()
+
+	return &server
+}
+
+// To be called in the main function
+func initMetricsServer(cm *ConfigurationManager) {
+
+	// Retrieve the metrics configuration
+	jConfig, err := cm.GetBytesConfigObject("metrics.json")
+	if err != nil {
+		panic("unable to get metrics configuration: " + err.Error())
+	}
+
+	// Parse configuration JSON
+	var config MetricsServerConfiguration
+	if err := json.Unmarshal(jConfig, &config); err != nil {
+		panic("bad metrics configuration " + err.Error())
+	}
+
+	// Make the metrics server globally available
+	MS = NewMetricsServer(config.BindAddress, config.Port)
+}
+
+// Shuts down the http server and the event loop
+// If ever done, make sure that the whole proces is terminating or that another
+// configuration instance intizialization will take place, because MetricsServer
+// initialization is done there
+func (ms *MetricsServer) Close() {
+	close(ms.controlChan)
+	<-ms.doneChan
+
+	// The other channels are not closed
 }
 
 ////////////////////////////////////////////////////////////
@@ -479,20 +557,6 @@ func GetHttpRouterMetrics(httpRouterMetrics HttpRouterMetrics, filter map[string
 
 //////////////////////////////////////////////////////////////////////////////////
 
-func NewMetricsServer() *MetricsServer {
-	server := MetricsServer{InputChan: make(chan interface{}, INPUT_QUEUE_SIZE), QueryChan: make(chan Query, QUERY_QUEUE_SIZE)}
-
-	// Initialize Metrics
-	server.resetMetrics()
-	server.diameterPeersTables = make(map[string]DiameterPeersTable, 1)
-	server.radiusServersTables = make(map[string]RadiusServersTable, 1)
-
-	// Start receive loop
-	go server.metricServerLoop()
-
-	return &server
-}
-
 // Empties all the counters
 func (ms *MetricsServer) resetMetrics() {
 	ms.diameterRequestsReceived = make(PeerDiameterMetrics)
@@ -526,13 +590,13 @@ func (ms *MetricsServer) resetMetrics() {
 
 // Wrapper to reset Diameter Metrics
 func (ms *MetricsServer) ResetMetrics() {
-	ms.InputChan <- ResetMetricsEvent{}
+	ms.metricEventChan <- ResetMetricsEvent{}
 }
 
 // Wrapper to get Diameter Metrics
 func (ms *MetricsServer) DiameterQuery(name string, filter map[string]string, aggLabels []string) PeerDiameterMetrics {
 	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
-	ms.QueryChan <- query
+	ms.queryChan <- query
 	v, ok := (<-query.RChan).(PeerDiameterMetrics)
 	if ok {
 		return v
@@ -544,7 +608,7 @@ func (ms *MetricsServer) DiameterQuery(name string, filter map[string]string, ag
 // Wrapper to get Radius Metrics
 func (ms *MetricsServer) RadiusQuery(name string, filter map[string]string, aggLabels []string) RadiusMetrics {
 	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
-	ms.QueryChan <- query
+	ms.queryChan <- query
 	v, ok := (<-query.RChan).(RadiusMetrics)
 	if ok {
 		return v
@@ -556,7 +620,7 @@ func (ms *MetricsServer) RadiusQuery(name string, filter map[string]string, aggL
 // Wrapper to get HttpClient metrics
 func (ms *MetricsServer) HttpClientQuery(name string, filter map[string]string, aggLabels []string) HttpClientMetrics {
 	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
-	ms.QueryChan <- query
+	ms.queryChan <- query
 	v, ok := (<-query.RChan).(HttpClientMetrics)
 	if ok {
 		return v
@@ -568,7 +632,7 @@ func (ms *MetricsServer) HttpClientQuery(name string, filter map[string]string, 
 // Wrapper to get HttpHandler metrics
 func (ms *MetricsServer) HttpHandlerQuery(name string, filter map[string]string, aggLabels []string) HttpHandlerMetrics {
 	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
-	ms.QueryChan <- query
+	ms.queryChan <- query
 	v, ok := (<-query.RChan).(HttpHandlerMetrics)
 	if ok {
 		return v
@@ -580,7 +644,7 @@ func (ms *MetricsServer) HttpHandlerQuery(name string, filter map[string]string,
 // Wrapper to get HttpRouter metrics
 func (ms *MetricsServer) HttpRouterQuery(name string, filter map[string]string, aggLabels []string) HttpRouterMetrics {
 	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
-	ms.QueryChan <- query
+	ms.queryChan <- query
 	v, ok := (<-query.RChan).(HttpRouterMetrics)
 	if ok {
 		return v
@@ -592,23 +656,58 @@ func (ms *MetricsServer) HttpRouterQuery(name string, filter map[string]string, 
 // Wrapper to get PeersTable
 func (ms *MetricsServer) PeersTableQuery() map[string]DiameterPeersTable {
 	query := Query{Name: "DiameterPeersTables", RChan: make(chan interface{})}
-	ms.QueryChan <- query
+	ms.queryChan <- query
 	return (<-query.RChan).(map[string]DiameterPeersTable)
 }
 
 // Wrapper to get RadiusServersTable
 func (ms *MetricsServer) RadiusServersTableQuery() map[string]RadiusServersTable {
 	query := Query{Name: "RadiusServersTables", RChan: make(chan interface{})}
-	ms.QueryChan <- query
+	ms.queryChan <- query
 	return (<-query.RChan).(map[string]RadiusServersTable)
 }
 
+// Loop for Prometheus metrics server
+func (ms *MetricsServer) httpLoop(bindAddress string, port int) {
+
+	mux := new(http.ServeMux)
+	mux.HandleFunc("/metrics", ms.getMetricsHandler())
+
+	bindAddrPort := fmt.Sprintf("%s:%d", bindAddress, port)
+	GetLogger().Infof("metrics server listening in %s", bindAddrPort)
+
+	ms.metricsServer = &http.Server{
+		Addr:              bindAddrPort,
+		Handler:           mux,
+		IdleTimeout:       1 * time.Minute,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	err := ms.metricsServer.ListenAndServeTLS(
+		os.Getenv("IGOR_BASE")+"../cert.pem",
+		os.Getenv("IGOR_BASE")+"../key.pem")
+
+	if !errors.Is(err, http.ErrServerClosed) {
+		fmt.Println(err)
+		panic("error starting metrics handler")
+	}
+
+	// Will get here only when a shutdown is invoked
+	close(ms.doneChan)
+}
+
+// Main loop for getting metrics and serving queries
 func (ms *MetricsServer) metricServerLoop() {
 
 	for {
 		select {
 
-		case query := <-ms.QueryChan:
+		case <-ms.controlChan:
+			// Shutdown server
+			ms.metricsServer.Shutdown(context.Background())
+			return
+
+		case query := <-ms.queryChan:
 
 			switch query.Name {
 			case "DiameterRequestsReceived":
@@ -668,7 +767,7 @@ func (ms *MetricsServer) metricServerLoop() {
 
 			close(query.RChan)
 
-		case event, ok := <-ms.InputChan:
+		case event, ok := <-ms.metricEventChan:
 
 			if !ok {
 				break
@@ -833,4 +932,67 @@ func (ms *MetricsServer) metricServerLoop() {
 			}
 		}
 	}
+}
+
+// /////////////////////////////////////
+// Handler of Prometheus requests
+
+func (ms *MetricsServer) getMetricsHandler() func(w http.ResponseWriter, req *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+
+		var builder strings.Builder
+		// Diameter Server
+		builder.WriteString(ms.diameterRequestsReceived.genPrometheusMetric("diameter_requests_received", "number of diameter requests received"))
+		builder.WriteString("\n")
+		builder.WriteString(ms.diameterAnswersSent.genPrometheusMetric("diameter_answers_sent", "number of diameter answers sent"))
+		builder.WriteString("\n")
+		// Diameter client
+		builder.WriteString(ms.diameterRequestsSent.genPrometheusMetric("diameter_requests_sent", "number of diameter requests sent"))
+		builder.WriteString("\n")
+		builder.WriteString(ms.diameterAnswersReceived.genPrometheusMetric("diameter_answers_received", "number of diameter answers received"))
+		builder.WriteString("\n")
+		builder.WriteString(ms.diameterRequestsTimeout.genPrometheusMetric("diameter_requests_timeout", "number of diameter requests timed out"))
+		builder.WriteString("\n")
+		builder.WriteString(ms.diameterAnswersStalled.genPrometheusMetric("diameter_answers_stalled", "number of diameter answers without corresponding request, possibly due to previous timeout"))
+		builder.WriteString("\n")
+		// Radius server
+		builder.WriteString(ms.radiusServerRequests.genPrometheusMetric("radius_server_requests", "number of radius server requests received"))
+		builder.WriteString("\n")
+		builder.WriteString(ms.radiusServerResponses.genPrometheusMetric("radius_server_responses", "number of radius server responses sent"))
+		builder.WriteString("\n")
+		builder.WriteString(ms.radiusServerDrops.genPrometheusMetric("radius_server_drops", "number of radius server requests not answered"))
+		builder.WriteString("\n")
+		// Radius client
+		builder.WriteString(ms.radiusClientRequests.genPrometheusMetric("radius_client_requests", "number of radius client requests sent"))
+		builder.WriteString("\n")
+		builder.WriteString(ms.radiusClientResponses.genPrometheusMetric("radius_client_responses", "number of radius client responses received"))
+		builder.WriteString("\n")
+		builder.WriteString(ms.radiusClientTimeouts.genPrometheusMetric("radius_client_timeouts", "number of radius client timeouts"))
+		builder.WriteString("\n")
+		builder.WriteString(ms.radiusClientResponsesStalled.genPrometheusMetric("radius_client_responses_stalled", "number of radius client responses without corresponding request, possibly due to previous timeout"))
+		builder.WriteString("\n")
+		builder.WriteString(ms.radiusClientResponsesDrop.genPrometheusMetric("radius_client_responses_drops", "number of radius client responses dropped"))
+		builder.WriteString("\n")
+		// Router
+		builder.WriteString(ms.diameterRouteNotFound.genPrometheusMetric("diameter_route_not_found", "diameter messages dropped due to route not found"))
+		builder.WriteString("\n")
+		builder.WriteString(ms.diameterNoAvailablePeer.genPrometheusMetric("diameter_peer_not_available", "diameter messages dropped due to no peer available"))
+		builder.WriteString("\n")
+		builder.WriteString(ms.diameterHandlerError.genPrometheusMetric("diameter_handler_error", "diameter handler errors"))
+		builder.WriteString("\n")
+		// HttpClient
+		builder.WriteString(ms.httpClientExchanges.genPrometheusMetric("http_client_exchanges", "requests sent to http handler"))
+		builder.WriteString("\n")
+		// HttpHandler
+		builder.WriteString(ms.httpHandlerExchanges.genPrometheusMetric("http_handler_exchanges", "requests received in http handler"))
+		builder.WriteString("\n")
+		// HttpRouter
+		builder.WriteString(ms.httpRouterExchanges.genPrometheusMetric("http_router_exchanges", "requests received in http router"))
+		builder.WriteString("\n")
+
+		// Write response
+		writer.Write([]byte(builder.String()))
+	}
+
 }

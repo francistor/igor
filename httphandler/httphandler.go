@@ -12,7 +12,6 @@ import (
 
 	"github.com/francistor/igor/constants"
 	"github.com/francistor/igor/core"
-	"github.com/francistor/igor/instrumentation"
 )
 
 // Receives Radius & Diameter requests via HTTP2, in JSON format, and processes them with the provided handlers
@@ -102,7 +101,7 @@ func getDiameterRequestHandler(handlerFunc core.MessageHandler) func(w http.Resp
 			logger.Error("error reading request %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(req.RequestURI, constants.NETWORK_ERROR)
+			core.PushHttpHandlerExchange(req.RequestURI, constants.NETWORK_ERROR)
 			return
 		}
 		var request core.DiameterMessage
@@ -110,7 +109,7 @@ func getDiameterRequestHandler(handlerFunc core.MessageHandler) func(w http.Resp
 			logger.Error("error unmarshalling request %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(req.RequestURI, constants.UNSERIALIZATION_ERROR)
+			core.PushHttpHandlerExchange(req.RequestURI, constants.UNSERIALIZATION_ERROR)
 			return
 		}
 
@@ -120,7 +119,7 @@ func getDiameterRequestHandler(handlerFunc core.MessageHandler) func(w http.Resp
 			logger.Errorf("error handling request %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(req.RequestURI, constants.HANDLER_FUNCTION_ERROR)
+			core.PushHttpHandlerExchange(req.RequestURI, constants.HANDLER_FUNCTION_ERROR)
 			return
 		}
 		jAnswer, err := json.Marshal(answer)
@@ -128,12 +127,12 @@ func getDiameterRequestHandler(handlerFunc core.MessageHandler) func(w http.Resp
 			logger.Errorf("error marshaling response %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(req.RequestURI, constants.SERIALIZATION_ERROR)
+			core.PushHttpHandlerExchange(req.RequestURI, constants.SERIALIZATION_ERROR)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		instrumentation.PushHttpHandlerExchange(req.RequestURI, constants.SUCCESS)
+		core.PushHttpHandlerExchange(req.RequestURI, constants.SUCCESS)
 	}
 }
 
@@ -149,7 +148,7 @@ func getRadiusRequestHandler(handlerFunc core.RadiusPacketHandler) func(w http.R
 			logger.Error("error reading request %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(req.RequestURI, constants.NETWORK_ERROR)
+			core.PushHttpHandlerExchange(req.RequestURI, constants.NETWORK_ERROR)
 			return
 		}
 		var request core.RadiusPacket
@@ -157,7 +156,7 @@ func getRadiusRequestHandler(handlerFunc core.RadiusPacketHandler) func(w http.R
 			logger.Error("error unmarshalling request %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(req.RequestURI, constants.UNSERIALIZATION_ERROR)
+			core.PushHttpHandlerExchange(req.RequestURI, constants.UNSERIALIZATION_ERROR)
 			return
 		}
 
@@ -167,7 +166,7 @@ func getRadiusRequestHandler(handlerFunc core.RadiusPacketHandler) func(w http.R
 			logger.Errorf("error handling request %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(req.RequestURI, constants.HANDLER_FUNCTION_ERROR)
+			core.PushHttpHandlerExchange(req.RequestURI, constants.HANDLER_FUNCTION_ERROR)
 			return
 		}
 		jAnswer, err := json.Marshal(answer)
@@ -175,11 +174,11 @@ func getRadiusRequestHandler(handlerFunc core.RadiusPacketHandler) func(w http.R
 			logger.Errorf("error marshaling response %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			instrumentation.PushHttpHandlerExchange(req.RequestURI, constants.SERIALIZATION_ERROR)
+			core.PushHttpHandlerExchange(req.RequestURI, constants.SERIALIZATION_ERROR)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		instrumentation.PushHttpHandlerExchange(req.RequestURI, constants.SUCCESS)
+		core.PushHttpHandlerExchange(req.RequestURI, constants.SUCCESS)
 	}
 }

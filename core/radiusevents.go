@@ -1,6 +1,8 @@
-package instrumentation
+package core
 
 import (
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -13,6 +15,23 @@ type RadiusMetricKey struct {
 	Code string
 }
 
+type RadiusMetrics map[RadiusMetricKey]uint64
+
+// Builder for Prometheus format export
+func (rm RadiusMetrics) genPrometheusMetric(metricName string, helpString string) string {
+	var builder strings.Builder
+	if len(rm) > 0 {
+		builder.WriteString(fmt.Sprintf("HELP %s %s\n", metricName, helpString))
+		builder.WriteString(fmt.Sprintf("TYPE %s counter\n", metricName))
+	}
+	for k, v := range rm {
+		builder.WriteString(fmt.Sprintf("%s{endpoint=\"%s\",code=\"%s\"} %d\n",
+			metricName, k.Endpoint, k.Code, v))
+	}
+
+	return builder.String()
+}
+
 // Radius Server
 
 type RadiusServerRequestEvent struct {
@@ -20,7 +39,7 @@ type RadiusServerRequestEvent struct {
 }
 
 func PushRadiusServerRequest(endpoint string, Code string) {
-	MS.InputChan <- RadiusServerRequestEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
+	MS.metricEventChan <- RadiusServerRequestEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
 type RadiusServerResponseEvent struct {
@@ -28,7 +47,7 @@ type RadiusServerResponseEvent struct {
 }
 
 func PushRadiusServerResponse(endpoint string, Code string) {
-	MS.InputChan <- RadiusServerResponseEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
+	MS.metricEventChan <- RadiusServerResponseEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
 type RadiusServerDropEvent struct {
@@ -36,7 +55,7 @@ type RadiusServerDropEvent struct {
 }
 
 func PushRadiusServerDrop(endpoint string, Code string) {
-	MS.InputChan <- RadiusServerDropEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
+	MS.metricEventChan <- RadiusServerDropEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
 // Radius Client
@@ -46,7 +65,7 @@ type RadiusClientRequestEvent struct {
 }
 
 func PushRadiusClientRequest(endpoint string, Code string) {
-	MS.InputChan <- RadiusClientRequestEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
+	MS.metricEventChan <- RadiusClientRequestEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
 type RadiusClientResponseEvent struct {
@@ -54,7 +73,7 @@ type RadiusClientResponseEvent struct {
 }
 
 func PushRadiusClientResponse(endpoint string, Code string) {
-	MS.InputChan <- RadiusClientResponseEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
+	MS.metricEventChan <- RadiusClientResponseEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
 type RadiusClientTimeoutEvent struct {
@@ -62,7 +81,7 @@ type RadiusClientTimeoutEvent struct {
 }
 
 func PushRadiusClientTimeout(endpoint string, Code string) {
-	MS.InputChan <- RadiusClientTimeoutEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
+	MS.metricEventChan <- RadiusClientTimeoutEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
 type RadiusClientResponseStalledEvent struct {
@@ -70,7 +89,7 @@ type RadiusClientResponseStalledEvent struct {
 }
 
 func PushRadiusClientResponseStalled(endpoint string, Code string) {
-	MS.InputChan <- RadiusClientResponseStalledEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
+	MS.metricEventChan <- RadiusClientResponseStalledEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
 type RadiusClientResponseDropEvent struct {
@@ -78,7 +97,7 @@ type RadiusClientResponseDropEvent struct {
 }
 
 func PushRadiusClientResponseDrop(endpoint string, Code string) {
-	MS.InputChan <- RadiusClientResponseDropEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
+	MS.metricEventChan <- RadiusClientResponseDropEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
 // Instrumentation of Diameter Peers table
@@ -96,5 +115,5 @@ type RadiusServersTableUpdatedEvent struct {
 }
 
 func PushRadiusServersTable(instanceName string, table RadiusServersTable) {
-	MS.InputChan <- RadiusServersTableUpdatedEvent{InstanceName: instanceName, Table: table}
+	MS.metricEventChan <- RadiusServersTableUpdatedEvent{InstanceName: instanceName, Table: table}
 }

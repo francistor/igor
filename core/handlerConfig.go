@@ -11,8 +11,8 @@ type HttpHandlerConfigurationManager struct {
 }
 
 // Slice of configuration managers
-// Except during testing, there will be only one instance, which will be retrieved by GetConfig(). A
-// specific instance is retrieved with GetConfigInstance()
+// Except during testing, there will be only one instance, which will be retrieved by GetConfig().
+// A specific instance is retrieved with GetConfigInstance()
 var httpHandlerConfigs []*HttpHandlerConfigurationManager = make([]*HttpHandlerConfigurationManager, 0)
 
 // Adds a Handler configuration object with the specified name
@@ -29,10 +29,11 @@ func InitHttpHandlerConfigInstance(bootstrapFile string, instanceName string, is
 	httpHandlerConfig := HttpHandlerConfigurationManager{CM: NewConfigurationManager(bootstrapFile, instanceName)}
 	httpHandlerConfigs = append(httpHandlerConfigs, &httpHandlerConfig)
 
-	// Initialize logger and dictionary, if default
+	// Initialize logger, dictionary and metrics if default
 	if isDefault {
 		initLogger(&httpHandlerConfig.CM)
 		initDictionaries(&httpHandlerConfig.CM)
+		initMetricsServer(&httpHandlerConfig.CM)
 	}
 
 	// Load handler configuraton

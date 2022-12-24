@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/francistor/igor/core"
-	"github.com/francistor/igor/instrumentation"
 )
 
 // This message handler parses the Igor-Command, which may specify
@@ -137,9 +136,9 @@ func TestDiameterPeerOK(t *testing.T) {
 	}
 
 	// Check metrics. Getting the metrics aggregating by application and command
-	metrics := instrumentation.MS.DiameterQuery("DiameterRequestsReceived", nil, []string{"AP", "CM"})
+	metrics := core.MS.DiameterQuery("DiameterRequestsReceived", nil, []string{"AP", "CM"})
 	// Should have received two TestApplication / TestRequest messages
-	if metric, ok := metrics[instrumentation.PeerDiameterMetricKey{AP: "TestApplication", CM: "TestRequest"}]; !ok {
+	if metric, ok := metrics[core.PeerDiameterMetricKey{AP: "TestApplication", CM: "TestRequest"}]; !ok {
 		t.Fatal("bad metrics for TestApplication and TestRequest")
 	} else {
 		if metric != 2 {
@@ -147,7 +146,7 @@ func TestDiameterPeerOK(t *testing.T) {
 		}
 	}
 	// Should have received several Base / Device-Watchdog
-	if metric, ok := metrics[instrumentation.PeerDiameterMetricKey{AP: "Base", CM: "Device-Watchdog"}]; !ok {
+	if metric, ok := metrics[core.PeerDiameterMetricKey{AP: "Base", CM: "Device-Watchdog"}]; !ok {
 		t.Fatal("bad metrics for Base and Device-Watchdog")
 	} else {
 		if metric < 2 {
@@ -156,8 +155,8 @@ func TestDiameterPeerOK(t *testing.T) {
 	}
 
 	// Aggregate timeouts per Peer. Getting the metrics aggregated by Peer
-	metrics = instrumentation.MS.DiameterQuery("DiameterRequestsTimeout", nil, []string{"Peer"})
-	if metric, ok := metrics[instrumentation.PeerDiameterMetricKey{Peer: "server.igorserver"}]; !ok {
+	metrics = core.MS.DiameterQuery("DiameterRequestsTimeout", nil, []string{"Peer"})
+	if metric, ok := metrics[core.PeerDiameterMetricKey{Peer: "server.igorserver"}]; !ok {
 		t.Fatal("bad timeout metrics")
 	} else {
 		if metric != 1 {
