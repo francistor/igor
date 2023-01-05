@@ -130,7 +130,8 @@ func initMetricsServer(cm *ConfigurationManager) {
 	// Retrieve the metrics configuration
 	jConfig, err := cm.GetBytesConfigObject("metrics.json")
 	if err != nil {
-		panic("unable to get metrics configuration: " + err.Error())
+		fmt.Println("metrics endpoint not configured")
+		return
 	}
 
 	// Parse configuration JSON

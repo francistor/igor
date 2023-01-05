@@ -292,6 +292,11 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 // directory and in the parent directory, which is useful for tests
 func (c *ConfigurationManager) fixBootstrapFileLocation(bootstrapFileName string, tryWithParent bool) string {
 
+	// Skip if file is in a http location
+	if strings.HasPrefix(bootstrapFileName, "http:") || strings.HasPrefix(bootstrapFileName, "https:") {
+		return bootstrapFileName
+	}
+
 	// Try first with the specification as it is
 	if fileInfo, err := os.Stat(bootstrapFileName); err == nil {
 		// File found

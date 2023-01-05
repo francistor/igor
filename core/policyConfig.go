@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"net"
+	"strings"
 )
 
 // Manages the configuration items for policy
@@ -169,19 +170,51 @@ type RadiusClient struct {
 	ClientClass      string
 	ClientProperties map[string]string
 	RadiusAttributes []RadiusAVP
+
+	// Cooked attribute, in case the IP address is in reality a CIDR block
+	OriginNetworkCIDR net.IPNet
 }
 
 // Holds the configuration of all Radius Clients, indexed by IP address
 type RadiusClients map[string]RadiusClient
 
-// Initializer to copy the name into the RadiusClient struct
+// Initializer to copy the IP address into the RadiusClient struct and
+// or parse the CIDR block
 func (rc RadiusClients) initialize() error {
-	for ipAddr, client := range rc {
-		client.IPAddress = ipAddr
-		rc[ipAddr] = client
+	for ipAddr, radiusClient := range rc {
+		radiusClient.IPAddress = ipAddr
+
+		if addrAndMask := strings.Split(ipAddr, "/"); len(addrAndMask) == 2 {
+			// It is a CDIR block
+			_, ipNet, err := net.ParseCIDR(ipAddr)
+			if err != nil {
+				panic("bad cidr specification in radius clients " + ipAddr)
+			}
+			radiusClient.OriginNetworkCIDR = *ipNet
+		}
+
+		rc[ipAddr] = radiusClient
 	}
 
 	return nil
+}
+
+// Get the radius client that has a mask compatible with the specified ip Address
+func (rc RadiusClients) FindRadiusClient(ipAddress net.IP) (RadiusClient, error) {
+
+	// First look for a perfect match
+	if radiusClient, found := rc[ipAddress.String()]; found {
+		return radiusClient, nil
+	}
+
+	// Otherwise try a network match
+	for _, radiusClient := range rc {
+		if radiusClient.OriginNetworkCIDR.Contains(ipAddress) {
+			return radiusClient, nil
+		}
+	}
+
+	return RadiusClient{}, fmt.Errorf("no suitable radius client for %s", ipAddress.String())
 }
 
 // Updates the radius clients configuration in the global variable

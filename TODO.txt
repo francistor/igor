@@ -1,4 +1,0 @@
-Utility to write CDR to file in different formats
-Utility to write CDR to Elastic
-Utility to write CDR to Kafka
-Get attribute from properties file

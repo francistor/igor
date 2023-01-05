@@ -17,15 +17,23 @@ var certMutex sync.Mutex
 
 // Helper function go generate certificates on each execution
 // Panics in case of any error
-// Files are "cert.pem" and "key.pem" located in the parent of the bootstrap directory.
+// Files are "cert.pem" and "key.pem" located in the parent of the bootstrap directory
+// or in the current directory if this variable is not set (because the bootstrap file is remote)
 // It returns the names of the files
 func GenerateCertificates() (string, string) {
 
 	certMutex.Lock()
 	defer certMutex.Unlock()
 
-	certFile := IgorConfigBase + "../cert.pem"
-	keyFile := IgorConfigBase + "../key.pem"
+	var certFile string
+	var keyFile string
+	if IgorConfigBase != "" {
+		certFile = IgorConfigBase + "../cert.pem"
+		keyFile = IgorConfigBase + "../key.pem"
+	} else {
+		certFile = "cert.pem"
+		keyFile = "key.pem"
+	}
 
 	// Return if the file already exists
 	if _, err := os.Stat(certFile); err == nil {
