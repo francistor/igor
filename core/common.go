@@ -61,11 +61,13 @@ func getE2EId() uint32 {
 func GetStateId(clean bool, next bool) int {
 
 	// Get the contents of the file
-	configBase := os.Getenv("IGOR_BASE")
-	if configBase == "" {
-		panic("environment variable IGOR_BASE undefined")
-	}
-	stateIdFileName := configBase + "state-id"
+	/*
+		configBase := os.Getenv("IGOR_BASE")
+		if configBase == "" {
+			panic("environment variable IGOR_BASE undefined")
+		}
+	*/
+	stateIdFileName := IgorConfigBase + "../state-id"
 
 	if clean {
 		os.Remove(stateIdFileName)
@@ -91,11 +93,13 @@ func GetStateId(clean bool, next bool) int {
 func writeStateId(stateId int) int {
 
 	// Get the contents of the file
-	configBase := os.Getenv("IGOR_BASE")
-	if configBase == "" {
-		panic("environment variable IGOR_BASE undefined")
-	}
-	stateIdFileName := configBase + "state-id"
+	/*
+		configBase := os.Getenv("IGOR_BASE")
+		if configBase == "" {
+			panic("environment variable IGOR_BASE undefined")
+		}
+	*/
+	stateIdFileName := IgorConfigBase + "../state-id"
 
 	if os.WriteFile(stateIdFileName, []byte(fmt.Sprintf("%d", stateId)), 0660) != nil {
 		panic("could not write state-id file")

@@ -8,7 +8,7 @@ import (
 
 func httpServer() {
 	// Serve configuration
-	var fileHandler = http.FileServer(http.Dir(os.Getenv("IGOR_BASE") + "resources"))
+	var fileHandler = http.FileServer(http.Dir("../resources"))
 	http.Handle("/", fileHandler)
 	if err := http.ListenAndServe(":8100", nil); err != nil {
 		panic("could not start http server")

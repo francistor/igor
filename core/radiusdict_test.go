@@ -8,7 +8,7 @@ import (
 func TestRadiusDict(t *testing.T) {
 
 	// Read the full Radius Dictionary
-	jsonDict, _ := os.ReadFile(os.Getenv("IGOR_BASE") + "resources/radiusDictionary.json")
+	jsonDict, _ := os.ReadFile("../resources/radiusDictionary.json")
 	radiusDict := NewRadiusDictionaryFromJSON(jsonDict)
 
 	// Basic type
@@ -96,7 +96,7 @@ func TestRadiusDict(t *testing.T) {
 
 func TestUnknownRadiusAVP(t *testing.T) {
 	// Read the full Radius Dictionary
-	jsonDict, _ := os.ReadFile(os.Getenv("IGOR_BASE") + "resources/radiusDictionary.json")
+	jsonDict, _ := os.ReadFile("../resources/radiusDictionary.json")
 	radiusDict := NewRadiusDictionaryFromJSON(jsonDict)
 
 	avp, err := radiusDict.GetFromName("Igor-Nothing")

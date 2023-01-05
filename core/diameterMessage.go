@@ -33,7 +33,7 @@ const (
 )
 
 // Type for functions that handle the diameter requests received
-type MessageHandler func(request *DiameterMessage) (*DiameterMessage, error)
+type DiameterMessageHandler func(request *DiameterMessage) (*DiameterMessage, error)
 
 type DiameterMessage struct {
 	// Diameter Message is

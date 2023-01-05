@@ -14,7 +14,7 @@ import (
 // Initialization
 var bootstrapFile = "resources/searchRules.json"
 var instanceName = "testClient"
-var cdrDirectoryName = os.Getenv("IGOR_BASE") + "cdr"
+var cdrDirectoryName = "../cdr"
 
 // Initializer of the test suite.
 func TestMain(m *testing.M) {

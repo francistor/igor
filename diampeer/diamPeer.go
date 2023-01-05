@@ -215,7 +215,7 @@ type DiameterPeer struct {
 	requestsMap map[uint32]RequestContext
 
 	// Registered Handler for incoming messages
-	handler core.MessageHandler
+	handler core.DiameterMessageHandler
 
 	// Ticker for watchdog requests
 	watchdogTicker *time.Ticker
@@ -230,7 +230,7 @@ type DiameterPeer struct {
 
 // Creates a new DiameterPeer when we are expected to establish the connection with the other side
 // and initiate the CER/CEA handshake
-func NewActiveDiameterPeer(configInstanceName string, rc chan interface{}, peer core.DiameterPeer, handler core.MessageHandler) *DiameterPeer {
+func NewActiveDiameterPeer(configInstanceName string, rc chan interface{}, peer core.DiameterPeer, handler core.DiameterMessageHandler) *DiameterPeer {
 
 	// Create the Peer struct
 	dp := DiameterPeer{
@@ -265,7 +265,7 @@ func NewActiveDiameterPeer(configInstanceName string, rc chan interface{}, peer 
 }
 
 // Creates a new DiameterPeer when the connection has been alread accepted
-func NewPassiveDiameterPeer(configInstanceName string, rc chan interface{}, conn net.Conn, handler core.MessageHandler) *DiameterPeer {
+func NewPassiveDiameterPeer(configInstanceName string, rc chan interface{}, conn net.Conn, handler core.DiameterMessageHandler) *DiameterPeer {
 
 	// Create the Peer Struct
 	dp := DiameterPeer{

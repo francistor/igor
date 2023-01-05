@@ -35,6 +35,7 @@ func (co *ConfigObject[T]) Update(cm *ConfigurationManager) error {
 		return err
 	} else {
 		if initializable, ok := any(theObject).(Initializable); ok {
+
 			if err := initializable.initialize(); err != nil {
 				return err
 			}

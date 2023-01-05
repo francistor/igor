@@ -75,11 +75,11 @@ type DiameterRouter struct {
 	http2Client http.Client
 
 	// Local handler
-	localHandler core.MessageHandler
+	localHandler core.DiameterMessageHandler
 }
 
 // Creates and runs a Router
-func NewDiameterRouter(instanceName string, handler core.MessageHandler) *DiameterRouter {
+func NewDiameterRouter(instanceName string, handler core.DiameterMessageHandler) *DiameterRouter {
 
 	router := DiameterRouter{
 		instanceName:         instanceName,

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -68,6 +69,9 @@ type ConfigurationManager struct {
 	dbHandle *sql.DB
 }
 
+// The home location for configuration files not referenced as absolute paths
+var IgorConfigBase string
+
 // Creates and initializes a ConfigurationManager
 func NewConfigurationManager(bootstrapFile string, instanceName string) ConfigurationManager {
 	cm := ConfigurationManager{
@@ -75,7 +79,7 @@ func NewConfigurationManager(bootstrapFile string, instanceName string) Configur
 		bootstrapFile: bootstrapFile,
 	}
 
-	cm.fillSearchRules(bootstrapFile)
+	cm.fillSearchRules(cm.fixBootstrapFileLocation(bootstrapFile, true))
 
 	return cm
 }
@@ -113,7 +117,7 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 			break
 		}
 	}
-	if origin == "" {
+	if innerName == "" {
 		// Not found
 		return nil, errors.New("object name does not match any rules")
 	}
@@ -188,7 +192,7 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 
 		return json.Marshal(entries)
 
-	} else if strings.HasPrefix(location, "http") {
+	} else if strings.HasPrefix(location, "http:") || strings.HasPrefix(location, "https:") {
 		// Read from http
 
 		// Create client with timeout
@@ -196,7 +200,6 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 			Timeout: HTTP_TIMEOUT_SECONDS * time.Second,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
-
 			},
 		}
 
@@ -217,11 +220,13 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 
 	} else {
 		// Read from file
-		configBase := os.Getenv("IGOR_BASE")
-		if configBase == "" {
-			panic("environment variable IGOR_BASE undefined")
-		}
-		if resp, err := os.ReadFile(configBase + location); err != nil {
+		/*
+			configBase := os.Getenv("IGOR_BASE")
+			if configBase == "" {
+				panic("environment variable IGOR_BASE undefined")
+			}
+		*/
+		if resp, err := os.ReadFile(IgorConfigBase + location); err != nil {
 			return nil, err
 		} else {
 			return resp, nil
@@ -279,5 +284,28 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 		} else {
 			panic("db access parameters not specified in searchrules")
 		}
+	}
+}
+
+// Sets the core.IgorConfigBase variable as the directory where the bootstrap file resides
+// and returns the normalized location of that bootstrap file, looking for it in the current
+// directory and in the parent directory, which is useful for tests
+func (c *ConfigurationManager) fixBootstrapFileLocation(bootstrapFileName string, tryWithParent bool) string {
+
+	// Try first with the specification as it is
+	if fileInfo, err := os.Stat(bootstrapFileName); err == nil {
+		// File found
+		abs, err := filepath.Abs(bootstrapFileName)
+		if err != nil {
+			panic(err)
+		}
+		IgorConfigBase = filepath.Dir(abs) + "/"
+		return fileInfo.Name()
+	}
+
+	if !tryWithParent {
+		panic("could not find the bootstrap file in " + bootstrapFileName)
+	} else {
+		return c.fixBootstrapFileLocation("../"+bootstrapFileName, false)
 	}
 }

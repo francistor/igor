@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
@@ -683,13 +682,11 @@ func (ms *MetricsServer) httpLoop(bindAddress string, port int) {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	err := ms.metricsServer.ListenAndServeTLS(
-		os.Getenv("IGOR_BASE")+"../cert.pem",
-		os.Getenv("IGOR_BASE")+"../key.pem")
+	// Prometheus uses plain old http
+	err := ms.metricsServer.ListenAndServe()
 
 	if !errors.Is(err, http.ErrServerClosed) {
-		fmt.Println(err)
-		panic("error starting metrics handler")
+		panic("error starting metrics handler: " + err.Error())
 	}
 
 	// Will get here only when a shutdown is invoked

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/francistor/igor/core"
@@ -69,16 +68,10 @@ func NewHttpRouter(instanceName string, diameterRouter *router.DiameterRouter, r
 // in a goroutine.
 func (dh *HttpRouter) Run() {
 
-	if _, err := os.Stat(os.Getenv("IGOR_BASE") + "../cert.pem"); errors.Is(err, os.ErrNotExist) {
-		panic("cert.pm file not found. Should be in the parent of IGOR_BASE " + os.Getenv("IGOR_BASE") + "../cert.pem")
-	}
-	if _, err := os.Stat(os.Getenv("IGOR_BASE") + "../key.pem"); errors.Is(err, os.ErrNotExist) {
-		panic("key.pm file not found. Should be in the parent of IGOR_BASE " + os.Getenv("IGOR_BASE") + "../key.pem")
-	}
+	// Make sure certificates exist in the current directory
+	certFile, keyFile := core.GenerateCertificates()
 
-	err := dh.httpServer.ListenAndServeTLS(
-		os.Getenv("IGOR_BASE")+"../cert.pem",
-		os.Getenv("IGOR_BASE")+"../key.pem")
+	err := dh.httpServer.ListenAndServeTLS(certFile, keyFile)
 
 	if !errors.Is(err, http.ErrServerClosed) {
 		fmt.Println(err)

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/francistor/igor/constants"
@@ -31,7 +30,7 @@ type HttpHandler struct {
 }
 
 // Creates a new DiameterHandler object
-func NewHttpHandler(instanceName string, diameterHandler core.MessageHandler, radiusHandler core.RadiusPacketHandler) HttpHandler {
+func NewHttpHandler(instanceName string, diameterHandler core.DiameterMessageHandler, radiusHandler core.RadiusPacketHandler) HttpHandler {
 
 	// If using the default mux (not done here. Just in case...)
 	// https://stackoverflow.com/questions/40786526/resetting-http-handlers-in-golang-for-unit-testing
@@ -64,20 +63,13 @@ func NewHttpHandler(instanceName string, diameterHandler core.MessageHandler, ra
 // in a goroutine.
 func (dh *HttpHandler) run() {
 
-	if _, err := os.Stat(os.Getenv("IGOR_BASE") + "../cert.pem"); errors.Is(err, os.ErrNotExist) {
-		panic("cert.pm file not found. Should be in the parent of IGOR_BASE " + os.Getenv("IGOR_BASE") + "../cert.pem")
-	}
-	if _, err := os.Stat(os.Getenv("IGOR_BASE") + "../key.pem"); errors.Is(err, os.ErrNotExist) {
-		panic("key.pm file not found. Should be in the parent of IGOR_BASE" + os.Getenv("IGOR_BASE") + "../key.pem")
-	}
+	// Make sure the certificates exists in the current directory
+	certFile, keyFile := core.GenerateCertificates()
 
-	err := dh.httpServer.ListenAndServeTLS(
-		os.Getenv("IGOR_BASE")+"../cert.pem",
-		os.Getenv("IGOR_BASE")+"../key.pem")
+	err := dh.httpServer.ListenAndServeTLS(certFile, keyFile)
 
 	if !errors.Is(err, http.ErrServerClosed) {
-		fmt.Println(err)
-		panic("error starting http handler")
+		panic("error starting http handler with: " + err.Error())
 	}
 
 	close(dh.doneChannel)
@@ -90,7 +82,7 @@ func (dh *HttpHandler) Close() {
 }
 
 // Given a Diameter Handler function, builds a http handler that unserializes, executes the handler and serializes the response
-func getDiameterRequestHandler(handlerFunc core.MessageHandler) func(w http.ResponseWriter, req *http.Request) {
+func getDiameterRequestHandler(handlerFunc core.DiameterMessageHandler) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		logger := core.GetLogger()

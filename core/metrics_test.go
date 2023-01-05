@@ -258,7 +258,7 @@ func TestPrometheusMetrics(t *testing.T) {
 	PushRadiusClientResponseStalled("127.0.0.1:1812", "1")
 	PushRadiusClientResponseDrop("127.0.0.1:1812", "1")
 
-	metrics, err := httpGet("https://localhost:9090/metrics")
+	metrics, err := httpGet("http://localhost:9090/metrics")
 	if err != nil {
 		t.Fatalf("could not get metrics: %s", err)
 	}
