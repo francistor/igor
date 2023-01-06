@@ -8,7 +8,7 @@ Igor offers two alternatives for building the algorigthms that treat the Radius 
 
 * Handle them in Go functions, implementing `type RadiusPacketHandler func(request *RadiusPacket) (*RadiusPacket, error)` or `type MessageHandler func(request *DiameterMessage) (*DiameterMessage, error)`
 
-* Handle them as http2 requests, with a JSON payload representing the radius packet or diameter message, producing an answer which will respresent the answer. Any web server can be used for this purpose, and standard http message processing techniques may be applied. As a drawback, the performance is much lower.
+* Handle them as http2 requests, with a JSON payload representing the radius packet or diameter message, producing an answer which will respresent the answer. Any web server can be used for this purpose, and standard http message processing techniques may be applied. As a drawback, the performance is poorer.
 
 In addition, Igor accepts also http requests that represent Radius or Diameter messages, which will be processed according to the defined rules, for instance, forwarding to another Diameter peer or Radius server. In this way, it will acct as a Radius client.
 
@@ -113,3 +113,67 @@ Igor provides some utilities for the development of handlers.
 * `radiusChecks.json` define rules for classifying radius packets, for instance in order to determine whether they are session or service accounting, or whether they should be forwarded to upstream servers. An specific object at the disposal of handler developers, named `RadiusPacketChecks` is provided, and a configuration object with this parametrization may be created with the syntax that can be found in the examples. It contains a number of keys that specify the rules to be checked using binary operators and conditions of types `equals`, `present`, `notpresent`, `contains` or `matches` (a regular expression) for the specified radius attribute. The name of this file may be changed
 
 * `radiusFilters.json` define rules for filering outgoing or incoming radius packets: removing attributes, adding attributes with a specific value, or explicitly copying a list of attributes. It is used by objects of type `AVPFilter` The name of this file may be changed.
+
+### Standard configuration management
+
+A `ConfigurationManager` object provides basic methods to manipulate configuration resources. It loads a bootstrap file and gets an instance name to be used when searching for objects, and retrieves them either as JSON object or just the raw bytes. Objects may be stored as local files, http URLs or in a database.
+
+Specialized Configuration Managers include methods for manipulaing standard configuration objects for Policy (Radius and Diameter), or Http handlers. Those embed a `ConfigurationManager` which is used internally and also can be used externally to manipulate additional configuration objects.
+
+Both the `PolicyConfigurationManager` and the `HttpHandlerConfigurationManager` take care of initializing the logging, dictionaries an the metrics upon instantiation. `PolicyConfigurationManager` offers specific methods for getting the standard configuration, such as `DiameterServerConf()` and a few others.
+
+A production application will typically instantiate only one specialized Configuration Manager, using a single instance. For testing, though, multiple instances may be created. The instance marked as `default` upon instantiation will be the only one initializing loggers and dictionaries, which are shared among all instances.
+
+### Custom configuration management
+
+Given any type `T` that can be serialized to JSON, an object of type `ConfigObject[T any]` can be instantiated and manipulated with the facilities in the core package. Its `Update()` method, which takes a `ConfigurationManager` as parameter, will force the retrieval of the contents using the Igor configuration system. The `Get()` method will be used to get a copy of the contents. `Update()` may be called at any time to refresh the contents and do hot updating, without affecting the contents of the objects already copied using previous `Get()` invokations.
+
+So, for instance, a configuration is defined and retrieved like this
+
+```
+var realms *core.ConfigObject[handler.RadiusUserFile]
+realms = core.NewConfigObject[handler.RadiusUserFile]("realms.json")
+if err = realms.Update(&ci.CM); err != nil {
+    return fmt.Errorf("could not get realm configuration: %w", err)
+}
+```
+
+A more specialized version of a configuration object is the `TemplatedConfigObject[T, P any]`, where `T` is the type of the template object, `P` is the type of the parameter object. When creating an object of this type, a text with a Go template that produces an objec of type `T` is passed, along with an instance of `map[string]P` that contains the parameters of the template for different values of a key. The produced object is a map from those keys to objects of type `P`. For instance, the parameters map may contain a set of values for different service names. `T` may contain the parametrization of a service, and the resulting object will be map where the configuration for each object is retrieved.
+
+So, for instance, here the configuration object "planparameters" contains a map of plan names to plan parameters, and "basicProfiles.txt" is a template to produce a UserFile.
+
+```
+// Service configuration
+var basicProfiles *core.TemplatedConfigObject[handler.RadiusUserFile, PlanTemplateParams]
+basicProfiles = core.NewTemplatedConfigObject[handler.RadiusUserFile, PlanTemplateParams]("basicProfiles.txt", "planparameters")
+if err = basicProfiles.Update(&ci.CM); err != nil {
+    return fmt.Errorf("could not get basic profiles: %w", err)
+}
+```
+
+## Logging
+
+For logging core operations, simply retrieve a logger and use zap functions.
+
+```
+core.GetLogger().Debugf("received packet: %v", reqBuf[:packetSize])
+```
+
+For logging in handlers, where it is required that all the log entries appear together, the following pattern must be implemented
+
+First, get and instance of the handler logger to use to invoke zap logging functions. Then, to do the final printing, invoke `WriteLog()` in a defered call
+
+```
+func EmptyDiameterHandler(request *core.DiameterMessage) (*core.DiameterMessage, error) {
+	hl := core.NewHandlerLogger()
+	l := hl.L
+
+	defer func(l *core.HandlerLogger) {
+		l.WriteLog()
+	}(hl)
+
+	l.Infof("%s", "Starting EmptyDiameterHandler")
+	l.Infof("%s %s", "request", request)
+```
+
+
