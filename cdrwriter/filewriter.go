@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	PACKET_BUFFER_SIZE = 1000
+	FILE_PACKET_BUFFER_SIZE = 1000
 )
 
 // Writes files rotating by date
@@ -49,7 +49,7 @@ func NewFileCDRWriter(filePath string, fileNameFormat string, formatter CDRForma
 	}
 
 	w := FileCDRWriter{
-		packetChan:     make(chan interface{}, PACKET_BUFFER_SIZE),
+		packetChan:     make(chan interface{}, FILE_PACKET_BUFFER_SIZE),
 		doneChan:       make(chan struct{}),
 		formatter:      formatter,
 		rotateSeconds:  rotateSeconds,
@@ -104,7 +104,7 @@ func (w *FileCDRWriter) WriteRadiusCDR(rp *core.RadiusPacket) {
 	w.packetChan <- rp
 }
 
-// Writes the Radius Diameter to file
+// Writes the Diameter CDR
 func (w *FileCDRWriter) WriteDiameterCDR(dm *core.DiameterMessage) {
 	w.packetChan <- dm
 }

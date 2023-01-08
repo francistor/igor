@@ -196,7 +196,7 @@ func TestIPv6PrefixAVP(t *testing.T) {
 func TestVendorTimeAVP(t *testing.T) {
 
 	var theValue = "2020-09-06T21:08:09 UTC"
-	var timeValue, err = time.Parse(timeFormatString, theValue)
+	var timeValue, err = time.Parse(TimeFormatString, theValue)
 
 	// Create avp
 	avp, err := NewRadiusAVP("Igor-TimeAttribute", theValue)

@@ -13,8 +13,25 @@ import (
 
 // Initialization
 var bootstrapFile = "resources/searchRules.json"
-var instanceName = "testClient"
+var instanceName = "testConfig"
 var cdrDirectoryName = "../cdr"
+
+var jElasticConfig = `
+{
+	"attributeMap": {
+		"IgorOctets": "Igor-OctetsAttribute",
+		"IgorString": "Igor-StringAttribute",
+		"SessionTime": "Acct-Session-Time!Acct-Delay-Time",
+		"InputBytes": "Acct-Input-Octets<Acct-Input-Gigawords",
+		"Status": "Acct-Status-Type"
+	},
+	"indexName": "cdr-",
+	"indexType": "field",
+	"attributeForIndex": "Igor-TimeAttribute",
+	"indexDateFormat": "2006-01",
+	"idFields": ["Acct-Session-Id", "NAS-IP-Address"],
+	"versionField": "Igor-TimeAttribute"
+}`
 
 // Initializer of the test suite.
 func TestMain(m *testing.M) {
@@ -49,7 +66,7 @@ func TestCSVFormat(t *testing.T) {
 	// Read JSON to Radius Packet
 	rp := buildSimpleRadiusPacket(t)
 
-	result := `"0102030405060708090a0b";;"stringvalue,anotherStringvalue";0,1,1;"127.0.0.1";"1966-11-26T03:34:08 UTC";"bebe:cafe::";"bebe:cafe:cccc::0/64";"00aabbccddeeff11";999999999999;"myString:1";"1122aabbccdd"`
+	result := `"0102030405060708090a0b";;"stringvalue,anotherStringvalue";0,1,1;"127.0.0.1";"1986-11-26T03:34:08 UTC";"bebe:cafe::";"bebe:cafe:cccc::0/64";"00aabbccddeeff11";999999999999;"myString:1";"1122aabbccdd"`
 	csvw := NewCSVWriter([]string{
 		"Igor-OctetsAttribute",
 		"Non-existing",
@@ -64,6 +81,7 @@ func TestCSVFormat(t *testing.T) {
 		"Igor-TaggedStringAttribute",
 		"Igor-SaltedOctetsAttribute"},
 		";", ",", "2006-01-02T15:04:05 MST", true, false)
+
 	cdrString := csvw.GetRadiusCDRString(&rp)
 	if strings.Contains(cdrString, "MyUserName") {
 		t.Fatalf("Written CDR contains filtered attribute User-Name")
@@ -84,7 +102,7 @@ func TestCSVParsedIntsFormat(t *testing.T) {
 	// Read JSON to Radius Packet
 	rp := buildSimpleRadiusPacket(t)
 
-	result := `"0102030405060708090a0b";;"stringvalue,anotherStringvalue";"Zero,One,One";"127.0.0.1";"1966-11-26T03:34:08 UTC";"bebe:cafe::";"bebe:cafe:cccc::0/64";"00aabbccddeeff11";"999999999999";"myString:1";"1122aabbccdd"`
+	result := `"0102030405060708090a0b";;"stringvalue,anotherStringvalue";"Zero,One,One";"127.0.0.1";"1986-11-26T03:34:08 UTC";"bebe:cafe::";"bebe:cafe:cccc::0/64";"00aabbccddeeff11";"999999999999";"myString:1";"1122aabbccdd"`
 	csvw := NewCSVWriter([]string{
 		"%Timestamp%",
 		"Igor-OctetsAttribute",
@@ -133,6 +151,37 @@ func TestJSONFormat(t *testing.T) {
 	}
 
 	fmt.Println(cdrString)
+}
+
+func TestElasticFormat(t *testing.T) {
+
+	var conf ElasticWriterConf
+	if err := json.Unmarshal([]byte(jElasticConfig), &conf); err != nil {
+		t.Fatalf("bad ElasticWriterConf format: %s", err)
+	}
+	ew := NewElasticWriter(conf)
+
+	rp := buildSimpleRadiusPacket(t)
+
+	// Accounting start
+	rp.Add("Acct-Status-Type", "Stop")
+	esCDR := ew.GetRadiusCDRString(&rp)
+
+	if !strings.Contains(esCDR, "\"_index\": \"cdr-1986-11\"") {
+		t.Fatal("bad index name")
+	}
+	if !strings.Contains(esCDR, "\"_id\": \"session-1|127.0.0.1|\"") {
+		t.Fatal("bad _id")
+	}
+	if !strings.Contains(esCDR, "\"version\": 200533360048") {
+		t.Fatal("bad version")
+	}
+	if !strings.Contains(esCDR, "\"InputBytes\": 4294968296") {
+		t.Fatal("bad input bytes")
+	}
+	if !strings.Contains(esCDR, "\"Status\": \"Stop\"") {
+		t.Fatal("bad accounting status type")
+	}
 }
 
 func TestFileWriter(t *testing.T) {
@@ -208,6 +257,21 @@ func TestFileWriterRotation(t *testing.T) {
 	}
 }
 
+func TestElasticWriter(t *testing.T) {
+	var conf ElasticWriterConf
+	if err := json.Unmarshal([]byte(jElasticConfig), &conf); err != nil {
+		t.Fatalf("bad ElasticWriterConf format: %s", err)
+	}
+	ew := NewElasticWriter(conf)
+
+	ecdrw := NewElasticCDRWriter("http://elasticdatabase:9200/_doc/_bulk?filter_path=took,errors", "", "", ew, 1)
+
+	rp := buildSimpleRadiusPacket(t)
+	ecdrw.WriteRadiusCDR(&rp)
+	time.Sleep(1 * time.Second)
+	//ecdrw.Close()
+}
+
 // Helper function
 func buildSimpleRadiusPacket(t *testing.T) core.RadiusPacket {
 	jsonPacket := `{
@@ -220,14 +284,20 @@ func buildSimpleRadiusPacket(t *testing.T) core.RadiusPacket {
 			{"Igor-IntegerAttribute": "1"},
 			{"Igor-IntegerAttribute": 1},
 			{"Igor-AddressAttribute": "127.0.0.1"},
-			{"Igor-TimeAttribute": "1966-11-26T03:34:08 UTC"},
+			{"Igor-TimeAttribute": "1986-11-26T03:34:08 UTC"},
 			{"Igor-IPv6AddressAttribute": "bebe:cafe::0"},
 			{"Igor-IPv6PrefixAttribute": "bebe:cafe:cccc::0/64"},
 			{"Igor-InterfaceIdAttribute": "00aabbccddeeff11"},
 			{"Igor-Integer64Attribute": 999999999999},
 			{"Igor-TaggedStringAttribute": "myString:1"},
 			{"Igor-SaltedOctetsAttribute": "1122aabbccdd"},
-			{"User-Name":"MyUserName"}
+			{"User-Name": "MyUserName"},
+			{"Acct-Input-Octets": 1000},
+			{"Acct-Input-Gigawords": 1},
+			{"Acct-Session-Time": 3600},
+			{"Acct-Delay-Time": 2},
+			{"Acct-Session-Id": "session-1"},
+			{"NAS-IP-Address": "127.0.0.1"}
 		]
 	}`
 

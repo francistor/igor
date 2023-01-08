@@ -218,6 +218,16 @@
                     }
                 },
                 {
+                    "code": 52,
+                    "name": "Acct-Input-Gigawords",
+                    "type": "Integer"
+                },
+                {
+                    "code": 53,
+                    "name": "Acct-Output-Gigawords",
+                    "type": "Integer"
+                },
+                {
                     "code": 60,
                     "name": "CHAP-Challenge",
                     "type": "Octets"

@@ -211,7 +211,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	case DiameterTypeTime:
 		var value uint32
 		err := binary.Read(reader, binary.BigEndian, &value)
-		avp.Value = zeroDiameterTime.Add(time.Second * time.Duration(value))
+		avp.Value = ZeroDiameterTime.Add(time.Second * time.Duration(value))
 		return currentIndex + 4, err
 
 	// UTF8 String
@@ -435,7 +435,7 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling diameter type %d and value %T %v", avp.DictItem.DiameterType, avp.Value, avp.Value)
 		}
-		if err = binary.Write(buffer, binary.BigEndian, uint32(timeValue.Sub(zeroDiameterTime).Seconds())); err != nil {
+		if err = binary.Write(buffer, binary.BigEndian, uint32(timeValue.Sub(ZeroDiameterTime).Seconds())); err != nil {
 			return int64(bytesWritten), err
 		}
 		bytesWritten += 4
@@ -683,7 +683,7 @@ func (avp *DiameterAVP) GetString() string {
 
 	case DiameterTypeTime:
 		var timeValue = avp.Value.(time.Time)
-		return timeValue.Format(timeFormatString)
+		return timeValue.Format(TimeFormatString)
 
 	case DiameterTypeUTF8String:
 		var stringValue, _ = avp.Value.(string)
@@ -856,7 +856,7 @@ func NewDiameterAVP(name string, value interface{}) (*DiameterAVP, error) {
 				return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 			}
 			var err error
-			avp.Value, err = time.Parse(timeFormatString, stringValue)
+			avp.Value, err = time.Parse(TimeFormatString, stringValue)
 			if err != nil {
 				return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T %s: %s", name, avp.DictItem.DiameterType, value, value, err)
 			}

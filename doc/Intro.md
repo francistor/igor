@@ -151,6 +151,16 @@ if err = basicProfiles.Update(&ci.CM); err != nil {
 }
 ```
 
+### Instantiating Configuration Managers
+
+The first action that an Igor executable needs to execute is to instantiate a Configuration Manager for its function. A Radius/Diameter server will instantiate a `PolicyConfigurationManager` with `InitPolicyConfigInstance()`. This function takes as parameters the location of the boostrap file, the instance name and whether it is the default instance. This is true, forcing the logger and dictionaries to be loaded, for any Igor executable, and may be false only for testing. After initialization, the instance name may be used to create routers (see below)
+
+```
+ci := core.InitPolicyConfigInstance('<bootstrap file>', '<name of instance>', <true|false>)
+```
+
+The Configuration Manager instance may be used later to get the standard configuration objects (Diameter Peers, Radius Server Groups, etc.) either using the pointer returned by the instantiation function above, by calling `core.GetPolicyConfig()`, that will return the default configuration instance, or `core.GetPolicyConfigInstance('<name of instance>')` that will return a specific instance (for testing). Also, may be used to manage the custom configuration objects (calling `Update()` and `Get()`).
+
 ## Logging
 
 For logging core operations, simply retrieve a logger and use zap functions.
@@ -175,5 +185,57 @@ func EmptyDiameterHandler(request *core.DiameterMessage) (*core.DiameterMessage,
 	l.Infof("%s", "Starting EmptyDiameterHandler")
 	l.Infof("%s %s", "request", request)
 ```
+
+## Routers
+
+The Routers are the core of Igor. Routers get requests and handle them.
+
+### Diameter Router
+
+The Diameter Router instantiates a DiameterPeer object for each one of the declared active peers, and for the passive peers when receiving and incoming connection. It instantiates and manages the Diameter Socket for incoming connections.
+
+When a Diameter Router is instantiated, the handler function for treating the requests is passed as a parameter. This is invoked if there is no rule (in Diameter Routes) stating that the request should be sent to a Diameter Peer or handled by an external Http2 handler.
+
+Besides treating requests received from Peers, it offers an interface to handle externally generated Diameter Messages, as `func (router *DiameterRouter) RouteDiameterRequest(request *core.DiameterMessage, timeout time.Duration) (*core.DiameterMessage, error)`. The router will handle this request the same way as it does for messages received from Peers.
+
+An equivalent function for asyncronous processing is provided, with the singnature `func (router *DiameterRouter) RouteDiameterRequestAsync(request *core.DiameterMessage, timeout time.Duration, handler func(*core.DiameterMessage, error))`
+
+#### Diameter Router lifecycle
+
+Diameter Routers are created with `NewDiameterRouter()`. Then, the `Start()` method has to be invoked.
+
+When needed, `Close()` may be invoked, which will wait until all resources are freed.
+
+### Radius Router
+
+The Radius Router instantiates a Radius Server which listen for incoming packets and a Radius Client that will provide methods to send requests and wait for answers from upstream servers. It manages the status of the Radius Server Groups, keeping track of failed requests and doing the balancing among the active ones.
+
+It offers methods for sending radius requests, with the signatures `func (router *RadiusRouter) RouteRadiusRequest(packet *core.RadiusPacket, destination string,perRequestTimeout time.Duration, tries int, serverTries int, secret string) (*core.RadiusPacket, error)` and `func (router *RadiusRouter) RouteRadiusRequestAsync(destination string, packet *core.RadiusPacket, perRequestTimeout time.Duration, tries int, serverTries int, secret string, handler func(*core.RadiusPacket, error))` for the synchronous and asynchronous versions respectively.
+
+Notice that the request may specifiy a destination in the form of a Radius Server Group as specified in the `RadiusServers.json` configuration resource, and in this case the `secret` will not be taken into account (the one configured in the file for each upstream server will be used), and the Radius Router will be in charge of the balancing. The parameter `tries` specifies the number of different upstream servers that will be tried, and `serverTries` specifies the number of tries for the same server (reusing the radius id). So, the total number of tries will be `tries * serverTries` and the total timeout will be `perRequestTimeout * tries * serverTries`.
+
+#### Radius Router lifecycle
+
+Diameter Routers are created with `NewRadiusRouter()`. Then, the `Start()` method has to be invoked.
+
+When needed, `Close()` may be invoked, which will wait until all resources are freed.
+
+## HttpRouter
+
+An HttpRouter implements an Http server that receives Routable Diameter Requests and Routable Radius Requests and directs them to a Diameter or Radius Router.
+
+A Routable Diameter/Radius request is an structure that encapsulates a Diameter/Radius request plus some metadata such as the timeout for the answer, and the destination of the packet and number of tries in case of Radius.
+
+## The Drivers: Diameter Peers and Radius Client Sockets
+
+### Diameter Peer
+
+The `DiameterPeer` object implements the connection with a remote Peer, honoring the Diameter State Machine.
+
+It offers a method for sending a message, which is used by the Diameter Router, and uses a DiameterRequestHandler that is passed upon instantiation to process the incoming messages.
+
+### RadiusClient
+
+The `RadiusClient` is a thin wrapper to manage `RadiusClientSockets`. A `RadiusClientSocket` is created for each origin UDP port. The `RadiusClientSocket` sends the requests to the upstream servers, generating the corresponding radius identifier and keeping track of the outstanding requests, to be matched with the answers and generating timeouts when needed.
 
 

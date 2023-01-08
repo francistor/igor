@@ -212,7 +212,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		if err := binary.Read(reader, binary.BigEndian, &value); err != nil {
 			return currentIndex, err
 		}
-		avp.Value = zeroRadiusTime.Add(time.Second * time.Duration(value))
+		avp.Value = ZeroRadiusTime.Add(time.Second * time.Duration(value))
 		return currentIndex + 4, nil
 
 	case RadiusTypeIPv6Prefix:
@@ -432,7 +432,7 @@ func (avp *RadiusAVP) ToWriter(buffer io.Writer, authenticator [16]byte, secret 
 		if !ok {
 			return int64(bytesWritten), fmt.Errorf("error marshaling radius type %d and value %T %v", avp.DictItem.RadiusType, avp.Value, avp.Value)
 		}
-		if err = binary.Write(buffer, binary.BigEndian, uint32(timeValue.Sub(zeroRadiusTime).Seconds())); err != nil {
+		if err = binary.Write(buffer, binary.BigEndian, uint32(timeValue.Sub(ZeroRadiusTime).Seconds())); err != nil {
 			return int64(bytesWritten), err
 		}
 		bytesWritten += 4
@@ -611,7 +611,7 @@ func (avp *RadiusAVP) GetString() string {
 
 	case RadiusTypeTime:
 		var timeValue, _ = avp.Value.(time.Time)
-		return timeValue.Format(timeFormatString)
+		return timeValue.Format(TimeFormatString)
 	}
 
 	return ""
@@ -645,6 +645,11 @@ func (avp *RadiusAVP) GetInt() int64 {
 	case RadiusTypeInteger, RadiusTypeInteger64:
 
 		return avp.Value.(int64)
+
+	case RadiusTypeTime:
+		timeValue := avp.Value.(time.Time)
+		return int64(timeValue.Sub(ZeroRadiusTime).Seconds())
+
 	default:
 		GetLogger().Errorf("cannot convert value to int64 %T %v", avp.Value, avp.Value)
 		return 0
@@ -786,7 +791,7 @@ func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 
 	case RadiusTypeTime:
 		if isString {
-			avp.Value, err = time.Parse(timeFormatString, stringValue)
+			avp.Value, err = time.Parse(TimeFormatString, stringValue)
 			if err != nil {
 				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T %s: %s", avp.DictItem.RadiusType, value, value, err)
 			}

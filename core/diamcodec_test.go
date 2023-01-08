@@ -339,7 +339,7 @@ func TestIPv6AddressDiameterAVP(t *testing.T) {
 
 func TestTimeDiameterAVP(t *testing.T) {
 	var theStringTime = "1966-11-26T03:21:54 UTC"
-	var theTime, _ = time.Parse(timeFormatString, theStringTime)
+	var theTime, _ = time.Parse(TimeFormatString, theStringTime)
 
 	// Create avp from string
 	avp, err := NewDiameterAVP("Igor-myTime", theStringTime)
@@ -602,7 +602,7 @@ func TestJSONDiameterAVP(t *testing.T) {
 		t.Errorf("unmarshalled avp has the wrong name: %s", avp.Name)
 	}
 	v, _ := avp.GetAVP("Igor-myTime")
-	vv, _ := time.Parse(timeFormatString, "1966-11-26T03:34:08 UTC")
+	vv, _ := time.Parse(TimeFormatString, "1966-11-26T03:34:08 UTC")
 	if v.GetDate() != vv {
 		t.Errorf("unmarshalled avp has the wrong date value: %s", v.String())
 	}
@@ -789,7 +789,7 @@ func TestDiameterMessageAllAttributeTypes(t *testing.T) {
 	if recoveredMessage.GetStringAVP("Igor-myTestAllGrouped.Igor-myEnumerated") != "two" {
 		t.Errorf("Error recovering Enumerated. Got <%s> instead of <two>", recoveredMessage.GetStringAVP("Igor-myTestAllGrouped.Igor-myEnumerated"))
 	}
-	targetTime, _ := time.Parse(timeFormatString, "1966-11-26T03:34:08 UTC")
+	targetTime, _ := time.Parse(TimeFormatString, "1966-11-26T03:34:08 UTC")
 	if recoveredMessage.GetDateAVP("Igor-myTestAllGrouped.Igor-myTime") != targetTime {
 		t.Errorf("Error recovering date. Got <%v> instead of <1966-11-26T03:34:08 UTC>", recoveredMessage.GetDateAVP("Igor-myTestAllGrouped.Igor-myTime"))
 	}
