@@ -64,7 +64,7 @@ func NewHttpHandler(instanceName string, diameterHandler core.DiameterMessageHan
 func (dh *HttpHandler) run() {
 
 	// Make sure the certificates exists in the current directory
-	certFile, keyFile := core.GenerateCertificates()
+	certFile, keyFile := core.EnsureCertificates()
 
 	err := dh.httpServer.ListenAndServeTLS(certFile, keyFile)
 

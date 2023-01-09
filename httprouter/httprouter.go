@@ -69,9 +69,14 @@ func NewHttpRouter(instanceName string, diameterRouter *router.DiameterRouter, r
 func (dh *HttpRouter) Run() {
 
 	// Make sure certificates exist in the current directory
-	certFile, keyFile := core.GenerateCertificates()
+	certFile, keyFile := core.EnsureCertificates()
 
-	err := dh.httpServer.ListenAndServeTLS(certFile, keyFile)
+	var err error
+	if dh.ci.HttpRouterConf().UsePlainHttp {
+		err = dh.httpServer.ListenAndServe()
+	} else {
+		err = dh.httpServer.ListenAndServeTLS(certFile, keyFile)
+	}
 
 	if !errors.Is(err, http.ErrServerClosed) {
 		fmt.Println(err)

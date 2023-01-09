@@ -1,4 +1,5 @@
 {
     "bindAddress": "0.0.0.0",
-    "bindPort": 20000
+    "bindPort": 20000,
+    "usePlainHttp": false
 }

@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"math/big"
 	"os"
+	"path"
 	"sync"
 	"time"
 )
@@ -20,13 +21,26 @@ var certMutex sync.Mutex
 // Files are "cert.pem" and "key.pem" located in the parent of the bootstrap directory
 // or in the current directory if this variable is not set (because the bootstrap file is remote)
 // It returns the names of the files
-func GenerateCertificates() (string, string) {
+// If environment variables IGOR_HTTPS_KEY_FILE and IGOR_HTTPS_CERT_FILE exist, use those instead
+// and does not create certificates
+func EnsureCertificates() (string, string) {
 
 	certMutex.Lock()
 	defer certMutex.Unlock()
 
-	var certFile string
-	var keyFile string
+	var certFile string = os.Getenv("IGOR_HTTPS_CERT_FILE")
+	var keyFile string = os.Getenv("IGOR_HTTPS_KEY_FILE")
+
+	// Check whether environment variables exist
+	if certFile != "" && keyFile != "" {
+		if path.IsAbs(certFile) {
+			return certFile, keyFile
+		} else {
+			return IgorConfigBase + certFile, IgorConfigBase + keyFile
+		}
+	}
+
+	// Locations of the files to be created are relative to the base config directory (bootstrap file)
 	if IgorConfigBase != "" {
 		certFile = IgorConfigBase + "../cert.pem"
 		keyFile = IgorConfigBase + "../key.pem"
@@ -39,6 +53,8 @@ func GenerateCertificates() (string, string) {
 	if _, err := os.Stat(certFile); err == nil {
 		return certFile, keyFile
 	}
+
+	// Generation of the certificate and key
 
 	// Generate private key
 	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
