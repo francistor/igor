@@ -4,7 +4,7 @@
             "password": "secret"
         }
         "replyItems":[
-            {"HW-Input-Peak-Information-Rate": {{.Speed}} },
+            {"Huawei-Input-Peak-Rate": {{.Speed}} },
             {"Reply-Message": "{{.Message}}"}
         ]
     }

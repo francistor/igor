@@ -14,17 +14,25 @@ func TestFreeradiusParser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// fmt.Println(jDict)
+	dict := newRadiusDictionaryFromJDict(&jDict)
 
 	/*
-		dict := newRadiusDictionaryFromJDict(&jDict)
-
-		myAVP := dict.AVPByName["Igor-IntegerAttribute"]
-		if myAVP.Code != 3 {
-			t.Fatal("Igor-IntegerAttribute has not code 3")
-		}
-		if myAVP.EnumValues["One"] != 1 {
-			t.Fatal("Igor-IntegerAttribute has no item 'One'")
+		for _, avp := range jDict.Avps {
+			for _, attr := range avp.Attributes {
+				fmt.Println(avp.VendorId, attr.Name)
+			}
 		}
 	*/
+
+	myAVP, ok := dict.AVPByName["Igor-IntegerAttribute"]
+	if !ok {
+		t.Fatal("Attribute not found")
+	}
+	if myAVP.Code != 3 {
+		t.Fatal("Igor-IntegerAttribute has not code 3")
+	}
+	if myAVP.EnumValues["One"] != 1 {
+		t.Fatal("Igor-IntegerAttribute has no item 'One'")
+	}
+
 }

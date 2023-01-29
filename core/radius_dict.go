@@ -182,12 +182,6 @@ func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) RadiusAVPDictItem {
 		panic(javp.Type + " is not a valid RadiusType")
 	}
 
-	if (javp.Encrypted || javp.Salted || javp.Withlen) && (radiusType != RadiusTypeOctets && radiusType != RadiusTypeString) {
-		if !(javp.Salted && (radiusType == RadiusTypeInteger || radiusType == RadiusTypeAddress)) {
-			panic(fmt.Sprintf("encrypted/salted/withlen not octets/string found in dictionary: %v", javp))
-		}
-	}
-
 	var codes map[int]string
 	if javp.EnumValues != nil {
 		codes = make(map[int]string)

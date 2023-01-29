@@ -77,7 +77,7 @@ func TestRadiusAttributesHandler(request *core.RadiusPacket) (*core.RadiusPacket
 					{"3GPP2-Pre-Shared-Secret": "010203AABBCC"},
 					{"3GPP2-MN-HA-Key": "the-key"},
 					{"Unisphere-LI-Action": 1},
-					{"Unisphere-Med-IP-Address": "2.2.2.2"}
+					{"Unisphere-Med-Ip-Address": "2.2.2.2"}
 				]
 				`
 

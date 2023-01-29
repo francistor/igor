@@ -63,13 +63,18 @@ PROTOCOL	RADIUS		1	verify=lib
 BEGIN-PROTOCOL	RADIUS
 
 
-$INCLUDE dictionary.rfc2865
-$INCLUDE dictionary.rfc2866
+$INCLUDE freeradius_dictionaries/dictionary.rfc2865
+$INCLUDE freeradius_dictionaries/dictionary.rfc2866
+$INCLUDE freeradius_dictionaries/dictionary.rfc2868
+$INCLUDE freeradius_dictionaries/dictionary.rfc2869
+$INCLUDE freeradius_dictionaries/dictionary.rfc3162
 
-$INCLUDE dictionary.cisco
-$INCLUDE dictionary.huawei
-$INCLUDE dictionary.nokia.sr
-$INCLUDE dictionary.unisphere
-$INCLUDE dictionary.juniper
+$INCLUDE freeradius_dictionaries/dictionary.cisco
+$INCLUDE freeradius_dictionaries/dictionary.huawei
+$INCLUDE freeradius_dictionaries/dictionary.nokia.sr
+$INCLUDE freeradius_dictionaries/dictionary.unisphere
+$INCLUDE freeradius_dictionaries/dictionary.juniper
+$INCLUDE freeradius_dictionaries/dictionary.psa
+$INCLUDE freeradius_dictionaries/dictionary.igor
 
 END-PROTOCOL RADIUS

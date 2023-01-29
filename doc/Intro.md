@@ -69,8 +69,17 @@ pool.
 
 ### Dictionaries
 
-The Diameter and Radius dictionaries are stored in resources named `radiusDictionary.json` and `diameterDictionary.json`. Those names are fixed. See the
-provided files for hints on the syntax.
+The Diameter and Radius dictionaries are stored in resources named `radiusDictionary.json` and `diameterDictionary.json`. Those names are fixed. See the provided files for hints on the syntax.
+
+Attributes may have the following associated metadata:
+* tagged: whether a single byte is added to the attribute, to match multiple attriubte subsets. When creating a tagged attribute a `:<tag>` suffix must be used
+* encrypted: whether the standard radius encryption mechanism is used.
+* salted: in this case, also the radius encryption mechanism is used on a payload that includes two random bytes.
+* withlen: the encrypted payload is prepended with a single byte size field, to clearly specify the size of the payload since, when using encryption, the total size is always padded to multiples of 16 bytes.
+
+#### Usage of freeradius dictionaries
+
+Igor will look first for a resource called `dictionary` that may contain a radius dictionary in Freeradius syntax, and use it instead of `radiusDictionary.json`. This file may contain `$INCLUDE` directives pointing to other dictionary files.
 
 ### Logging
 

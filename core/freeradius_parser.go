@@ -19,7 +19,7 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 	// Initially point to standard attributes
 	var currentVendorAVPsIndex int
 	if len(dict.Avps) == 0 {
-		dict.Avps = make([]jRadiusVendorAVPs, 1)
+		dict.Avps = append(dict.Avps, jRadiusVendorAVPs{VendorId: 0, Attributes: make([]jRadiusAVP, 0)})
 	}
 
 	// Iterate through the dictionary lines
@@ -54,24 +54,42 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 			if err != nil {
 				return errors.New("invalid VENDOR " + line)
 			}
+
+			// Insert into vendors field
 			dict.Vendors = append(dict.Vendors, jVendor{
 				VendorId:   uint32(vendorId),
 				VendorName: words[1],
 			})
 
-		case "START-VENDOR":
-			// Look for vendor in the current dict and set the current Vendor variables
+			// Initialize avps slice item for vendor
+			dict.Avps = append(dict.Avps,
+				jRadiusVendorAVPs{
+					VendorId:   uint32(vendorId),
+					Attributes: make([]jRadiusAVP, 0),
+				})
+
+		case "BEGIN-VENDOR":
 			// The vendor must have been defined previously
-			var found = false
+
+			// Look for vendor id
+			var vendorId uint32 = 0
 			for i := range dict.Vendors {
 				if dict.Vendors[i].VendorName == words[1] {
-					currentVendorAVPsIndex = i
-					found = true
+					vendorId = dict.Vendors[i].VendorId
 					break
 				}
 			}
-			if !found {
+
+			if vendorId == 0 {
 				return errors.New("vendor " + words[1] + " not found")
+			} else {
+				// Get the index for that vendorId
+				for i := range dict.Avps {
+					if dict.Avps[i].VendorId == vendorId {
+						currentVendorAVPsIndex = i
+						break
+					}
+				}
 			}
 
 		case "END-VENDOR":
@@ -140,15 +158,18 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 			if err != nil {
 				return errors.New("invalid VALUE " + line)
 			}
-			// Get the corresponding attribute
-			attrs := dict.Avps[currentVendorAVPsIndex].Attributes
-			for i, attr := range attrs {
+
+			// Look for the attribute name
+			for i, attr := range dict.Avps[currentVendorAVPsIndex].Attributes {
 				if attr.Name == words[1] {
-					enumValues := attrs[i].EnumValues
-					if enumValues == nil {
-						attrs[i].EnumValues = make(map[string]int)
+
+					// Initialize if necessary
+					if attr.EnumValues == nil {
+						dict.Avps[currentVendorAVPsIndex].Attributes[i].EnumValues = make(map[string]int)
 					}
-					attrs[i].EnumValues[words[2]] = val
+
+					// Add item
+					dict.Avps[currentVendorAVPsIndex].Attributes[i].EnumValues[words[2]] = val
 					break
 				}
 			}
@@ -182,6 +203,12 @@ func parseRadiusType(t string) string {
 	case "vsa":
 		return "VSA"
 	default:
+		// Exceptions
+		if strings.HasPrefix(t, "octets") {
+			// Freeradius uses sometimes octets[size]
+			return "octets"
+		}
+
 		panic("unrecognized attribute type " + t)
 	}
 }

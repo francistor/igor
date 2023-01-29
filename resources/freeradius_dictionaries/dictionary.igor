@@ -1,0 +1,24 @@
+VENDOR		Igor				30001
+
+BEGIN-VENDOR	Igor
+
+ATTRIBUTE	OctetsAttribute			        1	octets
+ATTRIBUTE	StringAttribute			        2	string
+ATTRIBUTE	IntegerAttribute		        3	integer
+ATTRIBUTE	AddressAttribute		        4	ipaddr
+ATTRIBUTE	TimeAttribute			        5	date
+ATTRIBUTE	IPv6AddressAttribute			6	ipv6addr
+ATTRIBUTE	IPv6PrefixAttribute 			7	ipv6prefix
+ATTRIBUTE	InterfaceIdAttribute			8	ifid
+ATTRIBUTE	Integer64Attribute			    9	integer64
+ATTRIBUTE	TaggedStringAttribute			11	string has_tag
+ATTRIBUTE	SaltedOctetsAttribute			12	octets encrypt=9
+ATTRIBUTE	TaggedSaltedOctetsAttribute		13	octets encrypt=8
+ATTRIBUTE	SaltedStringAttribute			14	string encrypt=9
+
+VALUE       IntegerAttribute                Zero 0
+VALUE       IntegerAttribute                One 1
+VALUE       IntegerAttribute                Two 2
+VALUE       IntegerAttribute                Three 3
+
+END-VENDOR	Igor

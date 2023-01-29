@@ -4,7 +4,7 @@
     [
         {"vendorId": 1001, "vendorName": "Igor"},
         {"vendorId": 9, "vendorName": "Cisco"},
-        {"vendorId": 2011, "vendorName": "HW"},
+        {"vendorId": 2011, "vendorName": "Huawei"},
         {"vendorId": 2352, "vendorName": "Redback"}, 
         {"vendorId": 4874, "vendorName": "Unisphere"},  
         {"VendorId": 5535, "vendorName": "3GPP2"}, 
@@ -306,32 +306,32 @@
             [
                 {
                     "code": 1,
-                    "name": "Input-Committed-Burst-Size",
+                    "name": "Input-Burst-Size",
                     "type": "Integer"
                 },
                 {
                     "code": 2,
-                    "name": "Input-Committed-Information-Rate",
+                    "name": "Input-Average-Rate",
                     "type": "Integer"
                 },
                 {
                     "code": 3,
-                    "name": "Input-Peak-Information-Rate",
+                    "name": "Input-Peak-Rate",
                     "type": "Integer"
                 },
                 {
                     "code": 4,
-                    "name": "Output-Committed-Burst-Size",
+                    "name": "Output-Burst-Size",
                     "type": "Integer"
                 },
                 {
                     "code": 5,
-                    "name": "Output-Committed-Information-Rate",
+                    "name": "Output-Average-Rate",
                     "type": "Integer"
                 },
                 {
                     "code": 6,
-                    "name": "Output-Peak-Information-Rate",
+                    "name": "Output-Peak-Rate",
                     "type": "Integer"
                 },
                 {
@@ -412,7 +412,7 @@
                 },
                 {
                     "code": 60,
-                    "name": "Med-IP-Address",
+                    "name": "Med-Ip-Address",
                     "type": "Address",
                     "salted": true,
                     "withlen": true

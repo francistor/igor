@@ -16,8 +16,8 @@
             {"Cisco-AVPair": "c=d"}
         ],
         "oobReplyItems":[
-            {"HW-Service-Info": "service-info-value2"},
-            {"HW-Account-Info": "additional"}
+            {"Huawei-Service-Info": "service-info-value2"},
+            {"Huawei-Account-Info": "additional"}
         ]
     }
 }

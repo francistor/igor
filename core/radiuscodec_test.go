@@ -360,7 +360,7 @@ func TestSaltedAddressAVP(t *testing.T) {
 	var value = "1.1.1.1"
 
 	// Create
-	avp, err := NewRadiusAVP("Unisphere-Med-IP-Address", value)
+	avp, err := NewRadiusAVP("Unisphere-Med-Ip-Address", value)
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return

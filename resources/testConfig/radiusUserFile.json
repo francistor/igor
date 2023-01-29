@@ -17,7 +17,7 @@
             {"Cisco-AVPair": "a=b"}
         ],
         "oobReplyItems":[
-            {"HW-Service-Info": "service-info-value"}
+            {"Huawei-Service-Info": "service-info-value"}
         ]
     },
 

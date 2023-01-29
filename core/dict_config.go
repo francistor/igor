@@ -17,12 +17,20 @@ func initDictionaries(cm *ConfigurationManager) {
 	diameterDict = NewDiameterDictionaryFromJSON([]byte(coreJSON))
 
 	// Radius
-	radiusDictJSON, err := cm.GetBytesConfigObject("radiusDictionary.json")
+	// First try freeradius dictionary
+	var jDict jRadiusDict
+	err = ParseFreeradiusDictionary(cm, "dictionary", &jDict)
 	if err != nil {
-		panic("Could not read radiusDictionary.json")
-	}
+		// If not found, try
+		radiusDictJSON, err := cm.GetBytesConfigObject("radiusDictionary.json")
+		if err != nil {
+			panic("Could not read radiusDictionary.json or dictionary (freeradius format)")
+		}
 
-	radiusDict = NewRadiusDictionaryFromJSON([]byte(radiusDictJSON))
+		radiusDict = NewRadiusDictionaryFromJSON([]byte(radiusDictJSON))
+	} else {
+		radiusDict = newRadiusDictionaryFromJDict(&jDict)
+	}
 }
 
 // Used globally to get access to the diameter dictionary
