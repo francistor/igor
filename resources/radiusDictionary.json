@@ -30,7 +30,7 @@
                 {
                     "code": 2,
                     "name": "User-Password",
-                    "type": "Octets",
+                    "type": "String",
                     "encrypted": true
                 },
                 {
@@ -262,9 +262,10 @@
                 {
                     "code": 69,
                     "name": "Tunnel-Password",
-                    "type": "Octets",
+                    "type": "String",
                     "tagged": true,
-                    "salted": true
+                    "salted": true,
+                    "withlen": true
                 },
                 {
                     "code": 95,
@@ -396,6 +397,25 @@
                     "code": 56,
                     "name": "DHCP-MAC-Address",
                     "type": "String"
+                },
+                {
+                    "code": 58,
+                    "name": "LI-Action",
+                    "type": "Integer",
+                    "salted": true,
+                    "withlen": true,
+                    "enumValues": 
+                    {
+                        "off": 0,
+                        "on": 1
+                    }
+                },
+                {
+                    "code": 60,
+                    "name": "Med-IP-Address",
+                    "type": "Address",
+                    "salted": true,
+                    "withlen": true
                 }
             ]
         },
@@ -489,13 +509,15 @@
                     "code": 3,
                     "name": "Pre-Shared-Secret",
                     "type": "Octets",
-                    "salted": true
+                    "salted": true,
+                    "withlen": true
                 },
                 {
                     "code": 58,
                     "name": "MN-HA-Key",
-                    "type": "Octets",
-                    "salted": true
+                    "type": "String",
+                    "salted": true,
+                    "withlen": true
                 }
             ]
         },
@@ -578,6 +600,12 @@
                     "type": "Octets",
                     "salted": true,
                     "tagged": true
+                },
+                {
+                    "code": 14,
+                    "name": "SaltedStringAttribute",
+                    "type": "String",
+                    "salted": true
                 }
             ]
         }

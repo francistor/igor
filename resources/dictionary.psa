@@ -1,0 +1,21 @@
+VENDOR		Igor				21100
+
+BEGIN-VENDOR	PSA
+
+ATTRIBUTE	ServiceType			        101	string
+ATTRIBUTE	ServiceName			        102	string
+ATTRIBUTE	AutoactivatedBasicService	104	string
+
+ATTRIBUTE	AutoActivatedCampaignService 105	string
+ATTRIBUTE	PHONE			            106	string
+ATTRIBUTE	CampaignData	            107	string
+
+ATTRIBUTE	Operation			        108	string
+ATTRIBUTE	IndexName	                109	string
+ATTRIBUTE	IndexValue	                110	string
+
+ATTRIBUTE	BRAS-NAS-IP-Address			114	string
+ATTRIBUTE	MAC-Address	                117	string
+ATTRIBUTE	LegacyClientId	            119	string
+
+END-VENDOR	PSA

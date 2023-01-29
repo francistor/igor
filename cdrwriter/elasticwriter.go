@@ -15,6 +15,8 @@ import (
 
 const (
 	ELASTIC_PACKET_BUFFER_SIZE = 1000
+	CDR_COUNT_THRESHOLD        = 1000
+	CDR_WRITE_TIME_MILLIS      = 250
 )
 
 type Tick struct{}
@@ -38,6 +40,9 @@ type ElasticCDRWriter struct {
 	username string
 	password string
 
+	// Unavailability for this time does not lead to throwing away the CDR
+	glitchTime time.Duration
+
 	// Formatter
 	formatter *ElasticWriter
 }
@@ -45,7 +50,7 @@ type ElasticCDRWriter struct {
 // Builds a writer
 // The attributeMap applies only for Radius
 // The key is the name of the attribute to be writen. The value is the name of the attribute in the CDR
-func NewElasticCDRWriter(url string, username string, password string, formatter *ElasticWriter, timeoutSeconds int) *ElasticCDRWriter {
+func NewElasticCDRWriter(url string, username string, password string, formatter *ElasticWriter, timeoutSeconds int, glitchSeconds int) *ElasticCDRWriter {
 
 	w := ElasticCDRWriter{
 		packetChan: make(chan interface{}, ELASTIC_PACKET_BUFFER_SIZE),
@@ -53,6 +58,7 @@ func NewElasticCDRWriter(url string, username string, password string, formatter
 		url:        url,
 		username:   username,
 		password:   password,
+		glitchTime: time.Duration(glitchSeconds) * time.Second,
 		formatter:  formatter,
 	}
 
@@ -77,9 +83,10 @@ func (w *ElasticCDRWriter) eventLoop() {
 	var sb strings.Builder
 	var cdrCounter = 0
 	var lastWritten = time.Now()
+	var lastError time.Time
 
 	// Sends Ticks through the packet channel
-	var ticker = time.NewTicker(250 * time.Millisecond)
+	var ticker = time.NewTicker(CDR_WRITE_TIME_MILLIS * time.Millisecond)
 	go func() {
 		for {
 			<-ticker.C
@@ -95,16 +102,22 @@ func (w *ElasticCDRWriter) eventLoop() {
 			cdrCounter++
 		}
 
-		if cdrCounter > 1000 || time.Since(lastWritten).Milliseconds() > 250 {
+		if cdrCounter > CDR_COUNT_THRESHOLD || time.Since(lastWritten).Milliseconds() > CDR_WRITE_TIME_MILLIS {
 			err := w.sendToElastic(&sb)
 			if err != nil {
 				// Not written to elasic and sb not reset.
 				core.GetLogger().Errorf("elastic writer error: %s", err)
 
-				// The policy implemented is to discard the unwritten CDR
-				sb.Reset()
+				// Only if we are outside the glitch interval, throw away the CDR
+				if time.Since(lastError) > w.glitchTime {
+					sb.Reset()
+				}
+				// Set to 0 so that we don't try again immediately later
 				cdrCounter = 0
+				lastError = time.Now()
+
 			} else {
+				// For clarity, repeated here
 				cdrCounter = 0
 			}
 			lastWritten = time.Now()

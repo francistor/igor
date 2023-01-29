@@ -30,8 +30,8 @@ func main() {
 	logger.Info("Diameter router started")
 
 	// Start Radius
-	// _ = router.NewRadiusRouter(*instancePtr, handler.TestRadiusAttributesHandler)
-	_ = router.NewRadiusRouter(*instancePtr, handler.EmptyRadiusHandler).Start()
+	_ = router.NewRadiusRouter(*instancePtr, handler.TestRadiusAttributesHandler).Start()
+	//_ = router.NewRadiusRouter(*instancePtr, handler.EmptyRadiusHandler).Start()
 	logger.Info("Radius router started")
 
 	time.Sleep(1000 * time.Minute)

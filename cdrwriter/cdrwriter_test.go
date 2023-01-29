@@ -264,7 +264,7 @@ func TestElasticWriter(t *testing.T) {
 	}
 	ew := NewElasticWriter(conf)
 
-	ecdrw := NewElasticCDRWriter("http://elasticdatabase:9200/_doc/_bulk?filter_path=took,errors", "", "", ew, 1)
+	ecdrw := NewElasticCDRWriter("http://elasticdatabase:9200/_doc/_bulk?filter_path=took,errors", "", "", ew, 1 /* Timeout */, 2 /* GlitchSeconds */)
 
 	rp := buildSimpleRadiusPacket(t)
 	ecdrw.WriteRadiusCDR(&rp)

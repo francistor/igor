@@ -23,12 +23,12 @@ echo
 # echo User-Password = \"hi, this is the __ password!\" > $REQUESTFILE
 # echo Tunnel-Type = \"PPTP\":2 > $REQUESTFILE
 # echo Igor-IntegerAttribute = 1 > $REQUESTFILE
-# echo 3GPP2-Pre-Shared-Secret = \"000000\" > $REQUESTFILE
-# echo 3GPP2-MN-HA-Key = \"000000\" >> $REQUESTFILE
+echo 3GPP2-Pre-Shared-Secret = \"010203\" > $REQUESTFILE
+echo 3GPP2-MN-HA-Key = \"thekey\" >> $REQUESTFILE
 # echo Igor-SaltedOctetsAttribute = \"123456789abcdef\" > $REQUESTFILE
-echo Igor-TaggedSaltedOctetsAttribute = \"123456789abcdef\" > $REQUESTFILE
 # echo Tunnel-Client-Endpoint= \"t\":2 >> $REQUESTFILE
-# echo Tunnel-Password = \"1\":2 > $REQUESTFILE
+echo Tunnel-Password = \"secretpasswordsent\":2 >> $REQUESTFILE
+echo Unisphere-LI-Action = 1 >> $REQUESTFILE
 
 # Send the packet
 # -overlap <number of simultaneous requests>

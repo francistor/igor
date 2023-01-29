@@ -30,22 +30,45 @@ func TestPasswordAVP(t *testing.T) {
 	//var password = "0"
 
 	// Create avp
-	avp, err := NewRadiusAVP("User-Password", []byte(password))
+	avp, err := NewRadiusAVP("User-Password", password)
 	if err != nil {
 		t.Errorf("error creating AVP: %v", err)
 		return
 	}
-	if avp.GetString() != fmt.Sprintf("%x", password) {
+	if avp.GetString() != password {
 		t.Errorf("value does not match")
 	}
 
 	// Serialize and unserialize
 	binaryAVP, _ := avp.ToBytes(authenticator, secret)
 	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP, authenticator, secret)
-	if !reflect.DeepEqual(bytes.Trim(rebuiltAVP.GetOctets(), "\x00"), []byte(password)) {
-		t.Errorf("value does not match after unmarshalling. Got %v", rebuiltAVP.GetOctets())
+	rebuiltPassword := rebuiltAVP.GetString()
+	if err != nil {
+		t.Errorf(err.Error())
+	} else if rebuiltPassword != password {
+		t.Errorf("password does not match. Got %s", rebuiltPassword)
 	}
-	rebuiltPassword, err := rebuiltAVP.GetPasswordString()
+}
+
+// Salted, Encrypted and WithLen
+func TestTunnelPasswordAVP(t *testing.T) {
+
+	var password = "'my-password! and a very long one indeed %&$"
+
+	// Create avp
+	avp, err := NewRadiusAVP("Tunnel-Password", password+":1")
+	if err != nil {
+		t.Errorf("error creating AVP: %v", err)
+		return
+	}
+	if avp.GetString() != password {
+		t.Errorf("value does not match")
+	}
+
+	// Serialize and unserialize
+	binaryAVP, _ := avp.ToBytes(authenticator, secret)
+	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP, authenticator, secret)
+	rebuiltPassword := rebuiltAVP.GetString()
 	if err != nil {
 		t.Errorf(err.Error())
 	} else if rebuiltPassword != password {
@@ -286,10 +309,10 @@ func TestTaggedAVP(t *testing.T) {
 
 func TestSaltedAVP(t *testing.T) {
 
-	theValue := "this is a salted attribute! and a very long one indeed!"
+	theValue := []byte("this is a salted attribute! and a very long one indeed!")
 
 	// Create 0
-	avp, err := NewRadiusAVP("Igor-SaltedOctetsAttribute", []byte(theValue))
+	avp, err := NewRadiusAVP("Igor-SaltedOctetsAttribute", theValue)
 	if err != nil {
 		t.Errorf("error creating avp: %v", err)
 		return
@@ -298,14 +321,37 @@ func TestSaltedAVP(t *testing.T) {
 	// Serialize and unserialize
 	binaryAVP, _ := avp.ToBytes(authenticator, secret)
 	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP, authenticator, secret)
-	if !reflect.DeepEqual(bytes.Trim(rebuiltAVP.GetOctets(), "\x00"), []byte(theValue)) {
+	// The retrieved value will be padded with zeroes
+	var padLen int
+	if len(theValue)%16 == 0 {
+		padLen = 0
+	} else {
+		padLen = 16 - len(theValue)%16
+	}
+	paddedValue := append(theValue, make([]byte, padLen)...)
+	if !reflect.DeepEqual(rebuiltAVP.GetOctets(), paddedValue) {
 		t.Errorf("value does not match after unmarshalling. Got %v", rebuiltAVP.GetOctets())
 	}
-	rebuiltValue, err := rebuiltAVP.GetPasswordString()
+}
+
+func TestSaltedIntegerAVP(t *testing.T) {
+
+	var value = 1
+
+	// Create 0
+	avp, err := NewRadiusAVP("Unisphere-LI-Action", value)
 	if err != nil {
-		t.Errorf(err.Error())
-	} else if rebuiltValue != theValue {
-		t.Errorf("value does not match. Got %s", rebuiltValue)
+		t.Errorf("error creating avp: %v", err)
+		return
+	}
+
+	// Serialize and unserialize
+	binaryAVP, _ := avp.ToBytes(authenticator, secret)
+	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP, authenticator, secret)
+
+	if rebuiltAVP.GetInt() != int64(value) {
+		t.Errorf("error recovering value from salted integer. Got %d instead of %v", rebuiltAVP.GetInt(), value)
+		return
 	}
 }
 
@@ -329,7 +375,7 @@ func TestAccessRequest(t *testing.T) {
 
 	request := NewRadiusRequest(ACCESS_REQUEST)
 	request.Add("User-Name", theUserName)
-	request.Add("User-Password", []byte(thePassword))
+	request.Add("User-Password", thePassword)
 
 	// Serialize
 	packetBytes, err := request.ToBytes(secret, 0)
@@ -347,7 +393,7 @@ func TestAccessRequest(t *testing.T) {
 		t.Errorf("attribute does not match <%s>", userName)
 	}
 
-	if password := recoveredPacket.GetPasswordStringAVP("User-Password"); password != thePassword {
+	if password := recoveredPacket.GetStringAVP("User-Password"); password != thePassword {
 		t.Errorf("attribute does not match <%s>", password)
 	}
 
@@ -442,7 +488,8 @@ func TestJSONAndCopyPacket(t *testing.T) {
 					{"Igor-Integer64Attribute": 999999999999},
 					{"Igor-TaggedStringAttribute": "myString:1"},
 					{"Igor-SaltedOctetsAttribute": "1122aabbccdd"},
-					{"User-Name":"MyUserName"}
+					{"User-Name":"MyUserName"},
+					{"Tunnel-Password":"secretpassword:2"}
 				]
 			}`
 
