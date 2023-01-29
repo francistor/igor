@@ -355,6 +355,27 @@ func TestSaltedIntegerAVP(t *testing.T) {
 	}
 }
 
+func TestSaltedAddressAVP(t *testing.T) {
+
+	var value = "1.1.1.1"
+
+	// Create
+	avp, err := NewRadiusAVP("Unisphere-Med-IP-Address", value)
+	if err != nil {
+		t.Errorf("error creating avp: %v", err)
+		return
+	}
+
+	// Serialize and unserialize
+	binaryAVP, _ := avp.ToBytes(authenticator, secret)
+	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP, authenticator, secret)
+
+	if rebuiltAVP.GetString() != value {
+		t.Errorf("error recovering value from salted address. Got %s instead of %s", rebuiltAVP.GetString(), value)
+		return
+	}
+}
+
 func TestEncryptFunction(t *testing.T) {
 	authenticator := GetAuthenticator()
 	password := "__! $? this is the - ñ long password  '            7887"
