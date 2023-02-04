@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/francistor/igor/core"
 )
@@ -48,14 +49,14 @@ func TestRadiusAttributesHandler(request *core.RadiusPacket) (*core.RadiusPacket
 		l.WriteLog()
 	}(hl)
 
-	// Print the password
-	pwd := request.GetStringAVP("User-Password")
-	l.Infof("Password: <%s>", pwd)
-
 	// Print all received attributes
 	for _, avp := range request.AVPs {
 		l.Infof("%s %s", avp.Name, avp.GetTaggedString())
 	}
+
+	// Validate
+	result, err := request.Auth("secret")
+	l.Infof("auth: %t, error: %v", result, err)
 
 	// Reply with one attribute of each type
 	jAVPs := `
@@ -75,7 +76,7 @@ func TestRadiusAttributesHandler(request *core.RadiusPacket) (*core.RadiusPacket
 					{"User-Name": "MyUserName"},
 					{"Tunnel-Password": "secretpassword:2"},
 					{"3GPP2-Pre-Shared-Secret": "010203AABBCC"},
-					{"3GPP2-MN-HA-Key": "the-key"},
+					{"3GPP2-MN-HA-Shared-Key": "the-key"},
 					{"Unisphere-LI-Action": 1},
 					{"Unisphere-Med-Ip-Address": "2.2.2.2"}
 				]
@@ -84,9 +85,10 @@ func TestRadiusAttributesHandler(request *core.RadiusPacket) (*core.RadiusPacket
 	resp := core.NewRadiusResponse(request, true)
 
 	var responseAVPs []core.RadiusAVP
-	err := json.Unmarshal([]byte(jAVPs), &responseAVPs)
+	err = json.Unmarshal([]byte(jAVPs), &responseAVPs)
 	if err != nil {
 		l.Errorf("could not build packet: %s", err.Error())
+		return nil, fmt.Errorf("could not build packet: %s", err.Error())
 	}
 
 	for _, avp := range responseAVPs {

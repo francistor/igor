@@ -532,6 +532,50 @@ func (rp *RadiusPacket) GetDateAVP(avpName string) time.Time {
 	return avp.GetDate()
 }
 
+// Same for octets
+func (rp *RadiusPacket) GetOctetsAVP(avpName string) []byte {
+	avp, err := rp.GetAVP(avpName)
+	if err != nil {
+		return nil
+	}
+	return avp.GetOctets()
+}
+
+///////////////////////////////////////////////////////////////
+// Password validation
+///////////////////////////////////////////////////////////////
+
+// Performs the authentication using PAP or CHAP
+func (rp *RadiusPacket) Auth(password string) (bool, error) {
+
+	// PAP
+	if p := rp.GetStringAVP("User-Password"); p != "" {
+		return password == p, nil
+	}
+
+	// CHAP
+	chapPwd := rp.GetOctetsAVP("CHAP-Password")
+	if len(chapPwd) != 17 {
+		return false, fmt.Errorf("no User-Password or invalid/unexisting CHAP-Password in request")
+	}
+	id := chapPwd[0]
+	response := chapPwd[1:17]
+
+	challenge := rp.GetOctetsAVP("CHAP-Challenge")
+	if len(challenge) == 0 {
+		challenge = rp.Authenticator[:]
+	}
+
+	// Calculate the desired output
+	hasher := md5.New()
+	hasher.Write([]byte{id})
+	hasher.Write([]byte(password))
+	hasher.Write(challenge)
+	expected := hasher.Sum(nil)
+
+	return bytes.Equal(expected, response), nil
+}
+
 ///////////////////////////////////////////////////////////////
 // Packet creation and manipulation
 ///////////////////////////////////////////////////////////////

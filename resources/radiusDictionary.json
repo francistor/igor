@@ -520,7 +520,7 @@
                 },
                 {
                     "code": 58,
-                    "name": "MN-HA-Key",
+                    "name": "MN-HA-Shared-Key",
                     "type": "String",
                     "salted": true,
                     "withlen": true
