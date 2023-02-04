@@ -28,7 +28,7 @@ func echoHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", true)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", nil, true)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())

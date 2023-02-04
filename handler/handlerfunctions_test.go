@@ -16,7 +16,7 @@ func TestMain(m *testing.M) {
 	bootFile := "resources/searchRules.json"
 	instanceName := "testConfig"
 
-	core.InitPolicyConfigInstance(bootFile, instanceName, true)
+	core.InitPolicyConfigInstance(bootFile, instanceName, nil, true)
 
 	os.Exit(m.Run())
 }

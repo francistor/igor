@@ -35,7 +35,7 @@ var jElasticConfig = `
 
 // Initializer of the test suite.
 func TestMain(m *testing.M) {
-	core.InitPolicyConfigInstance(bootstrapFile, instanceName, true)
+	core.InitPolicyConfigInstance(bootstrapFile, instanceName, nil, true)
 
 	// Execute the tests
 	exitCode := m.Run()

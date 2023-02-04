@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"text/template"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -65,6 +66,9 @@ type ConfigurationManager struct {
 	// The contents of the bootstrapFile are parsed here
 	searchRules SearchRules
 
+	// Global configuration parameters
+	configParams map[string]string
+
 	// Database Handle for access to the configuration database
 	dbHandle *sql.DB
 }
@@ -73,10 +77,28 @@ type ConfigurationManager struct {
 var IgorConfigBase string
 
 // Creates and initializes a ConfigurationManager
-func NewConfigurationManager(bootstrapFile string, instanceName string) ConfigurationManager {
+// The <params> argument is used as parameter to the objects, treated as templates
+func NewConfigurationManager(bootstrapFile string, instanceName string, params map[string]string) ConfigurationManager {
+
+	if params == nil {
+		params = make(map[string]string)
+	}
+
+	// Add environment variables to the params object
+	for _, envKV := range os.Environ() {
+		if strings.HasPrefix(envKV, "igor_") || strings.HasPrefix(envKV, "IGOR_") {
+			envKV = strings.TrimPrefix(envKV, "igor_")
+			envKV = strings.TrimPrefix(envKV, "IGOR_")
+
+			kv := strings.Split(envKV, "=")
+			params[kv[0]] = kv[1]
+		}
+	}
+
 	cm := ConfigurationManager{
 		instanceName:  instanceName,
 		bootstrapFile: bootstrapFile,
+		configParams:  params,
 	}
 
 	cm.fillSearchRules(cm.fixBootstrapFileLocation(bootstrapFile, true))
@@ -84,21 +106,62 @@ func NewConfigurationManager(bootstrapFile string, instanceName string) Configur
 	return cm
 }
 
+// Parses the object as a template using the parameters
+func (c *ConfigurationManager) parseObject(obj []byte) ([]byte, error) {
+
+	// Parse the template
+	tmpl, err := template.New("igor_template").Parse(string(obj))
+	if err != nil {
+		return nil, err
+	}
+	// Execute the template
+	var tmplRes strings.Builder
+	if err := tmpl.Execute(&tmplRes, c.configParams); err != nil {
+		return nil, err
+	}
+
+	return []byte(tmplRes.String()), nil
+}
+
 // Fills the object passed as parameter with the configuration object which is
-// interpreted as JSON
+// interpreted as JSON. The contents of the object are treated as a template with
+// parameters, which are replaced by the contents of the map passed at initialization
+// of the ConfigurationManager
 func (c *ConfigurationManager) BuildJSONConfigObject(objectName string, obj any) error {
 
 	jb, err := c.getObject(objectName)
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(jb, obj)
+
+	parsed, err := c.parseObject(jb)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(parsed, obj)
 }
 
 // Fills the object passed as parameter with the configuration object which is
-// interpreted as raw text
+// interpreted as raw text. This version treats the contents as a template to be
+// parsed
 func (c *ConfigurationManager) GetBytesConfigObject(objectName string) ([]byte, error) {
 
+	cb, err := c.getObject(objectName)
+	if err != nil {
+		return nil, err
+	}
+
+	parsed, err := c.parseObject(cb)
+	if err != nil {
+		return nil, err
+	}
+
+	return parsed, nil
+}
+
+// This version does not treat the object as a template
+func (c *ConfigurationManager) GetRawBytesConfigObject(objectName string) ([]byte, error) {
 	return c.getObject(objectName)
 }
 
@@ -220,12 +283,6 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 
 	} else {
 		// Read from file
-		/*
-			configBase := os.Getenv("IGOR_BASE")
-			if configBase == "" {
-				panic("environment variable IGOR_BASE undefined")
-			}
-		*/
 		if resp, err := os.ReadFile(IgorConfigBase + location); err != nil {
 			return nil, err
 		} else {
@@ -245,6 +302,12 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	rules, err := c.readResource(bootstrapFile)
 	if err != nil {
 		panic("could not retrieve the bootstrap file in " + bootstrapFile)
+	}
+
+	// Parse template
+	rules, err = c.parseObject(rules)
+	if err != nil {
+		panic("could not parse the bootstrap file in " + bootstrapFile + "due to " + err.Error())
 	}
 
 	// Decode Search Rules and add them to the ConfigurationManager object
@@ -276,10 +339,13 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 			}
 			c.dbHandle.SetMaxOpenConns(c.searchRules.Db.MaxOpenConns)
 
-			err = c.dbHandle.Ping()
-			if err != nil {
-				// If the database is not available, die
-				panic("could not ping database in " + c.searchRules.Db.Url)
+			// If IGOR_ABORT_IF_DB_ERROR is defined, panic on database error
+			if os.Getenv("IGOR_ABORT_IF_DB_ERROR") != "" {
+				err = c.dbHandle.Ping()
+				if err != nil {
+					// If the database is not available, die
+					panic("could not ping database in " + c.searchRules.Db.Url)
+				}
 			}
 		} else {
 			panic("db access parameters not specified in searchrules")

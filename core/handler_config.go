@@ -16,7 +16,7 @@ type HttpHandlerConfigurationManager struct {
 var httpHandlerConfigs []*HttpHandlerConfigurationManager = make([]*HttpHandlerConfigurationManager, 0)
 
 // Adds a Handler configuration object with the specified name
-func InitHttpHandlerConfigInstance(bootstrapFile string, instanceName string, isDefault bool) *HttpHandlerConfigurationManager {
+func InitHttpHandlerConfigInstance(bootstrapFile string, instanceName string, configParams map[string]string, isDefault bool) *HttpHandlerConfigurationManager {
 
 	// Check not already instantiated
 	for i := range httpHandlerConfigs {
@@ -26,7 +26,7 @@ func InitHttpHandlerConfigInstance(bootstrapFile string, instanceName string, is
 	}
 
 	// Better to create asap
-	httpHandlerConfig := HttpHandlerConfigurationManager{CM: NewConfigurationManager(bootstrapFile, instanceName)}
+	httpHandlerConfig := HttpHandlerConfigurationManager{CM: NewConfigurationManager(bootstrapFile, instanceName, configParams)}
 	httpHandlerConfigs = append(httpHandlerConfigs, &httpHandlerConfig)
 
 	// Initialize logger, dictionary and metrics if default

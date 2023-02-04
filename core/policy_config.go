@@ -29,7 +29,7 @@ var policyConfigs []*PolicyConfigurationManager = make([]*PolicyConfigurationMan
 
 // Adds a Policy (Radius and Diameter) configuration object with the specified name to the list of policyConfigs
 // if isDefault is true, also initializes the logger and the dictionaries, which are shared among all instances
-func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefault bool) *PolicyConfigurationManager {
+func InitPolicyConfigInstance(bootstrapFile string, instanceName string, configParams map[string]string, isDefault bool) *PolicyConfigurationManager {
 
 	// Check not already instantiated
 	for i := range policyConfigs {
@@ -40,7 +40,7 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, isDefau
 
 	// Better to create asap
 	policyConfig := PolicyConfigurationManager{
-		CM:                   NewConfigurationManager(bootstrapFile, instanceName),
+		CM:                   NewConfigurationManager(bootstrapFile, instanceName, configParams),
 		diameterServerConfig: NewConfigObject[DiameterServerConfig]("diameterServer.json"),
 		diameterRoutes:       NewConfigObject[DiameterRoutingRules]("diameterRoutes.json"),
 		diameterPeers:        NewConfigObject[DiameterPeers]("diameterPeers.json"),

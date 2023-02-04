@@ -37,11 +37,11 @@ func MyMessageHandler(request *core.DiameterMessage) (*core.DiameterMessage, err
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", true)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testClient", false)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", false)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", false)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testServerBadOriginNetwork", false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", nil, true)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClient", nil, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", nil, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", nil, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServerBadOriginNetwork", nil, false)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())

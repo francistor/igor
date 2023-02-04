@@ -20,7 +20,7 @@ func main() {
 	flag.Parse()
 
 	// Initialize the Config Object
-	core.InitPolicyConfigInstance(*bootPtr, *instancePtr, true)
+	core.InitPolicyConfigInstance(*bootPtr, *instancePtr, nil, true)
 
 	// Get logger
 	logger := core.GetLogger()

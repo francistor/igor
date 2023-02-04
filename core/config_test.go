@@ -37,6 +37,28 @@ func TestDatabaseObject(t *testing.T) {
 	}
 }
 
+func TestParametrizedObject(t *testing.T) {
+	type TestObject struct {
+		MyString  string
+		MyInteger int
+	}
+
+	co := NewConfigObject[TestObject]("parametrized.json.templ")
+	err := co.Update(&GetPolicyConfig().CM)
+	if err != nil {
+		t.Fatal("could not retrieve parametrized.templ")
+	}
+
+	// Values for this are set as environment variables at initialization of testing
+	if co.Get().MyString != igor_string_parameter {
+		t.Fatal("parametrized string object did not have the expected value")
+	}
+
+	if co.Get().MyInteger != igor_int_parameter {
+		t.Fatal("parametrized integer object did not have the expected value")
+	}
+}
+
 // Diameter Configuration
 func TestDiamConfig(t *testing.T) {
 

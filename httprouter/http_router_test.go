@@ -60,8 +60,8 @@ func TestMain(m *testing.M) {
 	bootstrapFile := "resources/searchRules.json"
 
 	// Initialize policy
-	core.InitPolicyConfigInstance(bootstrapFile, "testServer", true)
-	core.InitPolicyConfigInstance(bootstrapFile, "testSuperServer", false)
+	core.InitPolicyConfigInstance(bootstrapFile, "testServer", nil, true)
+	core.InitPolicyConfigInstance(bootstrapFile, "testSuperServer", nil, false)
 
 	// Execute the tests and exit
 	exitCode := m.Run()

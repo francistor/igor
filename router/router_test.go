@@ -78,12 +78,12 @@ func httpRadiusHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", true)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testClient", false)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testSuperServer", false)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", false)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", false)
-	core.InitHttpHandlerConfigInstance("resources/searchRules.json", "testServer", false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", nil, true)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClient", nil, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testSuperServer", nil, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", nil, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", nil, false)
+	core.InitHttpHandlerConfigInstance("resources/searchRules.json", "testServer", nil, false)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())

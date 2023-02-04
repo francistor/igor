@@ -7,7 +7,7 @@
     ],
     "db": {
         "__doc": "use loc=UTC if necessary",
-        "url": "francisco:francisco@tcp(n2:3306)/PSBA?parseTime=true",
+        "url": "psbauser:psbasecret@tcp(localhost:{{ .TEST_MYSQL_PORT }})/PSBA?parseTime=true",
         "driver": "mysql",
         "maxOpenConns": 10
     }

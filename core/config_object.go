@@ -79,7 +79,7 @@ func NewTemplatedConfigObject[T, P any](templateObjectName string, parametersObj
 func (tco *TemplatedConfigObject[T, P]) Update(cm *ConfigurationManager) error {
 
 	// Retrieve the template
-	tmplBytes, err := cm.GetBytesConfigObject(tco.templateObjectName)
+	tmplBytes, err := cm.GetRawBytesConfigObject(tco.templateObjectName)
 	if err != nil {
 		return err
 	}

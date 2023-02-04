@@ -32,6 +32,8 @@ Configuration is done using files (also called "resources"), which may reside lo
 
 Some configuration resources are mandatory, such as the dictionaries or diameter peer files, as they are neede by Igor core. Others may be created for the use of custom handlers.
 
+Configuration files are treated as go templates. Parameters are replaced by the contents of the corresponing `IGOR_` environment variables and the contents of a string map that may be passed at Configuration Manager initialization time (see later)
+
 ### Bootstrap: Searching the location of the configuration resources
 
 The configuration process starts by accessing the bootstrap configuration file, which must be specified somehow (typicaly in a command line parameter). The
@@ -111,17 +113,21 @@ The other relevant configuration files are:
 
 If a http router is spun, the configuration in `httpRouter.json` is taken into account. This will be the endpoint on which radius and diameter requests over http for the radius and diameter routers will be received. The router will handle or forward the requests to upstream radius and diameter servers. The purpose of the http router is to be able to instantiate radius and diameter clients that can be commanded using http and providing a way for external http handlers to generate radius and diameter requests to upstream servers.
 
+The Http router may use plain http or https, as specified in the configuration file. If http is used, a certificate and key are expected in the parent directory of the bootstrap file or in the current directory if the bootstrap file is remote. Alternatively, the `IGOR_HTTPS_CERT_FILE` and `IGOR_HTTPS_KEY_FILE` environment variables may be used, which are assumed to point to the location of the files. If none of this is available, the http router will automatically generate a certificate and key. In this case, the client obviously must have certificate validation turned off.
+
 ### Http handler configuration
 
 If Igor is launched as Http handler, the configuration in `httpHandler.json` is taken into account. This will be the endpoint on which radius and diameter requests will be received for the purpose of handling them. This module is provided as a sample and for testing, since the more common use case will be to handle this kinds of requests with a third party http2 server.
+
+The http handler always use TLS and http2. Thus certificates are mandatory.
 
 ### Helpers for radius configuration
 
 Igor provides some utilities for the development of handlers.
 
-* `radiusChecks.json` define rules for classifying radius packets, for instance in order to determine whether they are session or service accounting, or whether they should be forwarded to upstream servers. An specific object at the disposal of handler developers, named `RadiusPacketChecks` is provided, and a configuration object with this parametrization may be created with the syntax that can be found in the examples. It contains a number of keys that specify the rules to be checked using binary operators and conditions of types `equals`, `present`, `notpresent`, `contains` or `matches` (a regular expression) for the specified radius attribute. The name of this file may be changed
+* The `handler.RadiusPacketChecks` object implements a helper for rules to classify radius packets, for instance in order to determine whether they are session or service accounting, or whether they should be forwarded to upstream servers. This object is parametrized with a configuration object exemplified in the `radisusCheks.json`. It contains a number of keys that specify the rules to be checked using binary operators and conditions of types `equals`, `present`, `notpresent`, `contains` or `matches` (a regular expression) for the specified radius attribute. 
 
-* `radiusFilters.json` define rules for filering outgoing or incoming radius packets: removing attributes, adding attributes with a specific value, or explicitly copying a list of attributes. It is used by objects of type `AVPFilter` The name of this file may be changed.
+* The `handler.AVPFilters` object implements a helper for filtering radius packets: removing attributes, adding attributes with a specific value, or explicitly copying a list of attributes. This object is parametrized with a configuration object exemplified in the `radiusFiters.json` file.
 
 ### Standard configuration management
 
