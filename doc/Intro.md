@@ -78,6 +78,7 @@ Attributes may have the following associated metadata:
 * encrypted: whether the standard radius encryption mechanism is used.
 * salted: in this case, also the radius encryption mechanism is used on a payload that includes two random bytes.
 * withlen: the encrypted payload is prepended with a single byte size field, to clearly specify the size of the payload since, when using encryption, the total size is always padded to multiples of 16 bytes.
+* concat: the attribute may be larger than 255 bytes in size and should be split in chunnks when reading or writting
 
 #### Usage of freeradius dictionaries
 

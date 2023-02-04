@@ -2,7 +2,6 @@ package cdrwriter
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -149,8 +148,6 @@ func TestJSONFormat(t *testing.T) {
 	if !strings.Contains(cdrString, "\"Igor-InterfaceIdAttribute\":\"00aabbccddeeff11\"") {
 		t.Fatalf("missing attribute in written json")
 	}
-
-	fmt.Println(cdrString)
 }
 
 func TestElasticFormat(t *testing.T) {

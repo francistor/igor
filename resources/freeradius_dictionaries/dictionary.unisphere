@@ -1,14 +1,14 @@
 # -*- text -*-
 # Copyright (C) 2022 The FreeRADIUS Server project and contributors
 # This work is licensed under CC-BY version 4.0 https://creativecommons.org/licenses/by/4.0
-# Version $Id$
+# Version $Id: 9421fed4fc10d582c4676889f62e79de633e5acf $
 #
 #  dictionary.erx
 #
 #	Juniper's (was Unisphere's) broadband RAS
 #	From Terje Krogdahl <tekr@nextra.com>
 #
-# Version:	$Id$
+# Version:	$Id: 9421fed4fc10d582c4676889f62e79de633e5acf $
 #
 
 # This dictionary applies to access services on Juniper JUNOS (M/MX)

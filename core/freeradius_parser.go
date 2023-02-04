@@ -100,7 +100,8 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 			if len(words) < 4 {
 				return errors.New("invalid ATTRIBUTE " + line)
 			}
-			code, err := strconv.Atoi(words[2])
+			// Removing a possible dot in the begining of the code
+			code, err := strconv.Atoi(strings.TrimPrefix(words[2], "."))
 			if err != nil {
 				return errors.New("invalid ATTRIBUTE " + line)
 			}
@@ -108,10 +109,12 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 			// Options: comma separated value
 			// We only support the has_tag and encrypt attributes
 			// <vendor-name>,has_tag,encrypt=[1,2,3]
+			radiusType := parseRadiusType(words[3])
 			tagged := false
 			encrypted := false
 			salted := false
 			withlen := false
+			concat := false
 			if len(words) > 4 {
 				options := strings.Split(words[4], ",")
 				for _, option := range options {
@@ -122,6 +125,9 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 					} else if option == "encrypt=2" {
 						salted = true
 						withlen = true
+					} else if option == "encrypt=3" {
+						// Ascend propietary. Ignore
+						radiusType = "Octets"
 					} else if option == "encrypt=8" {
 						// This one does not exist in freeradius
 						tagged = true
@@ -129,14 +135,18 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 					} else if option == "encrypt=9" {
 						// This one does not exist in freeradius
 						salted = true
-					} else if option == "abinary" {
-						// Ignore
+					} else if option == "concat" {
+						concat = true
+					} else if option == "array" {
+						radiusType = "Octets"
+					} else if option == "abinary" || option == "extended" || option == "long-extended" {
+						// Ignore this ones
 					} else {
 						return errors.New("invalid ATTRIBUTE " + line)
 					}
 				}
 			}
-			radiusType := parseRadiusType(words[3])
+
 			if radiusType != "VSA" {
 				avp := jRadiusAVP{
 					Code:      byte(code),
@@ -146,6 +156,7 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 					Encrypted: encrypted,
 					Salted:    salted,
 					Withlen:   withlen,
+					Concat:    concat,
 				}
 				dict.Avps[currentVendorAVPsIndex].Attributes = append(dict.Avps[currentVendorAVPsIndex].Attributes, avp)
 			}
@@ -156,7 +167,12 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 			}
 			val, err := strconv.Atoi(words[3])
 			if err != nil {
-				return errors.New("invalid VALUE " + line)
+				// Try in hexa
+				if val64, err := strconv.ParseInt(strings.TrimPrefix(words[3], "0x"), 16, 32); err != nil {
+					return errors.New("invalid VALUE " + line)
+				} else {
+					val = int(val64)
+				}
 			}
 
 			// Look for the attribute name
@@ -181,11 +197,11 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 
 func parseRadiusType(t string) string {
 	switch t {
-	case "integer", "byte", "short", "signed", "time_delta":
+	case "integer", "uint32", "byte", "short", "signed", "time_delta":
 		return "Integer"
-	case "string":
+	case "string", "ipv4prefix":
 		return "String"
-	case "octets", "abinary", "struct":
+	case "octets", "abinary", "struct", "tlv", "combo-ip", "ether":
 		return "Octets"
 	case "ipaddr":
 		return "Address"
@@ -206,7 +222,11 @@ func parseRadiusType(t string) string {
 		// Exceptions
 		if strings.HasPrefix(t, "octets") {
 			// Freeradius uses sometimes octets[size]
-			return "octets"
+			return "Octets"
+		}
+		if strings.HasPrefix(t, "string") {
+			// Freeradius uses sometimes string[size]
+			return "String"
 		}
 
 		panic("unrecognized attribute type " + t)

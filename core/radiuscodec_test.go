@@ -555,6 +555,29 @@ func TestJSONAndCopyPacket(t *testing.T) {
 	}
 }
 
+func TestLongAttribute(t *testing.T) {
+	longOctets := "0000000000000000100000000000000020000000000000003000000000000000400000000000000050000000000000006000000000000000700000000000000080000000000000009000000000000000a000000000000000b000000000000000c000000000000000d000000000000000e000000000000000f000000000000000"
+	longOctets = longOctets + longOctets + "aa"
+
+	packet := NewRadiusRequest(ACCESS_REQUEST).Add("Igor-LongMessage", longOctets)
+	packet.Add("User-Name", "theUserName")
+
+	// Serialize
+	packetBytes, err := packet.ToBytes(secret, 0)
+	if err != nil {
+		t.Fatalf("could not serialize packet: %s", err)
+	}
+
+	// Unserialize
+	recoveredPacket, err := RadiusPacketFromBytes(packetBytes, secret)
+	if err != nil {
+		t.Fatalf("could not unserialize packet: %s", err)
+	}
+	if recoveredPacket.GetStringAVP("Igor-LongMessage") != longOctets {
+		t.Fatalf("bad recovered LongMessage %s", recoveredPacket.GetStringAVP("Igor-LongMessage"))
+	}
+}
+
 func TestCiscoAVPair(t *testing.T) {
 	packet := NewRadiusRequest(ACCESS_REQUEST).
 		Add("Cisco-AVPair", "subscriber:sa=internet(shape-rate=1000)").

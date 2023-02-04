@@ -29,7 +29,7 @@ echo 3GPP2-MN-HA-Key = \"thekey\" >> $REQUESTFILE
 # echo Tunnel-Client-Endpoint= \"t\":2 >> $REQUESTFILE
 echo Tunnel-Password = \"secretpasswordsent\":2 >> $REQUESTFILE
 echo Unisphere-LI-Action = 1 >> $REQUESTFILE
-echo Unisphere-Med-IP-Address = "1.1.1.1" >> $REQUESTFILE
+
 
 # Send the packet
 # -overlap <number of simultaneous requests>

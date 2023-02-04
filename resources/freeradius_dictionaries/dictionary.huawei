@@ -1,12 +1,12 @@
 # -*- text -*-
 # Copyright (C) 2022 The FreeRADIUS Server project and contributors
 # This work is licensed under CC-BY version 4.0 https://creativecommons.org/licenses/by/4.0
-# Version $Id$
+# Version $Id: 401c584faac0fb15fe0b611f6135d160cfe6d559 $
 ##############################################################################
 #
 #	Dictionary for Huawei.  See also dictionary.h3c
 #
-#	$Id$
+#	$Id: 401c584faac0fb15fe0b611f6135d160cfe6d559 $
 #
 ##############################################################################
 

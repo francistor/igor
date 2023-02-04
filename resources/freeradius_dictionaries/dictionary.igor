@@ -15,6 +15,7 @@ ATTRIBUTE	TaggedStringAttribute			11	string has_tag
 ATTRIBUTE	SaltedOctetsAttribute			12	octets encrypt=9
 ATTRIBUTE	TaggedSaltedOctetsAttribute		13	octets encrypt=8
 ATTRIBUTE	SaltedStringAttribute			14	string encrypt=9
+ATTRIBUTE	LongMessage			15	octets concat
 
 VALUE       IntegerAttribute                Zero 0
 VALUE       IntegerAttribute                One 1

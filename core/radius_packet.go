@@ -101,7 +101,22 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string) (n int64, er
 		if err != nil {
 			return currentIndex, err
 		}
-		rp.AVPs = append(rp.AVPs, nextAVP)
+
+		avpsLen := len(rp.AVPs)
+		// Support for concat attributes
+		if nextAVP.DictItem.Concat && // Current has concat attribute
+			avpsLen > 0 && // There is a previous one
+			rp.AVPs[avpsLen-1].DictItem.Code == nextAVP.DictItem.Code && // Of the same Code
+			rp.AVPs[avpsLen-1].DictItem.VendorId == nextAVP.DictItem.VendorId { // And same vendor
+
+			// Append the octets to the value
+			// It has been checked in the dictionary that concat must be octets
+			rp.AVPs[avpsLen-1].Value = append(rp.AVPs[avpsLen-1].Value.([]byte), nextAVP.Value.([]byte)...)
+
+		} else {
+			rp.AVPs = append(rp.AVPs, nextAVP)
+		}
+
 		currentIndex += bytesRead
 	}
 
@@ -152,6 +167,45 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 	// Using this buffer as a temporary scratch pad
 	var writer bytes.Buffer
 
+	// Normalize AVPs to fit in 256 bytes
+	// This mutates the RadiusPacket
+	// First, check that this is going to be needed, to avoid copying everything if not necessary
+	var doSplit = false
+	for i := range rp.AVPs {
+		if rp.AVPs[i].DictItem.Concat && rp.AVPs[i].Len() > 255 {
+			doSplit = true
+			break
+		}
+	}
+	if doSplit {
+		newAVPs := make([]RadiusAVP, 0)
+		for i := range rp.AVPs {
+			if rp.AVPs[i].DictItem.Concat && rp.AVPs[i].Len() > 255 {
+				// Split into multiple attributes
+				valueIndex := 0
+				octetsValue := rp.AVPs[i].Value.([]byte)
+
+				for valueIndex < len(octetsValue) {
+					lastIndex := valueIndex + 240 // Play on the safe side
+					if lastIndex > len(octetsValue) {
+						lastIndex = len(octetsValue)
+					}
+
+					splitAVP := rp.AVPs[i]
+					splitAVP.Value = octetsValue[valueIndex:lastIndex]
+					newAVPs = append(newAVPs, splitAVP)
+
+					valueIndex = lastIndex
+				}
+			} else {
+				// Normal path
+				newAVPs = append(newAVPs, rp.AVPs[i])
+			}
+		}
+
+		rp.AVPs = newAVPs
+	}
+
 	// Write code
 	if err = binary.Write(&writer, binary.BigEndian, rp.Code); err != nil {
 		return 0, err
@@ -193,7 +247,7 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 	currentIndex += 16
 
 	// Write all the AVP
-	for i := range rp.AVPs {
+	for i := 0; i < len(rp.AVPs); i++ {
 		n, err := rp.AVPs[i].ToWriter(&writer, rp.Authenticator, secret)
 		if err != nil {
 			return 0, err

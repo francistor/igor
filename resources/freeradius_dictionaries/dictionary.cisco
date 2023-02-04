@@ -1,14 +1,14 @@
 # -*- text -*-
 # Copyright (C) 2022 The FreeRADIUS Server project and contributors
 # This work is licensed under CC-BY version 4.0 https://creativecommons.org/licenses/by/4.0
-# Version $Id$
+# Version $Id: 87105e7356a360726e11bb4fa304c33feb21a8f6 $
 #
 # dictionary.cisco
 #
 #		Accounting VSAs originally by
 #		"Marcelo M. Sosa Lugones" <marcelo@sosa.com.ar>
 #
-# Version:	$Id$
+# Version:	$Id: 87105e7356a360726e11bb4fa304c33feb21a8f6 $
 #
 #  For documentation on Cisco RADIUS attributes, see:
 #

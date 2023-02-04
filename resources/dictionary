@@ -1,7 +1,7 @@
 # -*- text -*-
 # Copyright (C) 2022 The FreeRADIUS Server project and contributors
 # This work is licensed under CC-BY version 4.0 https://creativecommons.org/licenses/by/4.0
-# Version $Id$
+# Version $Id: cd703b768ed55f351c4dfd4686329f4bc25ae333 $
 #
 #
 #	DO NOT EDIT THE FILES IN THIS DIRECTORY
@@ -62,19 +62,277 @@
 PROTOCOL	RADIUS		1	verify=lib
 BEGIN-PROTOCOL	RADIUS
 
+#
+#	Include compatibility dictionary for older users file. Move
+#	this directive to the end of this file if you want to see the
+#	old names in the logfiles, instead of the new names.
+#
+$INCLUDE freeradius_dictionaries/dictionary.compat
 
+#
+#	These dictionaries define attributes in the IETF managed space.
+#	(i.e. 1..255). This is wrong.
+#
+#	The IETF allocated ones are listed lower down, which gives
+#	them priority.
+#
+#	i.e. don't do this.  Don't use these attributes.  If you do
+#	need to use them, list them in the raddb/dictionary, instead
+#	of here.
+#
+#$INCLUDE freeradius_dictionaries/dictionary.usr.illegal
+#$INCLUDE freeradius_dictionaries/dictionary.ascend.illegal
+
+#
+#	IETF allocated attributes and values.  Split out into
+#	the RFC which defined them.
+#
+#	For a complete list of the standard attributes and values,
+#	see:
+#		http://www.iana.org/assignments/radius-types
+#
 $INCLUDE freeradius_dictionaries/dictionary.rfc2865
 $INCLUDE freeradius_dictionaries/dictionary.rfc2866
+$INCLUDE freeradius_dictionaries/dictionary.rfc2867
 $INCLUDE freeradius_dictionaries/dictionary.rfc2868
 $INCLUDE freeradius_dictionaries/dictionary.rfc2869
 $INCLUDE freeradius_dictionaries/dictionary.rfc3162
+$INCLUDE freeradius_dictionaries/dictionary.rfc3576
+$INCLUDE freeradius_dictionaries/dictionary.rfc3580
+$INCLUDE freeradius_dictionaries/dictionary.rfc4072
+$INCLUDE freeradius_dictionaries/dictionary.rfc4372
+$INCLUDE freeradius_dictionaries/dictionary.rfc4603
+$INCLUDE freeradius_dictionaries/dictionary.rfc4675
+$INCLUDE freeradius_dictionaries/dictionary.rfc4679
+$INCLUDE freeradius_dictionaries/dictionary.rfc4818
+$INCLUDE freeradius_dictionaries/dictionary.rfc4849
+$INCLUDE freeradius_dictionaries/dictionary.rfc5176
+$INCLUDE freeradius_dictionaries/dictionary.rfc5447
+$INCLUDE freeradius_dictionaries/dictionary.rfc5580
+$INCLUDE freeradius_dictionaries/dictionary.rfc5607
+$INCLUDE freeradius_dictionaries/dictionary.rfc5904
+$INCLUDE freeradius_dictionaries/dictionary.rfc6519
+$INCLUDE freeradius_dictionaries/dictionary.rfc6572
+$INCLUDE freeradius_dictionaries/dictionary.rfc6677
+$INCLUDE freeradius_dictionaries/dictionary.rfc6911
+# $INCLUDE freeradius_dictionaries/dictionary.rfc6929
+# $INCLUDE freeradius_dictionaries/dictionary.rfc6930
+$INCLUDE freeradius_dictionaries/dictionary.rfc7055
+$INCLUDE freeradius_dictionaries/dictionary.rfc7155
+$INCLUDE freeradius_dictionaries/dictionary.rfc7268
+# $INCLUDE freeradius_dictionaries/dictionary.rfc7499
+# $INCLUDE freeradius_dictionaries/dictionary.rfc7930
+# $INCLUDE freeradius_dictionaries/dictionary.rfc8045
+# $INCLUDE freeradius_dictionaries/dictionary.rfc8559
 
+#
+#	Mostly values which have been allocated by IANA under
+#	"expert review", but which don't have an RFC associated with them.
+#
+# $INCLUDE freeradius_dictionaries/dictionary.iana
+
+#
+#	Vendor dictionaries are listed after the standard ones.
+#
+$INCLUDE freeradius_dictionaries/dictionary.3com
+$INCLUDE freeradius_dictionaries/dictionary.3gpp
+$INCLUDE freeradius_dictionaries/dictionary.3gpp2
+$INCLUDE freeradius_dictionaries/dictionary.acc
+$INCLUDE freeradius_dictionaries/dictionary.acme
+$INCLUDE freeradius_dictionaries/dictionary.actelis
+$INCLUDE freeradius_dictionaries/dictionary.adtran
+$INCLUDE freeradius_dictionaries/dictionary.adva
+$INCLUDE freeradius_dictionaries/dictionary.airespace
+$INCLUDE freeradius_dictionaries/dictionary.alcatel
+$INCLUDE freeradius_dictionaries/dictionary.alcatel-lucent.aaa
+$INCLUDE freeradius_dictionaries/dictionary.alteon
+$INCLUDE freeradius_dictionaries/dictionary.alvarion
+$INCLUDE freeradius_dictionaries/dictionary.apc
+$INCLUDE freeradius_dictionaries/dictionary.aptilo
+$INCLUDE freeradius_dictionaries/dictionary.arbor
+$INCLUDE freeradius_dictionaries/dictionary.arista
+$INCLUDE freeradius_dictionaries/dictionary.aruba
+$INCLUDE freeradius_dictionaries/dictionary.ascend
+$INCLUDE freeradius_dictionaries/dictionary.azaire
+$INCLUDE freeradius_dictionaries/dictionary.bay
+$INCLUDE freeradius_dictionaries/dictionary.bigswitch
+$INCLUDE freeradius_dictionaries/dictionary.bintec
+$INCLUDE freeradius_dictionaries/dictionary.bluecoat
+$INCLUDE freeradius_dictionaries/dictionary.boingo
+$INCLUDE freeradius_dictionaries/dictionary.broadsoft
+$INCLUDE freeradius_dictionaries/dictionary.brocade
+$INCLUDE freeradius_dictionaries/dictionary.bskyb
+$INCLUDE freeradius_dictionaries/dictionary.bt
+$INCLUDE freeradius_dictionaries/dictionary.cablelabs
+$INCLUDE freeradius_dictionaries/dictionary.cabletron
+$INCLUDE freeradius_dictionaries/dictionary.cambium
+$INCLUDE freeradius_dictionaries/dictionary.camiant
+$INCLUDE freeradius_dictionaries/dictionary.centec
+$INCLUDE freeradius_dictionaries/dictionary.checkpoint
+$INCLUDE freeradius_dictionaries/dictionary.chillispot
+$INCLUDE freeradius_dictionaries/dictionary.ciena
 $INCLUDE freeradius_dictionaries/dictionary.cisco
+$INCLUDE freeradius_dictionaries/dictionary.cisco.asa
+#
+#	 The Cisco VPN300 dictionary uses the same Vendor ID as the ASA one.
+#	 You shouldn't use both at the same time.
+#
+#   Note : the altiga dictionary, not listed here, also uses the same Vendor ID
+#
+#$INCLUDE freeradius_dictionaries/dictionary.cisco.vpn3000
+$INCLUDE freeradius_dictionaries/dictionary.cisco.bbsm
+$INCLUDE freeradius_dictionaries/dictionary.cisco.vpn5000
+$INCLUDE freeradius_dictionaries/dictionary.citrix
+$INCLUDE freeradius_dictionaries/dictionary.clavister
+$INCLUDE freeradius_dictionaries/dictionary.cnergee
+$INCLUDE freeradius_dictionaries/dictionary.colubris
+$INCLUDE freeradius_dictionaries/dictionary.compatible
+$INCLUDE freeradius_dictionaries/dictionary.cosine
+$INCLUDE freeradius_dictionaries/dictionary.covaro
+$INCLUDE freeradius_dictionaries/dictionary.dante
+$INCLUDE freeradius_dictionaries/dictionary.dellemc
+$INCLUDE freeradius_dictionaries/dictionary.digium
+$INCLUDE freeradius_dictionaries/dictionary.dlink
+$INCLUDE freeradius_dictionaries/dictionary.dragonwave
+$INCLUDE freeradius_dictionaries/dictionary.efficientip
+$INCLUDE freeradius_dictionaries/dictionary.eltex
+$INCLUDE freeradius_dictionaries/dictionary.epygi
+$INCLUDE freeradius_dictionaries/dictionary.equallogic
+$INCLUDE freeradius_dictionaries/dictionary.ericsson
+$INCLUDE freeradius_dictionaries/dictionary.ericsson.ab
+$INCLUDE freeradius_dictionaries/dictionary.ericsson.packet.core.networks
+$INCLUDE freeradius_dictionaries/dictionary.extreme
+$INCLUDE freeradius_dictionaries/dictionary.f5
+$INCLUDE freeradius_dictionaries/dictionary.fdxtended
+$INCLUDE freeradius_dictionaries/dictionary.force10
+$INCLUDE freeradius_dictionaries/dictionary.fortinet
+$INCLUDE freeradius_dictionaries/dictionary.foundry
+# $INCLUDE freeradius_dictionaries/dictionary.freeradius
+# $INCLUDE freeradius_dictionaries/dictionary.freeradius.evs5
+# $INCLUDE freeradius_dictionaries/dictionary.freeradius.internal
+$INCLUDE freeradius_dictionaries/dictionary.freeswitch
+$INCLUDE freeradius_dictionaries/dictionary.gandalf
+$INCLUDE freeradius_dictionaries/dictionary.gemtek
+$INCLUDE freeradius_dictionaries/dictionary.h3c
+$INCLUDE freeradius_dictionaries/dictionary.hillstone
+$INCLUDE freeradius_dictionaries/dictionary.hitron
+$INCLUDE freeradius_dictionaries/dictionary.hp
 $INCLUDE freeradius_dictionaries/dictionary.huawei
-$INCLUDE freeradius_dictionaries/dictionary.nokia.sr
-$INCLUDE freeradius_dictionaries/dictionary.unisphere
+$INCLUDE freeradius_dictionaries/dictionary.iea
+$INCLUDE freeradius_dictionaries/dictionary.iec
+$INCLUDE freeradius_dictionaries/dictionary.infinera
+$INCLUDE freeradius_dictionaries/dictionary.infonet
+$INCLUDE freeradius_dictionaries/dictionary.ipunplugged
+$INCLUDE freeradius_dictionaries/dictionary.issanni
+$INCLUDE freeradius_dictionaries/dictionary.itk
 $INCLUDE freeradius_dictionaries/dictionary.juniper
-$INCLUDE freeradius_dictionaries/dictionary.psa
+$INCLUDE freeradius_dictionaries/dictionary.karlnet
+# $INCLUDE freeradius_dictionaries/dictionary.kineto
+$INCLUDE freeradius_dictionaries/dictionary.lancom
+$INCLUDE freeradius_dictionaries/dictionary.lantronix
+$INCLUDE freeradius_dictionaries/dictionary.livingston
+$INCLUDE freeradius_dictionaries/dictionary.localweb
+$INCLUDE freeradius_dictionaries/dictionary.lucent
+$INCLUDE freeradius_dictionaries/dictionary.manzara
+$INCLUDE freeradius_dictionaries/dictionary.meinberg
+$INCLUDE freeradius_dictionaries/dictionary.mellanox
+$INCLUDE freeradius_dictionaries/dictionary.meraki
+$INCLUDE freeradius_dictionaries/dictionary.merit
+$INCLUDE freeradius_dictionaries/dictionary.meru
+$INCLUDE freeradius_dictionaries/dictionary.microsemi
+$INCLUDE freeradius_dictionaries/dictionary.microsoft
+$INCLUDE freeradius_dictionaries/dictionary.mikrotik
+$INCLUDE freeradius_dictionaries/dictionary.mimosa
+$INCLUDE freeradius_dictionaries/dictionary.motorola
+#
+#  The WiMAX dictionary uses the sanme vendor space
+#  as the main motorola freeradius_dictionaries/dictionary.
+#
+#$INCLUDE freeradius_dictionaries/dictionary.motorola.wimax
+$INCLUDE freeradius_dictionaries/dictionary.navini
+$INCLUDE freeradius_dictionaries/dictionary.net
+$INCLUDE freeradius_dictionaries/dictionary.netelastic
+$INCLUDE freeradius_dictionaries/dictionary.netscreen
+$INCLUDE freeradius_dictionaries/dictionary.networkphysics
+$INCLUDE freeradius_dictionaries/dictionary.nexans
+$INCLUDE freeradius_dictionaries/dictionary.nile
+$INCLUDE freeradius_dictionaries/dictionary.nokia
+$INCLUDE freeradius_dictionaries/dictionary.nokia.sr
+$INCLUDE freeradius_dictionaries/dictionary.ntua
+
+#
+#  Commented out because of attribute conflicts.
+#
+#$INCLUDE freeradius_dictionaries/dictionary.nokia.conflict
+$INCLUDE freeradius_dictionaries/dictionary.nomadix
+$INCLUDE freeradius_dictionaries/dictionary.nortel
+#
+#  Commented out because of attribute conflicts.
+#
+#$INCLUDE freeradius_dictionaries/dictionary.openser
+$INCLUDE freeradius_dictionaries/dictionary.packeteer
+$INCLUDE freeradius_dictionaries/dictionary.paloalto
+$INCLUDE freeradius_dictionaries/dictionary.patton
+$INCLUDE freeradius_dictionaries/dictionary.perle
+$INCLUDE freeradius_dictionaries/dictionary.pfsense
+$INCLUDE freeradius_dictionaries/dictionary.pica8
+$INCLUDE freeradius_dictionaries/dictionary.propel
+$INCLUDE freeradius_dictionaries/dictionary.prosoft
+$INCLUDE freeradius_dictionaries/dictionary.proxim
+$INCLUDE freeradius_dictionaries/dictionary.purewave
+$INCLUDE freeradius_dictionaries/dictionary.quiconnect
+$INCLUDE freeradius_dictionaries/dictionary.quintum
+$INCLUDE freeradius_dictionaries/dictionary.rcntec
+$INCLUDE freeradius_dictionaries/dictionary.redcreek
+$INCLUDE freeradius_dictionaries/dictionary.riverbed
+$INCLUDE freeradius_dictionaries/dictionary.riverstone
+$INCLUDE freeradius_dictionaries/dictionary.roaringpenguin
+$INCLUDE freeradius_dictionaries/dictionary.ruckus
+$INCLUDE freeradius_dictionaries/dictionary.ruggedcom
+$INCLUDE freeradius_dictionaries/dictionary.sandy
+$INCLUDE freeradius_dictionaries/dictionary.sangoma
+$INCLUDE freeradius_dictionaries/dictionary.sg
+$INCLUDE freeradius_dictionaries/dictionary.shasta
+$INCLUDE freeradius_dictionaries/dictionary.shiva
+$INCLUDE freeradius_dictionaries/dictionary.siemens
+$INCLUDE freeradius_dictionaries/dictionary.slipstream
+$INCLUDE freeradius_dictionaries/dictionary.sonicwall
+$INCLUDE freeradius_dictionaries/dictionary.springtide
+$INCLUDE freeradius_dictionaries/dictionary.starent
+$INCLUDE freeradius_dictionaries/dictionary.surfnet
+$INCLUDE freeradius_dictionaries/dictionary.symbol
+$INCLUDE freeradius_dictionaries/dictionary.t_systems_nova
+$INCLUDE freeradius_dictionaries/dictionary.telebit
+# $INCLUDE freeradius_dictionaries/dictionary.telrad
+$INCLUDE freeradius_dictionaries/dictionary.terena
+$INCLUDE freeradius_dictionaries/dictionary.trapeze
+$INCLUDE freeradius_dictionaries/dictionary.travelping
+$INCLUDE freeradius_dictionaries/dictionary.tripplite
+$INCLUDE freeradius_dictionaries/dictionary.tropos
+$INCLUDE freeradius_dictionaries/dictionary.ubnt
+$INCLUDE freeradius_dictionaries/dictionary.ukerna
+$INCLUDE freeradius_dictionaries/dictionary.unisphere
+$INCLUDE freeradius_dictionaries/dictionary.unix
+# $INCLUDE freeradius_dictionaries/dictionary.usr
+$INCLUDE freeradius_dictionaries/dictionary.utstarcom
+$INCLUDE freeradius_dictionaries/dictionary.valemount
+$INCLUDE freeradius_dictionaries/dictionary.vasexperts
+$INCLUDE freeradius_dictionaries/dictionary.versanet
+$INCLUDE freeradius_dictionaries/dictionary.walabi
+$INCLUDE freeradius_dictionaries/dictionary.waverider
+$INCLUDE freeradius_dictionaries/dictionary.wichorus
+$INCLUDE freeradius_dictionaries/dictionary.wifialliance
+# $INCLUDE freeradius_dictionaries/dictionary.wimax
+$INCLUDE freeradius_dictionaries/dictionary.wispr
+$INCLUDE freeradius_dictionaries/dictionary.xedia
+$INCLUDE freeradius_dictionaries/dictionary.xirrus
+$INCLUDE freeradius_dictionaries/dictionary.xylan
+$INCLUDE freeradius_dictionaries/dictionary.yubico
+$INCLUDE freeradius_dictionaries/dictionary.zeus
+$INCLUDE freeradius_dictionaries/dictionary.zte
+$INCLUDE freeradius_dictionaries/dictionary.zyxel
+
 $INCLUDE freeradius_dictionaries/dictionary.igor
+$INCLUDE freeradius_dictionaries/dictionary.psa
 
 END-PROTOCOL RADIUS

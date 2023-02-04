@@ -28,10 +28,10 @@ var igor_int_parameter int = -3
 func TestMain(m *testing.M) {
 
 	// Initialize mysql container
+
 	ctx := context.Background()
 	_, mysqlPort := SetupMysql(ctx)
 	os.Setenv("IGOR_TEST_MYSQL_PORT", fmt.Sprintf("%d", mysqlPort))
-	fmt.Println(os.Getenv("IGOR_TEST_MYSQL_PORT"))
 
 	// Initialize additional environment variables
 	os.Setenv("IGOR_STR_PARAM", igor_string_parameter)

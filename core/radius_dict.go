@@ -40,6 +40,7 @@ type RadiusAVPDictItem struct {
 	Tagged     bool
 	Salted     bool
 	Withlen    bool
+	Concat     bool
 }
 
 // Represents the full Radius Dictionary
@@ -133,6 +134,7 @@ type jRadiusAVP struct {
 	Tagged     bool
 	Salted     bool
 	Withlen    bool
+	Concat     bool
 }
 
 type jRadiusVendorAVPs struct {
@@ -182,6 +184,11 @@ func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) RadiusAVPDictItem {
 		panic(javp.Type + " is not a valid RadiusType")
 	}
 
+	// Sanity check
+	if javp.Concat && radiusType != RadiusTypeOctets {
+		panic(javp.Name + " is concat but not of type Octets")
+	}
+
 	var codes map[int]string
 	if javp.EnumValues != nil {
 		codes = make(map[int]string)
@@ -206,5 +213,6 @@ func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) RadiusAVPDictItem {
 		Tagged:     javp.Tagged,
 		Salted:     javp.Salted,
 		Withlen:    javp.Withlen,
+		Concat:     javp.Concat,
 	}
 }

@@ -79,8 +79,7 @@ func (dh *HttpRouter) Run() {
 	}
 
 	if !errors.Is(err, http.ErrServerClosed) {
-		fmt.Println(err)
-		panic("error starting http handler")
+		panic("error starting http handler  " + err.Error())
 	}
 
 	close(dh.doneChannel)

@@ -2,4 +2,4 @@
 3GPP2-MN-HA-Key = "thekey"
 Tunnel-Password = "secretpasswordsent":2
 Unisphere-LI-Action = 1
-Unisphere-Med-IP-Address = 1.1.1.1
+EAP-Message = Code = Response

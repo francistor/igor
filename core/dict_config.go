@@ -21,7 +21,7 @@ func initDictionaries(cm *ConfigurationManager) {
 	var jDict jRadiusDict
 	err = ParseFreeradiusDictionary(cm, "dictionary", &jDict)
 	if err != nil {
-		// If not found, try
+		// If not found, try native format
 		radiusDictJSON, err := cm.GetBytesConfigObject("radiusDictionary.json")
 		if err != nil {
 			panic("Could not read radiusDictionary.json or dictionary (freeradius format)")

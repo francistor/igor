@@ -16,14 +16,6 @@ func TestFreeradiusParser(t *testing.T) {
 
 	dict := newRadiusDictionaryFromJDict(&jDict)
 
-	/*
-		for _, avp := range jDict.Avps {
-			for _, attr := range avp.Attributes {
-				fmt.Println(avp.VendorId, attr.Name)
-			}
-		}
-	*/
-
 	myAVP, ok := dict.AVPByName["Igor-IntegerAttribute"]
 	if !ok {
 		t.Fatal("Attribute not found")

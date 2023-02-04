@@ -1,12 +1,12 @@
 # -*- text -*-
 # Copyright (C) 2022 The FreeRADIUS Server project and contributors
 # This work is licensed under CC-BY version 4.0 https://creativecommons.org/licenses/by/4.0
-# Version $Id$
+# Version $Id: 7d920052c295b2c34d0393b56f35e98486edca82 $
 ##############################################################################
 #
 #	Nokia (Formerly Alcatel-Lucent) Service Router dictionary.
 #
-#	$Id$
+#	$Id: 7d920052c295b2c34d0393b56f35e98486edca82 $
 #
 # See "7750 Service Router - RADIUS Attributes Reference Guide".
 #

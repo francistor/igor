@@ -340,7 +340,7 @@ func RadiusAVPFromBytes(inputBytes []byte, authenticator [16]byte, secret string
 // Returns the number of bytes written including padding
 func (avp *RadiusAVP) ToWriter(writer io.Writer, authenticator [16]byte, secret string) (int64, error) {
 
-	var bytesWritten = 0
+	var bytesWritten int = 0
 	var err error
 	var salt [2]byte
 
@@ -358,7 +358,10 @@ func (avp *RadiusAVP) ToWriter(writer io.Writer, authenticator [16]byte, secret 
 
 	// Write Length
 	avpLen := avp.Len()
-	if err = binary.Write(writer, binary.BigEndian, avpLen); err != nil {
+	if avpLen > 255 {
+		return 0, fmt.Errorf("size of AVP %s is bigger than 255 bytes", avp.Name)
+	}
+	if err = binary.Write(writer, binary.BigEndian, byte(avpLen)); err != nil {
 		return int64(bytesWritten), err
 	}
 	bytesWritten += 1
@@ -379,7 +382,7 @@ func (avp *RadiusAVP) ToWriter(writer io.Writer, authenticator [16]byte, secret 
 
 		// Write length. This is the length of the embedded AVP, which is 6 bytes
 		// less, discounting code, len and vendorId
-		if err = binary.Write(writer, binary.BigEndian, avpLen-6); err != nil {
+		if err = binary.Write(writer, binary.BigEndian, byte(avpLen-6)); err != nil {
 			return int64(bytesWritten), err
 		}
 		bytesWritten += 1
@@ -610,7 +613,7 @@ func (avp *RadiusAVP) ToWriter(writer io.Writer, authenticator [16]byte, secret 
 	}
 
 	// Saninty check
-	if byte(bytesWritten) != avpLen {
+	if bytesWritten != avpLen {
 		panic(fmt.Sprintf("Bad AVP size. Bytes Written: %d, reported size: %d", bytesWritten, avpLen))
 	}
 
@@ -630,7 +633,7 @@ func (avp *RadiusAVP) ToBytes(authenticator [16]byte, secret string) (data []byt
 }
 
 // Returns the size of the AVP
-func (avp *RadiusAVP) Len() byte {
+func (avp *RadiusAVP) Len() int {
 	var dataSize = 0
 
 	switch avp.DictItem.RadiusType {
@@ -693,7 +696,7 @@ func (avp *RadiusAVP) Len() byte {
 		dataSize += 8
 	}
 
-	return byte(dataSize)
+	return dataSize
 }
 
 /////////////////////////////////////////////
