@@ -937,6 +937,7 @@ func (ms *MetricsServer) metricServerLoop() {
 
 func (ms *MetricsServer) getMetricsHandler() func(w http.ResponseWriter, req *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Add("Content-Type", "text/plain")
 		writer.WriteHeader(http.StatusOK)
 
 		var builder strings.Builder

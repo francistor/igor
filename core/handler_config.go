@@ -32,7 +32,8 @@ func InitHttpHandlerConfigInstance(bootstrapFile string, instanceName string, co
 	// Initialize logger, dictionary and metrics if default
 	if isDefault {
 		initLogger(&httpHandlerConfig.CM)
-		initDictionaries(&httpHandlerConfig.CM)
+		initRadiusDict(&httpHandlerConfig.CM)
+		initDiameterDict(&httpHandlerConfig.CM)
 		initMetricsServer(&httpHandlerConfig.CM)
 	}
 

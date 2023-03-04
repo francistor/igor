@@ -264,11 +264,16 @@ func TestPrometheusMetrics(t *testing.T) {
 	}
 
 	if !strings.Contains(metrics, `diameter_requests_received{peer="testPeer",oh="server.igorserver",or="igorserver",dh="",dr="",ap="TestApplication",cm="TestRequest"} 1`) {
-		t.Fatal("diameter_requests_received not found")
+		t.Fatal("diameter_requests_received not found or incorrect")
 	}
 	if !strings.Contains(metrics, `radius_server_requests{endpoint="127.0.0.1:1812",code="1"} 1`) {
-		t.Fatal("radius_server_requests not found")
+		t.Fatal("radius_server_requests not found or incorrect")
 	}
+	if !strings.Contains(metrics, `radius_client_requests{endpoint="127.0.0.1:1812",code="1"} 1`) {
+		t.Fatal("radius_client_requests not found or incorrect")
+	}
+
+	fmt.Println(metrics)
 
 	// TODO: add others
 }

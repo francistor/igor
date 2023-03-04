@@ -318,7 +318,7 @@ func (router *RadiusRouter) eventLoop() {
 								core.GetLogger().Warnf("error in answer from %s %s: %s", requestParamsSet.serverName, requestParamsSet.endpoint, v.Error())
 							}
 						}
-						req.RChan <- fmt.Errorf("answer not received after %d tries", len(rps))
+						req.RChan <- fmt.Errorf("answer not received after %d tries\n", len(rps))
 						close(req.RChan)
 
 					}(requestParams, rrr)

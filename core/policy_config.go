@@ -55,7 +55,6 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, configP
 	// Initialize logger and dictionary, if default
 	if isDefault {
 		initLogger(&policyConfig.CM)
-		initDictionaries(&policyConfig.CM)
 		initMetricsServer(&policyConfig.CM)
 	}
 
@@ -65,6 +64,9 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, configP
 		panic(cerr)
 	}
 	if policyConfig.diameterServerConfig.Get().BindAddress != "" {
+		if isDefault {
+			initDiameterDict(&policyConfig.CM)
+		}
 		if cerr = policyConfig.UpdateDiameterPeers(); cerr != nil {
 			panic(cerr)
 		}
@@ -80,6 +82,9 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string, configP
 		panic(cerr)
 	}
 	if policyConfig.radiusServerConfig.Get().BindAddress != "" {
+		if isDefault {
+			initRadiusDict(&policyConfig.CM)
+		}
 		if cerr = policyConfig.UpdateRadiusClients(); cerr != nil {
 			panic(cerr)
 		}

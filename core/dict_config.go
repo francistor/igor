@@ -4,8 +4,8 @@ package core
 var diameterDict *DiameterDict
 var radiusDict *RadiusDict
 
-// Loads the Radius and Diameter dictionaries
-func initDictionaries(cm *ConfigurationManager) {
+// Loads the Diameter dictionary
+func initDiameterDict(cm *ConfigurationManager) {
 
 	// Load dictionaries
 
@@ -15,11 +15,15 @@ func initDictionaries(cm *ConfigurationManager) {
 		panic("Could not read diameterDictionary.json")
 	}
 	diameterDict = NewDiameterDictionaryFromJSON([]byte(coreJSON))
+}
+
+// Loads the Radius dictionary
+func initRadiusDict(cm *ConfigurationManager) {
 
 	// Radius
 	// First try freeradius dictionary
 	var jDict jRadiusDict
-	err = ParseFreeradiusDictionary(cm, "dictionary", &jDict)
+	err := ParseFreeradiusDictionary(cm, "dictionary", &jDict)
 	if err != nil {
 		// If not found, try native format
 		radiusDictJSON, err := cm.GetBytesConfigObject("radiusDictionary.json")
