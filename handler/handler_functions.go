@@ -59,6 +59,7 @@ func TestRadiusAttributesHandler(request *core.RadiusPacket) (*core.RadiusPacket
 	l.Infof("auth: %t, error: %v", result, err)
 
 	// Reply with one attribute of each type
+
 	jAVPs := `
 				[
 					{"Igor-OctetsAttribute": "0102030405060708090a0b"},
@@ -80,7 +81,7 @@ func TestRadiusAttributesHandler(request *core.RadiusPacket) (*core.RadiusPacket
 					{"Unisphere-LI-Action": 1},
 					{"Unisphere-Med-Ip-Address": "2.2.2.2"}
 				]
-				`
+					`
 
 	resp := core.NewRadiusResponse(request, true)
 

@@ -393,10 +393,12 @@ func TestAccessRequest(t *testing.T) {
 
 	theUserName := "MyUserName"
 	thePassword := "pwd"
+	theTunnelPassword := "the password for the tunnel:1"
 
 	request := NewRadiusRequest(ACCESS_REQUEST)
 	request.Add("User-Name", theUserName)
 	request.Add("User-Password", thePassword)
+	request.Add("Tunnel-Password", theTunnelPassword)
 
 	// Serialize
 	packetBytes, err := request.ToBytes(secret, 0)

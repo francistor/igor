@@ -45,6 +45,7 @@ func localRadiusHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) 
 	l.Infof("started localRadiusHandler for request %s", request)
 	resp := core.NewRadiusResponse(request, true)
 	resp.Add("User-Name", "EchoLocal")
+	resp.Add("Tunnel-Password", "the password for the tunnel:1")
 
 	command := request.GetStringAVP("Igor-Command")
 	switch command {
@@ -405,6 +406,9 @@ func TestRadiusHandleLocal(t *testing.T) {
 	}
 	if resp.GetStringAVP("User-Name") != "EchoLocal" {
 		t.Fatalf("bad response from server testClient. Got %s", resp.GetStringAVP("User-Name"))
+	}
+	if resp.GetTaggedStringAVP("Tunnel-Password") != "the password for the tunnel:1" {
+		t.Fatalf("bad response from server testClient. Got %s", resp.GetTaggedStringAVP("Tunnel-Password"))
 	}
 
 	client.Close()

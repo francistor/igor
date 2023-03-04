@@ -11,6 +11,7 @@ ATTRIBUTE	IPv6AddressAttribute			6	ipv6addr
 ATTRIBUTE	IPv6PrefixAttribute 			7	ipv6prefix
 ATTRIBUTE	InterfaceIdAttribute			8	ifid
 ATTRIBUTE	Integer64Attribute			    9	integer64
+ATTRIBUTE   Command                         10  string
 ATTRIBUTE	TaggedStringAttribute			11	string has_tag
 ATTRIBUTE	SaltedOctetsAttribute			12	octets encrypt=9
 ATTRIBUTE	TaggedSaltedOctetsAttribute		13	octets encrypt=8

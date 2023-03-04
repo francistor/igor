@@ -585,21 +585,22 @@
                 },
                 {
                     "code": 10,
+                    "name": "Command",
+                    "type": "String"
+                },
+                {
+                    "code": 11,
                     "name": "TaggedStringAttribute",
                     "type": "String",
                     "tagged": true
                 },
                 {
-                    "code": 11,
+                    "code": 12,
                     "name": "SaltedOctetsAttribute",
                     "type": "Octets",
                     "salted": true
                 },
-                {
-                    "code": 12,
-                    "name": "Command",
-                    "type": "String"
-                },
+
                 {
                     "code": 13,
                     "name": "TaggedSaltedOctetsAttribute",

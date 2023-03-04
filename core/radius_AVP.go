@@ -158,7 +158,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		if avp.DictItem.Withlen {
 			size := avpBytes[0]
 			if len(avpBytes) < int(size)+1 {
-				return currentIndex, fmt.Errorf("bad internal length value")
+				return currentIndex, fmt.Errorf("bad internal length value %d < int(%d)+1, bytes: %v. Salted: %t", len(avpBytes), size, avpBytes, avp.DictItem.Salted)
 			}
 			avpBytes = avpBytes[1 : size+1]
 
