@@ -392,7 +392,7 @@ func (c *PolicyConfigurationManager) DiameterPeers() DiameterPeers {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Holds the configuration fot the HTTP Router
+// Holds the configuration for the HTTP Router
 type HttpRouterConfig struct {
 	BindAddress  string
 	BindPort     int

@@ -1,6 +1,6 @@
 package core
 
-// These global variables have to be initialized using initDictionaries
+// These global variables have to be initialized using the corresponding function below
 var diameterDict *DiameterDict
 var radiusDict *RadiusDict
 
@@ -40,14 +40,14 @@ func initRadiusDict(cm *ConfigurationManager) {
 // Used globally to get access to the diameter dictionary
 func GetDDict() *DiameterDict {
 	if diameterDict == nil {
-		panic("uninitialized radius dictionary. Use initDictionaries first")
+		panic("uninitialized radius dictionary. Use initDiameterDict first")
 	}
 	return diameterDict
 }
 
 func GetRDict() *RadiusDict {
 	if radiusDict == nil {
-		panic("uninitialized radius dictionary. Use initDictionaries first")
+		panic("uninitialized radius dictionary. Use initRadiusDict first")
 	}
 	return radiusDict
 }

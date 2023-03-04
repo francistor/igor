@@ -940,6 +940,10 @@ func (ms *MetricsServer) getMetricsHandler() func(w http.ResponseWriter, req *ht
 		writer.Header().Add("Content-Type", "text/plain")
 		writer.WriteHeader(http.StatusOK)
 
+		fmt.Println("***********************************")
+		fmt.Println(ms.radiusClientRequests)
+		fmt.Println("***********************************")
+
 		var builder strings.Builder
 		// Diameter Server
 		builder.WriteString(ms.diameterRequestsReceived.genPrometheusMetric("diameter_requests_received", "number of diameter requests received"))
