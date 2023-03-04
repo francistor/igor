@@ -3,6 +3,7 @@ package radiusclient
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -272,7 +273,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 					continue
 				}
 
-				core.PushRadiusClientResponse(endpoint, string(radiusPacket.Code))
+				core.PushRadiusClientResponse(endpoint, strconv.Itoa(int(radiusPacket.Code)))
 				core.GetLogger().Debugf("<- Client received RadiusPacket %s\n", radiusPacket)
 
 				// Send the answer to the requester
@@ -346,7 +347,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 						rcs.wg.Add(1)
 						rcs.eventLoopChannel <- retriedClientRadiusRequest
 					}
-					core.PushRadiusClientTimeout(v.endpoint, string(v.packet.Code))
+					core.PushRadiusClientTimeout(v.endpoint, strconv.Itoa(int(v.packet.Code)))
 
 				}),
 				secret: v.secret,
@@ -354,7 +355,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				authenticator: v.packet.Authenticator,
 			}
 
-			core.PushRadiusClientRequest(v.endpoint, string(v.packet.Code))
+			core.PushRadiusClientRequest(v.endpoint, strconv.Itoa(int(v.packet.Code)))
 			core.GetLogger().Debugf("-> Client sent RadiusPacket with Identifier %d - %s\n", radiusId, v.packet)
 
 			// Corresponding to the Add(1) in SendRadiusRequest

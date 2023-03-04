@@ -3,6 +3,7 @@ package radiusserver
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"sync/atomic"
 
 	"github.com/francistor/igor/core"
@@ -103,13 +104,13 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 		// Validate the packet
 		if radiusPacket.Code != core.ACCESS_REQUEST {
 			if !core.ValidateRequestAuthenticator(reqBuf[:packetSize], radiusClient.Secret) {
-				core.PushRadiusServerDrop(clientIPAddr, string(radiusPacket.Code))
+				core.PushRadiusServerDrop(clientIPAddr, strconv.Itoa(int(radiusPacket.Code)))
 				core.GetLogger().Warnf("invalid request packet %s\n", radiusPacket)
 				continue
 			}
 		}
 
-		core.PushRadiusServerRequest(clientIPAddr, string(radiusPacket.Code))
+		core.PushRadiusServerRequest(clientIPAddr, strconv.Itoa(int(radiusPacket.Code)))
 		core.GetLogger().Debugf("<- Server received RadiusPacket %s\n", radiusPacket)
 
 		// Wait for response
@@ -121,23 +122,23 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 
 			if err != nil {
 				core.GetLogger().Errorf("discarding packet for %s with code %d: %s", addr.String(), radiusPacket.Code, err)
-				core.PushRadiusServerDrop(clientIPAddr, string(code))
+				core.PushRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))
 				return
 			}
 
 			respBuf, err := response.ToBytes(secret, radiusPacket.Identifier)
 			if err != nil {
 				core.GetLogger().Errorf("error serializing packet for %s with code %d: %s", addr.String(), code, err)
-				core.PushRadiusServerDrop(clientIPAddr, string(code))
+				core.PushRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))
 				return
 			}
 			if _, err = socket.WriteTo(respBuf, addr); err != nil {
 				core.GetLogger().Errorf("error sending packet to %s with code %d: %s", addr.String(), code, err)
-				core.PushRadiusServerDrop(clientIPAddr, string(code))
+				core.PushRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))
 				return
 			}
 
-			core.PushRadiusServerResponse(clientIPAddr, string(code))
+			core.PushRadiusServerResponse(clientIPAddr, strconv.Itoa(int(code)))
 			core.GetLogger().Debugf("-> Server sent RadiusPacket %s\n", response)
 
 		}(radiusPacket, radiusClient.Secret, clientAddr)
