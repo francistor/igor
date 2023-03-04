@@ -27,6 +27,11 @@ func (rm RadiusMetrics) genPrometheusMetric(metricName string, helpString string
 	for k, v := range rm {
 		builder.WriteString(fmt.Sprintf("%s{endpoint=\"%s\",code=\"%s\"} %d\n",
 			metricName, k.Endpoint, k.Code, v))
+
+		fmt.Println("***************************")
+		fmt.Println(k.Code)
+		fmt.Println(fmt.Sprintf("-%s-", k.Code))
+		fmt.Println("***************************")
 	}
 
 	return builder.String()
