@@ -46,7 +46,7 @@ func GetDDict() *DiameterDict {
 }
 
 func GetRDict() *RadiusDict {
-	if diameterDict == nil {
+	if radiusDict == nil {
 		panic("uninitialized radius dictionary. Use initDictionaries first")
 	}
 	return radiusDict
