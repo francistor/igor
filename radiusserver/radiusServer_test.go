@@ -68,7 +68,7 @@ func TestRadiusServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	receivedPacket, err := core.RadiusPacketFromBytes(responseBuffer, "secret")
+	receivedPacket, err := core.RadiusPacketFromBytes(responseBuffer, "secret", core.Zero_authenticator)
 	if err != nil {
 		t.Fatal(err)
 	}

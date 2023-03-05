@@ -95,7 +95,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 
 		// Decode the packet
 		core.GetLogger().Debugf("received packet: %v", reqBuf[:packetSize])
-		radiusPacket, err := core.RadiusPacketFromBytes((reqBuf[:packetSize]), radiusClient.Secret)
+		radiusPacket, err := core.RadiusPacketFromBytes((reqBuf[:packetSize]), radiusClient.Secret, core.Zero_authenticator)
 		if err != nil {
 			core.GetLogger().Errorf("error decoding packet %s\n", err)
 			continue

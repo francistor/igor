@@ -85,11 +85,11 @@ func TestRadiusDict(t *testing.T) {
 	if err != nil {
 		t.Errorf("Igor code 10 not found")
 	} else {
-		if avp.Name != "Igor-TaggedStringAttribute" {
-			t.Errorf("Igor code 10 is not Igor-TaggedStringAttribute but %s", avp.Name)
+		if avp.Name != "Igor-Command" {
+			t.Errorf("Igor code 10 is not Igor-Command but %s", avp.Name)
 		}
 		if avp.Tagged != true {
-			t.Error("Igor code 10 is not TaggedStringAttribute", avp.Name)
+			t.Error("Igor code 10 is not Igorcommand", avp.Name)
 		}
 	}
 }

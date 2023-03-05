@@ -273,8 +273,6 @@ func TestPrometheusMetrics(t *testing.T) {
 		t.Fatal("radius_client_requests not found or incorrect")
 	}
 
-	fmt.Println(metrics)
-
 	// TODO: add others
 }
 

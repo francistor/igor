@@ -263,7 +263,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				}
 
 				// Decode the packet
-				radiusPacket, err := core.RadiusPacketFromBytes(v.packetBytes, requestContext.secret)
+				radiusPacket, err := core.RadiusPacketFromBytes(v.packetBytes, requestContext.secret, requestContext.authenticator)
 				if err != nil {
 					core.PushRadiusClientResponseDrop(endpoint, code)
 					core.GetLogger().Errorf("error decoding packet from %s %s", endpoint, err)

@@ -32,7 +32,7 @@ const (
 	COA_NAK     = 45
 )
 
-var zero_authenticator = [16]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+var Zero_authenticator = [16]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
 // Type for functions that handle the diameter requests received
 type RadiusPacketHandler func(request *RadiusPacket) (*RadiusPacket, error)
@@ -63,7 +63,8 @@ type RadiusPacket struct {
 }
 
 // Reads the RadiusPacket from a Reader interface, such as a network connection
-func (rp *RadiusPacket) FromReader(reader io.Reader, secret string) (n int64, err error) {
+// If reading a response, the relevant authenticator for encryption will be the one of the request, passed in the ra paramter
+func (rp *RadiusPacket) FromReader(reader io.Reader, secret string, ra [16]byte) (n int64, err error) {
 
 	var packetLen uint16
 
@@ -93,11 +94,19 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string) (n int64, er
 	}
 	currentIndex += 16
 
+	// Build the relevant authenticator
+	var authenticator [16]byte
+	if rp.IsRequest() {
+		authenticator = rp.Authenticator
+	} else {
+		authenticator = ra
+	}
+
 	rp.AVPs = make([]RadiusAVP, 0)
 	for currentIndex < int64(packetLen) {
 		nextAVP := RadiusAVP{}
 
-		bytesRead, err := nextAVP.FromReader(reader, rp.Authenticator, secret)
+		bytesRead, err := nextAVP.FromReader(reader, authenticator, secret)
 		if err != nil {
 			return currentIndex, err
 		}
@@ -128,11 +137,11 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string) (n int64, er
 }
 
 // Builds a Radius Packet from a Byte slice
-func RadiusPacketFromBytes(inputBytes []byte, secret string) (*RadiusPacket, error) {
+func RadiusPacketFromBytes(inputBytes []byte, secret string, ra [16]byte) (*RadiusPacket, error) {
 	reader := bytes.NewReader(inputBytes)
 
 	radiusPacket := RadiusPacket{}
-	_, err := radiusPacket.FromReader(reader, secret)
+	_, err := radiusPacket.FromReader(reader, secret, ra)
 
 	return &radiusPacket, err
 }
@@ -233,12 +242,12 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 	currentIndex += 2
 
 	// Write authenticator
-	// If it is a response, authenticator will be set to the request authenticator,
+	// If it is a response, authenticator will be set to the request authenticator.
 	// Otherwise, set to a new one or to zero
 	if rp.Code == ACCESS_REQUEST {
 		rp.Authenticator = GetAuthenticator()
 	} else if rp.Code == ACCOUNTING_REQUEST || rp.Code == DISCONNECT_REQUEST || rp.Code == COA_REQUEST {
-		rp.Authenticator = zero_authenticator
+		rp.Authenticator = Zero_authenticator
 	}
 	// else Do nothing. Authenticator will be set to the one in the request
 	if err = binary.Write(&writer, binary.BigEndian, rp.Authenticator); err != nil {
@@ -321,13 +330,22 @@ func (rp *RadiusPacket) ToBytes(secret string, id byte) (data []byte, err error)
 }
 
 // Returns the size of the Radius packet
-func (dm *RadiusPacket) Len() uint16 {
+func (rp *RadiusPacket) Len() uint16 {
 	var avpLen uint16 = 0
-	for i := range dm.AVPs {
-		avpLen += uint16(dm.AVPs[i].Len())
+	for i := range rp.AVPs {
+		avpLen += uint16(rp.AVPs[i].Len())
 	}
 
 	return 20 + avpLen
+}
+
+func (rp *RadiusPacket) IsRequest() bool {
+	switch rp.Code {
+	case ACCESS_REQUEST, ACCOUNTING_REQUEST, COA_REQUEST:
+		return true
+	default:
+		return false
+	}
 }
 
 ///////////////////////////////////////////////////////////////
@@ -682,7 +700,7 @@ func ValidateRequestAuthenticator(packetBytes []byte, secret string) bool {
 
 	hasher := md5.New()
 	hasher.Write(packetBytes[0:4])
-	hasher.Write(zero_authenticator[:])
+	hasher.Write(Zero_authenticator[:])
 	hasher.Write(packetBytes[20:])
 	hasher.Write([]byte(secret))
 	auth := hasher.Sum(nil)

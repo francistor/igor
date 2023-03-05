@@ -407,7 +407,7 @@ func TestAccessRequest(t *testing.T) {
 	}
 
 	// Unserialize
-	recoveredPacket, err := RadiusPacketFromBytes(packetBytes, secret)
+	recoveredPacket, err := RadiusPacketFromBytes(packetBytes, secret, Zero_authenticator)
 	if err != nil {
 		t.Errorf("could not unserialize packet: %s", err)
 	}
@@ -445,7 +445,7 @@ func TestAccountingRequest(t *testing.T) {
 	}
 
 	// Unserialize
-	recoveredPacket, err := RadiusPacketFromBytes(packetBytes, secret)
+	recoveredPacket, err := RadiusPacketFromBytes(packetBytes, secret, Zero_authenticator)
 	if err != nil {
 		t.Errorf("could not unserialize packet: %s", err)
 	}
@@ -571,7 +571,7 @@ func TestLongAttribute(t *testing.T) {
 	}
 
 	// Unserialize
-	recoveredPacket, err := RadiusPacketFromBytes(packetBytes, secret)
+	recoveredPacket, err := RadiusPacketFromBytes(packetBytes, secret, Zero_authenticator)
 	if err != nil {
 		t.Fatalf("could not unserialize packet: %s", err)
 	}
