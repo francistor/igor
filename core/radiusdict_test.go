@@ -88,8 +88,16 @@ func TestRadiusDict(t *testing.T) {
 		if avp.Name != "Igor-Command" {
 			t.Errorf("Igor code 10 is not Igor-Command but %s", avp.Name)
 		}
-		if avp.Tagged != true {
-			t.Error("Igor code 10 is not Igorcommand", avp.Name)
+	}
+	avp, err = radiusDict.GetFromCode(RadiusAVPCode{30001, 13})
+	if err != nil {
+		t.Errorf("Igor code 13 not found")
+	} else {
+		if avp.Name != "Igor-TaggedSaltedOctetsAttribute" {
+			t.Errorf("Igor code 13 is not Igor-TaggedSaltedOctetsAttribute but %s", avp.Name)
+		}
+		if !avp.Salted || !avp.Tagged {
+			t.Errorf("Igor code 13 is not Tagged or Salted")
 		}
 	}
 }
