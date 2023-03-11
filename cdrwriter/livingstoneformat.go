@@ -10,7 +10,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-type LivingstoneWriter struct {
+type LivingstoneFormat struct {
 	positiveFilter      []string
 	negativeFilter      []string
 	headDateFormat      string
@@ -18,8 +18,8 @@ type LivingstoneWriter struct {
 }
 
 // Creates a new instance of a Livinstone Writer
-func NewLivingstoneWriter(positiveFilter []string, negativeFilter []string, headDateFormat string, attributeDateFormat string) *LivingstoneWriter {
-	lw := LivingstoneWriter{
+func NewLivingstoneFormat(positiveFilter []string, negativeFilter []string, headDateFormat string, attributeDateFormat string) *LivingstoneFormat {
+	lw := LivingstoneFormat{
 		positiveFilter:      positiveFilter,
 		negativeFilter:      negativeFilter,
 		headDateFormat:      headDateFormat,
@@ -30,11 +30,11 @@ func NewLivingstoneWriter(positiveFilter []string, negativeFilter []string, head
 }
 
 // Not implemented
-func (w *LivingstoneWriter) GetDiameterCDRString(dm *core.DiameterMessage) string {
+func (w *LivingstoneFormat) GetDiameterCDRString(dm *core.DiameterMessage) string {
 	panic("GetDiameterCDRString is not implemented by CSVWriter")
 }
 
-func (w *LivingstoneWriter) GetRadiusCDRString(rp *core.RadiusPacket) string {
+func (w *LivingstoneFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 	var builder strings.Builder
 
 	// Write header

@@ -8,7 +8,7 @@ import (
 	"github.com/francistor/igor/core"
 )
 
-type CSVWriter struct {
+type CSVFormat struct {
 	// The attribute names of the fields to write
 	fields []string
 	// Separator for the fields
@@ -24,8 +24,8 @@ type CSVWriter struct {
 }
 
 // Creates a new instance of a Livinstone Writer
-func NewCSVWriter(fields []string, fieldSeparator string, attributeSeparator string, attributeDateFormat string, quoteStrings bool, parseInts bool) *CSVWriter {
-	lw := CSVWriter{
+func NewCSVFormat(fields []string, fieldSeparator string, attributeSeparator string, attributeDateFormat string, quoteStrings bool, parseInts bool) *CSVFormat {
+	lw := CSVFormat{
 		fields:              fields,
 		fieldSeparator:      fieldSeparator,
 		attributeSeparator:  attributeSeparator,
@@ -38,14 +38,14 @@ func NewCSVWriter(fields []string, fieldSeparator string, attributeSeparator str
 }
 
 // Not implemented
-func (w *CSVWriter) GetDiameterCDRString(dm *core.DiameterMessage) string {
+func (w *CSVFormat) GetDiameterCDRString(dm *core.DiameterMessage) string {
 	panic("GetDiameterCDRString is not implemented by CSVWriter")
 }
 
 // Write CDR as list with separators
 // Special field names:
 // * %Timestamp% -> Datetime of CDR generation
-func (w *CSVWriter) GetRadiusCDRString(rp *core.RadiusPacket) string {
+func (w *CSVFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 	var builder strings.Builder
 
 	// Iterate through the fields in the spec

@@ -50,7 +50,7 @@ func TestLivingstoneFormat(t *testing.T) {
 	// Read JSON to Radius Packet
 	rp := buildSimpleRadiusPacket(t)
 
-	lw := NewLivingstoneWriter(nil, []string{"User-Name"}, "2006-01-02T15:04:05 MST", "2006-01-02T15:04:05 MST")
+	lw := NewLivingstoneFormat(nil, []string{"User-Name"}, "2006-01-02T15:04:05 MST", "2006-01-02T15:04:05 MST")
 	cdrString := lw.GetRadiusCDRString(&rp)
 	if strings.Contains(cdrString, "User-Name") {
 		t.Fatalf("Written CDR contains filtered attribute User-Name")
@@ -66,7 +66,7 @@ func TestCSVFormat(t *testing.T) {
 	rp := buildSimpleRadiusPacket(t)
 
 	result := `"0102030405060708090a0b";;"stringvalue,anotherStringvalue";0,1,1;"127.0.0.1";"1986-11-26T03:34:08 UTC";"bebe:cafe::";"bebe:cafe:cccc::0/64";"00aabbccddeeff11";999999999999;"myString:1";"1122aabbccdd"`
-	csvw := NewCSVWriter([]string{
+	csvw := NewCSVFormat([]string{
 		"Igor-OctetsAttribute",
 		"Non-existing",
 		"Igor-StringAttribute",
@@ -102,7 +102,7 @@ func TestCSVParsedIntsFormat(t *testing.T) {
 	rp := buildSimpleRadiusPacket(t)
 
 	result := `"0102030405060708090a0b";;"stringvalue,anotherStringvalue";"Zero,One,One";"127.0.0.1";"1986-11-26T03:34:08 UTC";"bebe:cafe::";"bebe:cafe:cccc::0/64";"00aabbccddeeff11";"999999999999";"myString:1";"1122aabbccdd"`
-	csvw := NewCSVWriter([]string{
+	csvw := NewCSVFormat([]string{
 		"%Timestamp%",
 		"Igor-OctetsAttribute",
 		"Non-existing",
@@ -140,7 +140,7 @@ func TestJSONFormat(t *testing.T) {
 	// Read JSON to Radius Packet
 	rp := buildSimpleRadiusPacket(t)
 
-	lw := NewJSONWriter(nil, []string{"User-Name"})
+	lw := NewJSONFormat(nil, []string{"User-Name"})
 	cdrString := lw.GetRadiusCDRString(&rp)
 	if strings.Contains(cdrString, "User-Name") {
 		t.Fatalf("Written CDR contains filtered attribute User-Name")
@@ -152,17 +152,17 @@ func TestJSONFormat(t *testing.T) {
 
 func TestElasticFormat(t *testing.T) {
 
-	var conf ElasticWriterConf
+	var conf ElasticFormatConf
 	if err := json.Unmarshal([]byte(jElasticConfig), &conf); err != nil {
 		t.Fatalf("bad ElasticWriterConf format: %s", err)
 	}
-	ew := NewElasticWriter(conf)
+	ef := NewElasticFormat(conf)
 
 	rp := buildSimpleRadiusPacket(t)
 
 	// Accounting start
 	rp.Add("Acct-Status-Type", "Stop")
-	esCDR := ew.GetRadiusCDRString(&rp)
+	esCDR := ef.GetRadiusCDRString(&rp)
 
 	if !strings.Contains(esCDR, "\"_index\": \"cdr-1986-11\"") {
 		t.Fatal("bad index name")
@@ -189,7 +189,7 @@ func TestFileWriter(t *testing.T) {
 	// Read JSON to Radius Packet
 	rp := buildSimpleRadiusPacket(t)
 
-	lw := NewLivingstoneWriter(nil, []string{"User-Name"}, "2006-01-02T15:04:05 MST", "2006-01-02T15:04:05 MST")
+	lw := NewLivingstoneFormat(nil, []string{"User-Name"}, "2006-01-02T15:04:05 MST", "2006-01-02T15:04:05 MST")
 
 	// Magic date is 2006-01-02T15:04:05 MST"
 	fw := NewFileCDRWriter(cdrDirectoryName, "cdr_2006-01-02.txt", lw, 1000)
@@ -224,7 +224,7 @@ func TestFileWriterRotation(t *testing.T) {
 	// Read JSON to Radius Packet
 	rp := buildSimpleRadiusPacket(t)
 
-	lw := NewLivingstoneWriter(nil, []string{"User-Name"}, "2006-01-02T15:04:05 MST", "2006-01-02T15:04:05 MST")
+	lw := NewLivingstoneFormat(nil, []string{"User-Name"}, "2006-01-02T15:04:05 MST", "2006-01-02T15:04:05 MST")
 
 	// Magic date is 2006-01-02T15:04:05 MST"
 	// Rotate in 2 seconds
@@ -255,11 +255,11 @@ func TestFileWriterRotation(t *testing.T) {
 }
 
 func TestElasticWriter(t *testing.T) {
-	var conf ElasticWriterConf
+	var conf ElasticFormatConf
 	if err := json.Unmarshal([]byte(jElasticConfig), &conf); err != nil {
 		t.Fatalf("bad ElasticWriterConf format: %s", err)
 	}
-	ew := NewElasticWriter(conf)
+	ew := NewElasticFormat(conf)
 
 	ecdrw := NewElasticCDRWriter("http://elasticdatabase:9200/_doc/_bulk?filter_path=took,errors", "", "", ew, 1 /* Timeout */, 2 /* GlitchSeconds */)
 

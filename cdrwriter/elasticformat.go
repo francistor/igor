@@ -33,10 +33,10 @@ const (
 // status-type is performed
 //
 // The index may be as specified in the indexType element
-// "fixed" -> 0
-// "field" -> 1 and the name of the attribute to be used is specified in the attributeForInex
-// "currentDate" -> 2
-type ElasticWriterConf struct {
+// "fixed" -> ES_INDEX_TYPE_FIXED
+// "field" -> ES_INDEX_TYPE_FIELD and the name of the attribute to be used is specified in the attributeForIndex
+// "currentDate" -> ES_INDEX_TYPE_CURRENTDATE
+type ElasticFormatConf struct {
 	AttributeMap map[string]string
 
 	// Parameters for the insertion index
@@ -55,12 +55,12 @@ type ElasticWriterConf struct {
 	IndexTypeValue int
 }
 
-type ElasticWriter struct {
-	ElasticWriterConf
+type ElasticFormat struct {
+	ElasticFormatConf
 }
 
-// Creates an instance of JSONElasticWriter
-func NewElasticWriter(conf ElasticWriterConf) *ElasticWriter {
+// Creates an instance of ElasticWriter with the specified configuration
+func NewElasticFormat(conf ElasticFormatConf) *ElasticFormat {
 
 	if strings.EqualFold(conf.IndexType, "fixed") {
 		conf.IndexTypeValue = ES_INDEX_TYPE_FIXED
@@ -76,22 +76,22 @@ func NewElasticWriter(conf ElasticWriterConf) *ElasticWriter {
 	}
 
 	if len(conf.IdFields) == 0 {
-		panic("IdFileds is required")
+		panic("IdFields is required")
 	}
 
-	return &ElasticWriter{
+	return &ElasticFormat{
 		conf,
 	}
 }
 
 // Writes the Diameter CDR in JSON format
-func (ew *ElasticWriter) GetDiameterCDRString(dm *core.DiameterMessage) string {
+func (ew *ElasticFormat) GetDiameterCDRString(dm *core.DiameterMessage) string {
 	panic("writing diameter not supported")
 }
 
 // Writes the CDR in JSON format applying the format
 // In case of error, returns zero string
-func (ew *ElasticWriter) GetRadiusCDRString(rp *core.RadiusPacket) string {
+func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 
 	// Calculate offset for version
 	var versionOffset int64
@@ -220,7 +220,7 @@ func (ew *ElasticWriter) GetRadiusCDRString(rp *core.RadiusPacket) string {
 }
 
 // Helper to write "esAttributeName": <attributeValue> from an AVP
-func (ew *ElasticWriter) writeAVP(sb *strings.Builder, avp core.RadiusAVP, attributeName string, notFirst bool) {
+func (ew *ElasticFormat) writeAVP(sb *strings.Builder, avp core.RadiusAVP, attributeName string, notFirst bool) {
 
 	if notFirst {
 		sb.WriteString(", ")
@@ -250,7 +250,7 @@ func (ew *ElasticWriter) writeAVP(sb *strings.Builder, avp core.RadiusAVP, attri
 }
 
 // Helper to write "esAttributeName": integerAttributeValue
-func (ew *ElasticWriter) writeInt(sb *strings.Builder, value int64, attributeName string, notFirst bool) {
+func (ew *ElasticFormat) writeInt(sb *strings.Builder, value int64, attributeName string, notFirst bool) {
 
 	if notFirst {
 		sb.WriteString(", ")

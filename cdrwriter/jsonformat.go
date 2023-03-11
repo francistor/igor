@@ -8,14 +8,14 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-type JSONWriter struct {
+type JSONFormat struct {
 	positiveFilter []string
 	negativeFilter []string
 }
 
 // Creates a new instance of a Livinstone Writer
-func NewJSONWriter(positiveFilter []string, negativeFilter []string) *JSONWriter {
-	lw := JSONWriter{
+func NewJSONFormat(positiveFilter []string, negativeFilter []string) *JSONFormat {
+	lw := JSONFormat{
 		positiveFilter: positiveFilter,
 		negativeFilter: negativeFilter,
 	}
@@ -29,7 +29,7 @@ func NewJSONWriter(positiveFilter []string, negativeFilter []string) *JSONWriter
 // in the packet/message. A Timestamp attribute may be added in the handler if not sent by the BRAS
 
 // Writes the Diameter CDR in JSON format
-func (w *JSONWriter) GetDiameterCDRString(dm *core.DiameterMessage) string {
+func (w *JSONFormat) GetDiameterCDRString(dm *core.DiameterMessage) string {
 	toSerialize := make([]*core.DiameterAVP, 0)
 
 	// Write AVPs
@@ -50,7 +50,7 @@ func (w *JSONWriter) GetDiameterCDRString(dm *core.DiameterMessage) string {
 }
 
 // Writes the CDR in JSON format
-func (w *JSONWriter) GetRadiusCDRString(rp *core.RadiusPacket) string {
+func (w *JSONFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 
 	toSerialize := make([]*core.RadiusAVP, 0)
 

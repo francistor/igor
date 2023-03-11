@@ -44,13 +44,13 @@ type ElasticCDRWriter struct {
 	glitchTime time.Duration
 
 	// Formatter
-	formatter *ElasticWriter
+	formatter *ElasticFormat
 }
 
 // Builds a writer
 // The attributeMap applies only for Radius
-// The key is the name of the attribute to be writen. The value is the name of the attribute in the CDR
-func NewElasticCDRWriter(url string, username string, password string, formatter *ElasticWriter, timeoutSeconds int, glitchSeconds int) *ElasticCDRWriter {
+// The key is the name of the attribute to be written. The value is the name of the attribute in the CDR
+func NewElasticCDRWriter(url string, username string, password string, formatter *ElasticFormat, timeoutSeconds int, glitchSeconds int) *ElasticCDRWriter {
 
 	w := ElasticCDRWriter{
 		packetChan: make(chan interface{}, ELASTIC_PACKET_BUFFER_SIZE),
