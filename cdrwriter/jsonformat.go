@@ -23,8 +23,6 @@ func NewJSONFormat(positiveFilter []string, negativeFilter []string) *JSONFormat
 	return &lw
 }
 
-///---> What to write to ELASTIC?
-
 // There is no specific field for the Timestamp. If needed, the attribute must be already present
 // in the packet/message. A Timestamp attribute may be added in the handler if not sent by the BRAS
 

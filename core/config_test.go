@@ -1,6 +1,7 @@
 package core
 
 import (
+	"net"
 	"strings"
 	"testing"
 )
@@ -127,6 +128,12 @@ func TestRadiusConfig(t *testing.T) {
 	}
 	if rc["127.0.0.1"].RadiusAttributes[0].GetInt() != 120 {
 		t.Fatalf("Bad Session-Timeout radius attribute")
+	}
+
+	// Find radius client
+	_, err := rc.FindRadiusClient(net.ParseIP("1.2.3.4"))
+	if err != nil {
+		t.Fatalf("Radius client 1.2.3.4 not found")
 	}
 
 	// Get Radius Servers configuration

@@ -9,5 +9,10 @@
 		"radiusAttributes":[
 			{"Session-Timeout": 120}
 		]
+	},
+	"all_origins":{
+		"name": "all_origins",
+		"IPAddress": "1.2.3.0/24",
+		"secret": "secret"
 	}
 }

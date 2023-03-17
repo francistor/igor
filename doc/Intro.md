@@ -97,8 +97,7 @@ The resource `metrics.json` defines the bind address and port for exposing the P
 If the file `radiusServer.json` does not include a `bindAddress` property, the radius sever is not started and the rest of the radius configuration files are not read. In this resource, the basic parameters for radius are configured. Namely, the ports to lisen for authorization, accounting and CoA, and the origin ports to be used when acting as a radius client (`originPorts` property).
 
 The other relevant configuration files are:
-* `radiusClients.json` specifies the IP addresses from which radius requests may be received and the secret for each one of them. The IPAddress field may be
-an IP address or a CIDR block, with syntax `IP mask/size`
+* `radiusClients.json` specifies the IP addresses from which radius requests may be received and the secret for each one of them. The IPAddress field may be an IP address or a CIDR block, with syntax `IP mask/size`. This field may not exist, and the name of the entry should then be the client IP address
 * `radiusServers.json` specifies the upstream radius servers, grouped in radius groups. For each server, the origin ports may override what is specified in the global radius configuration, and the quarantine time an maximum errors in a row are specified. The Igor radius router accepts requests that may reference either a radius group or a single server (IP address) and explicit secret. In the latter case, the features that track the status of each server are not used
 * `radiusHttpHandlers.json` specifies the URLs to invoke for each type of request, in case this kind of http handlers need to be invoked. Otherwise, local handling is used, using the handler function specified upon radius router creation
 
