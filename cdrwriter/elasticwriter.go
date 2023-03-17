@@ -148,6 +148,7 @@ func (w *ElasticCDRWriter) sendToElastic(sb *strings.Builder) error {
 	if err != nil {
 		return fmt.Errorf("could not generate request: %w", err)
 	}
+	httpReq.Header.Set("Content-Type", "Application/json")
 	if w.username != "" {
 		httpReq.SetBasicAuth(w.username, w.password)
 	}

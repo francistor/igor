@@ -228,6 +228,11 @@
                     "type": "Integer"
                 },
                 {
+                    "code": 55,
+                    "name": "Event-Timestamp",
+                    "type": "Time"
+                },
+                {
                     "code": 60,
                     "name": "CHAP-Challenge",
                     "type": "Octets"

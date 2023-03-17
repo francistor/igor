@@ -167,13 +167,13 @@ func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 
 	// Write content
 	sb.WriteString("{")
-	var notFirst = false
+	var first = true
 	for k, v := range ew.AttributeMap {
 		if strings.Contains(v, ":") {
 			// Write the first not null
 			for _, attrName := range strings.Split(v, ":") {
 				if avp, err := rp.GetAVP(attrName); err != nil {
-					ew.writeAVP(&sb, avp, k, notFirst)
+					ew.writeStringAVP(&sb, avp, k, &first)
 					break
 				}
 			}
@@ -183,7 +183,7 @@ func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 			for _, attrName := range strings.Split(v, "+") {
 				val += rp.GetIntAVP(attrName)
 			}
-			ew.writeInt(&sb, val, k, notFirst)
+			ew.writeIntAVP(&sb, val, k, &first)
 		} else if strings.Contains(v, "!") {
 			// Substract the values
 			var val int64 = 0
@@ -194,7 +194,7 @@ func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 					val -= rp.GetIntAVP(attrName)
 				}
 			}
-			ew.writeInt(&sb, val, k, notFirst)
+			ew.writeIntAVP(&sb, val, k, &first)
 		} else if strings.Contains(v, "<") {
 			// Add the second multiplied by 2^32 (for Gigawords)
 			var val int64 = 0
@@ -205,13 +205,12 @@ func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 					val += rp.GetIntAVP(attrName) * int64(4294967296)
 				}
 			}
-			ew.writeInt(&sb, val, k, notFirst)
+			ew.writeIntAVP(&sb, val, k, &first)
 		} else {
 			if avp, err := rp.GetAVP(v); err == nil {
-				ew.writeAVP(&sb, avp, k, notFirst)
+				ew.writeStringAVP(&sb, avp, k, &first)
 			}
 		}
-		notFirst = true
 	}
 	sb.WriteString("}")
 
@@ -220,10 +219,12 @@ func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 }
 
 // Helper to write "esAttributeName": <attributeValue> from an AVP
-func (ew *ElasticFormat) writeAVP(sb *strings.Builder, avp core.RadiusAVP, attributeName string, notFirst bool) {
+func (ew *ElasticFormat) writeStringAVP(sb *strings.Builder, avp core.RadiusAVP, attributeName string, first *bool) {
 
-	if notFirst {
+	if !*first {
 		sb.WriteString(", ")
+	} else {
+		*first = false
 	}
 
 	sb.WriteString("\"")
@@ -250,10 +251,12 @@ func (ew *ElasticFormat) writeAVP(sb *strings.Builder, avp core.RadiusAVP, attri
 }
 
 // Helper to write "esAttributeName": integerAttributeValue
-func (ew *ElasticFormat) writeInt(sb *strings.Builder, value int64, attributeName string, notFirst bool) {
+func (ew *ElasticFormat) writeIntAVP(sb *strings.Builder, value int64, attributeName string, first *bool) {
 
-	if notFirst {
+	if !*first {
 		sb.WriteString(", ")
+	} else {
+		*first = false
 	}
 
 	sb.WriteString("\"")
