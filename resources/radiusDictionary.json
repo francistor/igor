@@ -377,6 +377,16 @@
             "attributes":
             [
                 {
+                    "code": 1,
+                    "name": "Client_DNS_Pri",
+                    "type": "Address"
+                },
+                {
+                    "code": 2,
+                    "name": "Client_DNS_Sec",
+                    "type": "Address"
+                },
+                {
                     "code": 190,
                     "name": "Service-Name",
                     "type": "String",

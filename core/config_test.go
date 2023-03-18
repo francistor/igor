@@ -18,8 +18,8 @@ func TestHttpRetrieval(t *testing.T) {
 
 // Uncomment to test
 // Requires to populate the PSBA database with
-// INSERT INTO accessNodes (AccessNodeId, Parameters) values ("RepublicaHW01", '{"ipAddress": "127.0.0.1", "secret": "mysecret", "attributes": [{"Redback-Primary-DNS": "1.2.3.4"}, {"Session-Timeout": 3600}]}');
-// INSERT INTO accessNodes (AccessNodeId, Parameters) values ("RepublicaHW02", '{"ipAddress": "127.0.0.2", "secret": "mysecret", "attributes": [{"Redback-Primary-DNS": "1.2.3.4"}, {"Session-Timeout": 7200}]}');
+// INSERT INTO accessNodes (AccessNodeId, Parameters) values ("RepublicaHW01", '{"ipAddress": "127.0.0.1", "secret": "mysecret", "attributes": [{"Redback-Client_DNS_Pri": "1.2.3.4"}, {"Session-Timeout": 3600}]}');
+// INSERT INTO accessNodes (AccessNodeId, Parameters) values ("RepublicaHW02", '{"ipAddress": "127.0.0.2", "secret": "mysecret", "attributes": [{"Redback-Client_DNS_Pri": "1.2.3.4"}, {"Session-Timeout": 7200}]}');
 func TestDatabaseObject(t *testing.T) {
 
 	type RadiusClientEntry struct {

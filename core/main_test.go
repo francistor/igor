@@ -284,8 +284,8 @@ INSERT INTO planProfiles (PlanName, ExternalPlanName, ProfileName) values ('Plan
 INSERT INTO planProfiles (PlanName, ExternalPlanName, ProfileName) values ('PlanOverriden', 'ExtPlanOverriden', "Prof0");
 
 -- Radius Clients
-INSERT INTO accessNodes (AccessNodeId, Parameters) values ("127.0.0.1", '{"name": "RepublicaHW01", "ipAddress": "127.0.0.1", "secret": "mysecret", "clientClass": "Huawei", "attributes": [{"Redback-Primary-DNS": "1.2.3.4"}, {"Session-Timeout": 3600}]}');
-INSERT INTO accessNodes (AccessNodeId, Parameters) values ("127.0.0.2", '{"name": "RepublicaHW02", "ipAddress": "127.0.0.2", "secret": "mysecret", "clientClass": "Huawei", "attributes": [{"Redback-Primary-DNS": "1.2.3.4"}, {"Session-Timeout": 7200}]}');
+INSERT INTO accessNodes (AccessNodeId, Parameters) values ("127.0.0.1", '{"name": "RepublicaHW01", "ipAddress": "127.0.0.1", "secret": "mysecret", "clientClass": "Huawei", "attributes": [{"Redback-Client_DNS_Pri": "1.2.3.4"}, {"Session-Timeout": 3600}]}');
+INSERT INTO accessNodes (AccessNodeId, Parameters) values ("127.0.0.2", '{"name": "RepublicaHW02", "ipAddress": "127.0.0.2", "secret": "mysecret", "clientClass": "Huawei", "attributes": [{"Redback-Client_DNS_Pri": "1.2.3.4"}, {"Session-Timeout": 7200}]}');
 
 -- Plan parameters
 INSERT INTO planParameters (PlanName, Parameters) values ("Plan1", '{"Speed": 1000, "Message": "hello plan 1"}');
