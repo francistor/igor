@@ -1089,11 +1089,12 @@ func (avp *DiameterAVP) ToMap() map[string]interface{} {
 	case DiameterTypeGrouped:
 		// Grouped AVP. The value is an array of JSON
 		targetGroup := make([]map[string]interface{}, 0)
-		avpGroup := avp.Value.([]DiameterAVP)
-		for i := range avpGroup {
-			targetGroup = append(targetGroup, avpGroup[i].ToMap())
+		if avpGroup, ok := avp.Value.([]DiameterAVP); ok {
+			for i := range avpGroup {
+				targetGroup = append(targetGroup, avpGroup[i].ToMap())
+			}
+			theMap[avp.Name] = targetGroup
 		}
-		theMap[avp.Name] = targetGroup
 	}
 	return theMap
 }
