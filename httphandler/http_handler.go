@@ -90,7 +90,7 @@ func getDiameterRequestHandler(handlerFunc core.DiameterMessageHandler) func(w h
 		// Get the Diameter Request
 		jRequest, err := io.ReadAll(req.Body)
 		if err != nil {
-			logger.Error("error reading request %s", err)
+			logger.Errorf("error reading request %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
 			core.PushHttpHandlerExchange(req.RequestURI, constants.NETWORK_ERROR)
@@ -98,12 +98,13 @@ func getDiameterRequestHandler(handlerFunc core.DiameterMessageHandler) func(w h
 		}
 		var request core.DiameterMessage
 		if err = json.Unmarshal(jRequest, &request); err != nil {
-			logger.Error("error unmarshalling request %s", err)
+			logger.Errorf("error unmarshalling request %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			core.PushHttpHandlerExchange(req.RequestURI, constants.UNSERIALIZATION_ERROR)
 			return
 		}
+		request.Tidy()
 
 		// Generate the Diameter Answer, invoking the passed function
 		answer, err := handlerFunc(&request)
@@ -137,7 +138,7 @@ func getRadiusRequestHandler(handlerFunc core.RadiusPacketHandler) func(w http.R
 		// Get the Radius Request
 		jRequest, err := io.ReadAll(req.Body)
 		if err != nil {
-			logger.Error("error reading request %s", err)
+			logger.Errorf("error reading request %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
 			core.PushHttpHandlerExchange(req.RequestURI, constants.NETWORK_ERROR)
@@ -145,7 +146,7 @@ func getRadiusRequestHandler(handlerFunc core.RadiusPacketHandler) func(w http.R
 		}
 		var request core.RadiusPacket
 		if err = json.Unmarshal(jRequest, &request); err != nil {
-			logger.Error("error unmarshalling request %s", err)
+			logger.Errorf("error unmarshalling request %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			core.PushHttpHandlerExchange(req.RequestURI, constants.UNSERIALIZATION_ERROR)

@@ -107,12 +107,13 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 		}
 		var request router.RoutableDiameterRequest
 		if err = json.Unmarshal(jRequest, &request); err != nil {
-			logger.Error("error unmarshalling request: %s", err)
+			logger.Errorf("error unmarshalling request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			core.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
 			return
 		}
+		request.Message.Tidy()
 
 		// Fill the timeout
 		if err = request.ParseTimeout(); err != nil {

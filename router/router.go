@@ -184,6 +184,7 @@ func HttpDiameterRequest(client http.Client, endpoint string, diameterRequest *c
 		core.PushHttpClientExchange(endpoint, constants.UNSERIALIZATION_ERROR)
 		return nil, fmt.Errorf("error unmarshaling response from %s: %s", endpoint, err)
 	}
+	diameterAnswer.Tidy()
 
 	core.PushHttpClientExchange(endpoint, constants.SUCCESS)
 	return &diameterAnswer, nil
