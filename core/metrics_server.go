@@ -985,31 +985,6 @@ func (ms *MetricsServer) getRadiusServersHandler() func(w http.ResponseWriter, r
 	}
 }
 
-// Common for the below functions
-// Returns the query name, the aggregation keys and the filter
-func parseQuery(request *http.Request) (string, string, map[string]string, []string, error) {
-	// Get parameters
-	filter := make(map[string]string)
-	for q, v := range request.URL.Query() {
-		if q != "agg" {
-			filter[q] = v[0]
-		}
-	}
-	agg := strings.Split(request.URL.Query().Get("agg"), ",")
-	pathElements := strings.Split(request.URL.Path, "/")
-	// After splitting, there is a "" in the beginning
-	if len(pathElements) != 3 || len(pathElements[2]) < 2 {
-		return "", "", nil, nil, fmt.Errorf("bad path %s", request.URL)
-	}
-	queryName := pathElements[2]
-	// Capitalize first letter
-	queryName = strings.ToUpper(queryName[0:1]) + queryName[1:]
-
-	queryType := pathElements[1]
-
-	return queryType, queryName, filter, agg, nil
-}
-
 // For endpoints of the form
 // /<metricType>/<metricname>?agg=<comma-separated-labels>&filterkeya=filtervalue1&filterkey2=filtervalue2
 func (ms *MetricsServer) getMetricsHandler() func(w http.ResponseWriter, req *http.Request) {

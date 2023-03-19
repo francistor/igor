@@ -934,6 +934,15 @@ func NewDiameterAVP(name string, value interface{}) (*DiameterAVP, error) {
 	return &avp, nil
 }
 
+// Diameter AVP Builder that does not return error but nil
+func BuildDiameterAVP(name string, value interface{}) *DiameterAVP {
+	if avp, err := NewDiameterAVP(name, value); err != nil {
+		return nil
+	} else {
+		return avp
+	}
+}
+
 // If grouped, checks that the embedded AVPs are in the dictionary
 func (avp *DiameterAVP) Check() error {
 
@@ -971,14 +980,19 @@ func (avp *DiameterAVP) Check() error {
 ///////////////////////////////////////////////////////////////
 
 // Adds a new AVP to the Grouped AVP. Does nothing if the current value is not grouped
-func (avp *DiameterAVP) AddAVP(gavp DiameterAVP) *DiameterAVP {
+func (avp *DiameterAVP) AddAVP(gavp *DiameterAVP) *DiameterAVP {
+
+	if gavp == nil {
+		return avp
+	}
+
 	var groupedValue, ok = avp.Value.([]DiameterAVP)
 	if !ok {
 		GetLogger().Error("value is not of type grouped")
 		return avp
 	}
 	// TODO: verify allowed in dictionary
-	avp.Value = append(groupedValue, gavp)
+	avp.Value = append(groupedValue, *gavp)
 	return avp
 }
 
@@ -986,7 +1000,7 @@ func (avp *DiameterAVP) AddAVP(gavp DiameterAVP) *DiameterAVP {
 func (avp *DiameterAVP) Add(name string, value interface{}) *DiameterAVP {
 	avp, err := NewDiameterAVP(name, value)
 	if err != nil {
-		avp.AddAVP(*avp)
+		avp.AddAVP(avp)
 	}
 	return avp
 }
@@ -1097,7 +1111,7 @@ func FromMap(avpMap map[string]interface{}) (DiameterAVP, error) {
 				if e2 != nil {
 					return DiameterAVP{}, e2
 				}
-				groupedAVP.AddAVP(innerAVP)
+				groupedAVP.AddAVP(&innerAVP)
 			}
 			return *groupedAVP, nil
 		default:

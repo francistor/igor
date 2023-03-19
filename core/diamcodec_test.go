@@ -486,8 +486,8 @@ func TestGroupedDiameterAVP(t *testing.T) {
 	avpInt, _ := NewDiameterAVP("Igor-myInteger32", theInt)
 	avpString, _ := NewDiameterAVP("Igor-myString", theString)
 
-	avpl1.AddAVP(*avpInt).AddAVP(*avpString)
-	avpl0.AddAVP(*avpl1)
+	avpl1.AddAVP(avpInt).AddAVP(avpString)
+	avpl0.AddAVP(avpl1)
 
 	// Serialize and unserialize
 	binaryAVP, _ := avpl0.MarshalBinary()
@@ -645,11 +645,11 @@ func TestDiameterMessage(t *testing.T) {
 	groupedAVP, _ := NewDiameterAVP("Igor-myGrouped", nil)
 	intAVP, _ := NewDiameterAVP("Igor-myInteger32", 1)
 	stringAVP, _ := NewDiameterAVP("Igor-myString", "hello")
-	groupedAVP.AddAVP(*intAVP)
-	groupedAVP.AddAVP(*stringAVP)
-	groupedInGroupedAVP.AddAVP(*groupedAVP)
-	groupedInGroupedAVP.AddAVP(*intAVP)
-	groupedInGroupedAVP.AddAVP(*stringAVP)
+	groupedAVP.AddAVP(intAVP)
+	groupedAVP.AddAVP(stringAVP)
+	groupedInGroupedAVP.AddAVP(groupedAVP)
+	groupedInGroupedAVP.AddAVP(intAVP)
+	groupedInGroupedAVP.AddAVP(stringAVP)
 
 	diameterMessage.AddAVP(sessionIdAVP)
 	diameterMessage.AddAVP(originHostAVP)

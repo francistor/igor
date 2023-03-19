@@ -340,7 +340,9 @@ func (m *DiameterMessage) CheckAttributes() error {
 
 // Adds a new AVP to the message
 func (m *DiameterMessage) AddAVP(avp *DiameterAVP) *DiameterMessage {
-	m.AVPs = append(m.AVPs, *avp)
+	if avp != nil {
+		m.AVPs = append(m.AVPs, *avp)
+	}
 	return m
 }
 
