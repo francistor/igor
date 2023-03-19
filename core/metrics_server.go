@@ -682,6 +682,7 @@ func (ms *MetricsServer) httpLoop(bindAddress string, port int) {
 	mux.HandleFunc("/metrics", ms.getPrometheusMetricsHandler())
 	mux.HandleFunc("/diameterPeers", ms.getDiameterPeersHandler())
 	mux.HandleFunc("/radiusServers", ms.getRadiusServersHandler())
+	// Same for all below
 	mux.HandleFunc("/diameterMetrics/", ms.getMetricsHandler())
 	mux.HandleFunc("/radiusMetrics/", ms.getMetricsHandler())
 	mux.HandleFunc("/httpClientMetrics/", ms.getMetricsHandler())

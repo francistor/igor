@@ -824,7 +824,12 @@ func NewDiameterAVP(name string, value interface{}) (*DiameterAVP, error) {
 		} else {
 			var groupedValue, ok = value.([]DiameterAVP)
 			if !ok {
-				return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
+				// Try with a single value instead of an array
+				var singleValue, ok = value.(DiameterAVP)
+				if !ok {
+					return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
+				}
+				avp.Value = []DiameterAVP{singleValue}
 			}
 			avp.Value = groupedValue
 		}
