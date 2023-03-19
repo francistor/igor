@@ -772,6 +772,7 @@ func (avp *DiameterAVP) GetIPAddress() net.IP {
 
 // Creates a new AVP
 // If the type of value is not compatible with the Diameter type in the dictionary, an error is returned
+// If grouped, the value may be an array of AVPs or a single AVP or a pointer to an AVP
 func NewDiameterAVP(name string, value interface{}) (*DiameterAVP, error) {
 	var avp = DiameterAVP{}
 
@@ -827,11 +828,17 @@ func NewDiameterAVP(name string, value interface{}) (*DiameterAVP, error) {
 				// Try with a single value instead of an array
 				var singleValue, ok = value.(DiameterAVP)
 				if !ok {
-					return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
+					var ptrValue, ok = value.(*DiameterAVP)
+					if !ok {
+						return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
+					}
+					avp.Value = []DiameterAVP{*ptrValue}
+				} else {
+					avp.Value = []DiameterAVP{singleValue}
 				}
-				avp.Value = []DiameterAVP{singleValue}
+			} else {
+				avp.Value = groupedValue
 			}
-			avp.Value = groupedValue
 		}
 
 	case DiameterTypeAddress, DiameterTypeIPv4Address, DiameterTypeIPv6Address:
@@ -993,6 +1000,14 @@ func (avp *DiameterAVP) AddAVP(gavp *DiameterAVP) *DiameterAVP {
 	}
 	// TODO: verify allowed in dictionary
 	avp.Value = append(groupedValue, *gavp)
+	return avp
+}
+
+// Adds multiple AVP to a grouped AVP
+func (avp *DiameterAVP) AddAVPs(avps ...*DiameterAVP) *DiameterAVP {
+	for _, v := range avps {
+		avp.AddAVP(v)
+	}
 	return avp
 }
 

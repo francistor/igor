@@ -28,17 +28,18 @@ var igor_int_parameter int = -3
 func TestMain(m *testing.M) {
 
 	// Initialize mysql container
+	/*
+		ctx := context.Background()
+		container, mysqlPort := SetupMysql(ctx)
+		os.Setenv("IGOR_TEST_MYSQL_PORT", fmt.Sprintf("%d", mysqlPort))
 
-	ctx := context.Background()
-	container, mysqlPort := SetupMysql(ctx)
-	os.Setenv("IGOR_TEST_MYSQL_PORT", fmt.Sprintf("%d", mysqlPort))
-
-	// Clean up the container after the test is complete
-	defer func() {
-		if err := container.Terminate(ctx); err != nil {
-			fmt.Printf("failed to terminate container: %s\n", err)
-		}
-	}()
+		// Clean up the container after the test is complete
+		defer func() {
+			if err := container.Terminate(ctx); err != nil {
+				fmt.Printf("failed to terminate container: %s\n", err)
+			}
+		}()
+	*/
 
 	// Initialize additional environment variables
 	os.Setenv("IGOR_STR_PARAM", igor_string_parameter)

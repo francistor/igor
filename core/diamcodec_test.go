@@ -726,6 +726,53 @@ func TestDiameterMessage(t *testing.T) {
 	// Cuando se añade un AVP ¿es una copia o se puede modificar el orgiginal?
 }
 
+// Different ways to create the grouped AVP
+func TestDiameterMessage2(t *testing.T) {
+
+	var ci = GetPolicyConfig()
+
+	diameterMessage, err := NewDiameterRequest("TestApplication", "TestRequest")
+	diameterMessage.AddOriginAVPs(ci)
+	if err != nil {
+		t.Fatalf("could not create diameter request for application TestAppliciaton and command TestRequest")
+	}
+	sessionIdAVP, _ := NewDiameterAVP("Session-Id", "my-session-id")
+	originHostAVP, _ := NewDiameterAVP("Origin-Host", "server.igorserver")
+	originRealmAVP, _ := NewDiameterAVP("Origin-Realm", "igorserver")
+	destinationHostAVP, _ := NewDiameterAVP("Destination-Host", "server.igorserver")
+	destinationRealmAVP, _ := NewDiameterAVP("Destination-Realm", "igorserver")
+
+	diameterMessage.AddAVP(sessionIdAVP)
+	diameterMessage.AddAVP(originHostAVP)
+	diameterMessage.AddAVP(originRealmAVP)
+	diameterMessage.AddAVP(destinationHostAVP)
+	diameterMessage.AddAVP(destinationRealmAVP)
+
+	diameterMessage.Add("3GPP-Charging-Rule-Install", []DiameterAVP{
+		*BuildDiameterAVP("3GPP-Charging-Rule-Base-Name", "service-1"),
+	})
+
+	// Serialize
+	theBytes, err := diameterMessage.MarshalBinary()
+	if err != nil {
+		t.Fatalf("could not serialize diameter message %s", err)
+	}
+
+	// Unserialize
+	recoveredMessage, _, err := DiameterMessageFromBytes(theBytes)
+	if err != nil {
+		t.Fatalf("could not unserialize diameter message %s", err)
+	}
+
+	r, err := recoveredMessage.GetAVPFromPath("3GPP-Charging-Rule-Install.3GPP-Charging-Rule-Base-Name")
+	if err != nil {
+		t.Fatalf("bad charging rule base name. Error: %s", err)
+	}
+	if r.GetString() != "service-1" {
+		t.Fatalf("bad charging rule base name: %s", r.GetString())
+	}
+}
+
 func TestDiameterMessageAllAttributeTypes(t *testing.T) {
 
 	jDiameterMessage := `
