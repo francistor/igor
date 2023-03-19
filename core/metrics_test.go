@@ -209,15 +209,15 @@ func TestRadiusMetrics(t *testing.T) {
 	} else if v != 1 {
 		t.Fatalf("RadiusClientResponsesStalled is not 1")
 	}
-	rm = MS.RadiusQuery("RadiusClientResponsesDrop", nil, []string{"Endpoint"})
+	rm = MS.RadiusQuery("RadiusClientResponsesDrops", nil, []string{"Endpoint"})
 	if v, ok := rm[RadiusMetricKey{Endpoint: "127.0.0.1:1812"}]; !ok {
-		t.Fatalf("RadiusClientResponsesDrop not found")
+		t.Fatalf("RadiusClientResponsesDrops not found")
 	} else if v != 1 {
-		t.Fatalf("RadiusClientResponsesDrop is not 1")
+		t.Fatalf("RadiusClientResponsesDrops is not 1")
 	}
 }
 
-func TestPrometheusMetrics(t *testing.T) {
+func TestHttpMetricsEndpoint(t *testing.T) {
 
 	MS.ResetMetrics()
 	time.Sleep(100 * time.Millisecond)
@@ -274,10 +274,23 @@ func TestPrometheusMetrics(t *testing.T) {
 	}
 
 	// TODO: add others
+
+	metricsJSON, _ := httpGet("http://localhost:9090/diameterMetrics/diameterRequestsReceived?agg=Peer&oh=server.igorserver")
+	if !strings.Contains(metricsJSON, `"Peer":"testPeer"`) || !strings.Contains(metricsJSON, `"Value":1`) {
+		t.Fatal("bad diameterMetric " + metricsJSON)
+	}
+
+	metricsJSON, _ = httpGet("http://localhost:9090/radiusMetrics/radiusServerRequests?agg=Code&endpoint=127.0.0.1:1812")
+	if !strings.Contains(metricsJSON, `"Code":"1"`) || !strings.Contains(metricsJSON, `"Value":1`) {
+		t.Fatal("bad radiusMetric " + metricsJSON)
+	}
+
+	// TODO: add others
 }
 
 // Helper function
 func httpGet(location string) (string, error) {
+
 	// Create client with timeout
 	httpClient := http.Client{
 		Timeout: HTTP_TIMEOUT_SECONDS * time.Second,

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -13,6 +14,25 @@ type HttpClientMetricKey struct {
 }
 
 type HttpClientMetrics map[HttpClientMetricKey]uint64
+
+// Custom marshalling
+func (hc HttpClientMetrics) MarshalJSON() ([]byte, error) {
+
+	// JSON object will have a property for the key and another one for the value
+	type T struct {
+		Key   HttpClientMetricKey
+		Value uint64
+	}
+
+	// The array of T to produce as JSON
+	metrics := make([]T, 0)
+
+	for m, v := range hc {
+		metrics = append(metrics, T{Key: m, Value: v})
+	}
+
+	return json.Marshal(metrics)
+}
 
 // Builder for Prometheus format export
 func (hcm HttpClientMetrics) genPrometheusMetric(metricName string, helpString string) string {
@@ -46,6 +66,25 @@ type HttpHandlerMetricKey struct {
 
 type HttpHandlerMetrics map[HttpHandlerMetricKey]uint64
 
+// Custom marshalling
+func (hc HttpHandlerMetrics) MarshalJSON() ([]byte, error) {
+
+	// JSON object will have a property for the key and another one for the value
+	type T struct {
+		Key   HttpHandlerMetricKey
+		Value uint64
+	}
+
+	// The array of T to produce as JSON
+	metrics := make([]T, 0)
+
+	for m, v := range hc {
+		metrics = append(metrics, T{Key: m, Value: v})
+	}
+
+	return json.Marshal(metrics)
+}
+
 // Builder for Prometheus format export
 func (hhm HttpHandlerMetrics) genPrometheusMetric(metricName string, helpString string) string {
 	var builder strings.Builder
@@ -77,6 +116,25 @@ type HttpRouterMetricKey struct {
 }
 
 type HttpRouterMetrics map[HttpRouterMetricKey]uint64
+
+// Custom marshalling
+func (hc HttpRouterMetrics) MarshalJSON() ([]byte, error) {
+
+	// JSON object will have a property for the key and another one for the value
+	type T struct {
+		Key   HttpRouterMetricKey
+		Value uint64
+	}
+
+	// The array of T to produce as JSON
+	metrics := make([]T, 0)
+
+	for m, v := range hc {
+		metrics = append(metrics, T{Key: m, Value: v})
+	}
+
+	return json.Marshal(metrics)
+}
 
 // Builder for Prometheus format export
 func (hrm HttpRouterMetrics) genPrometheusMetric(metricName string, helpString string) string {

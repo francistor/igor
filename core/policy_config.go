@@ -185,27 +185,6 @@ type RadiusClients map[string]RadiusClient
 
 // Initializer to copy the IP address into the RadiusClient struct and
 // or parse the CIDR block
-func (rc RadiusClients) initialize2() error {
-	for ipAddr, radiusClient := range rc {
-		radiusClient.IPAddress = ipAddr
-
-		if addrAndMask := strings.Split(ipAddr, "/"); len(addrAndMask) == 2 {
-			// It is a CDIR block
-			_, ipNet, err := net.ParseCIDR(ipAddr)
-			if err != nil {
-				panic("bad cidr specification in radius clients " + ipAddr)
-			}
-			radiusClient.OriginNetworkCIDR = *ipNet
-		}
-
-		rc[ipAddr] = radiusClient
-	}
-
-	return nil
-}
-
-// Initializer to copy the IP address into the RadiusClient struct and
-// or parse the CIDR block
 func (rc RadiusClients) initialize() error {
 	for name, radiusClient := range rc {
 

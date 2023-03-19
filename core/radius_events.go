@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -16,6 +17,25 @@ type RadiusMetricKey struct {
 }
 
 type RadiusMetrics map[RadiusMetricKey]uint64
+
+// Custom marshalling of PeerDiameterMetrics
+func (rm RadiusMetrics) MarshalJSON() ([]byte, error) {
+
+	// JSON object will have a property for the key and another one for the value
+	type T struct {
+		Key   RadiusMetricKey
+		Value uint64
+	}
+
+	// The array of T to produce as JSON
+	metrics := make([]T, 0)
+
+	for m, v := range rm {
+		metrics = append(metrics, T{Key: m, Value: v})
+	}
+
+	return json.Marshal(metrics)
+}
 
 // Builder for Prometheus format export
 func (rm RadiusMetrics) genPrometheusMetric(metricName string, helpString string) string {
