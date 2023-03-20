@@ -156,5 +156,10 @@ type HttpRouterExchangeEvent struct {
 }
 
 func PushHttpRouterExchange(errorCode string, path string) {
+	// Strip the querystring to the path
+	pos := strings.IndexRune(path, '?')
+	if pos >= 0 {
+		path = path[:pos]
+	}
 	MS.metricEventChan <- HttpRouterExchangeEvent{Key: HttpRouterMetricKey{ErrorCode: errorCode, Path: path}}
 }

@@ -1,6 +1,6 @@
 {
     "coreLogConfig":{
-        "level": "info",
+        "level": "debug",
         "development": true,
         "encoding": "console",
         "outputPaths": ["stdout"],

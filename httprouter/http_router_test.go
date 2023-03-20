@@ -69,6 +69,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
+// Requests are sent using http and forwarded to super-servers both for radius and diameter
 func TestHttpRouterHandler(t *testing.T) {
 
 	rrouter := router.NewRadiusRouter("testServer", nil).Start()
@@ -92,7 +93,7 @@ func TestHttpRouterHandler(t *testing.T) {
 
 	jRadiusRequest := `
 	{
-		"destination": "igor-superserver-group",
+		"destination": "{{ .DESTINATION_GROUP }}",
 		"packet": {
 			"Code": 1,
 			"AVPs":[
@@ -118,7 +119,7 @@ func TestHttpRouterHandler(t *testing.T) {
 	}
 	`
 
-	jRadiusAnswer, err := RouteHttp(client, httpRouterURL+"/routeRadiusRequest", []byte(jRadiusRequest))
+	jRadiusAnswer, err := RouteHttp(client, httpRouterURL+"/routeRadiusRequest?DESTINATION_GROUP=igor-superserver-group", []byte(jRadiusRequest))
 	if err != nil {
 		t.Fatalf("error routing radius: %s", err)
 	}
@@ -142,7 +143,7 @@ func TestHttpRouterHandler(t *testing.T) {
 			"avps":[
 				{"Origin-Host": "server.igorserver"},
 				{"Origin-Realm": "igorserver"},
-				{"Destination-Realm": "igorsuperserver"},
+				{"Destination-Realm": "{{ .DESTINATION_REALM }}"},
 				{
 					"Igor-myTestAllGrouped": [
 						{"Igor-myOctetString": "0102030405060708090a0b"},
@@ -170,16 +171,16 @@ func TestHttpRouterHandler(t *testing.T) {
 	}
 
 	`
-	jDiameterAnswer, err := RouteHttp(client, httpRouterURL+"/routeDiameterRequest", []byte(jRDiameterRequest))
+	jDiameterAnswer, err := RouteHttp(client, httpRouterURL+"/routeDiameterRequest?DESTINATION_REALM=igorsuperserver", []byte(jRDiameterRequest))
 	if err != nil {
-		t.Fatalf("error routing radius: %s", err)
+		t.Fatalf("error routing diameter: %s", err)
 	}
 	diameterAnswer := core.DiameterMessage{}
 	if json.Unmarshal(jDiameterAnswer, &diameterAnswer) != nil {
 		t.Fatalf("error decoding diameter response: %s", err)
 	}
 	if diameterAnswer.GetStringAVP("User-Name") != "EchoLocal" {
-		t.Fatalf("radius response does not contain expected diameter attribute")
+		t.Fatalf("diameter response does not contain expected diameter attribute")
 	}
 
 	rrm := core.MS.HttpRouterQuery("HttpRouterExchanges", nil, []string{"Path"})

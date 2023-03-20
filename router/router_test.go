@@ -229,7 +229,7 @@ func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 		t.Fatalf("NewDiameterRequest error %s", err)
 	}
 	request.AddOriginAVPs(core.GetPolicyConfig())
-	request.Add("Destination-Realm", "igorsuperserver")
+	request.Add("Destination-Realm", "igorserver")
 	request.Add("User-Name", "TestUserNameRequest")
 	response, err := client.RouteDiameterRequest(request, time.Duration(1000*time.Millisecond))
 	if err != nil {

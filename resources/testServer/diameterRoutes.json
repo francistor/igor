@@ -1,5 +1,5 @@
 [
-	{"realm": "*", "applicationId": "TestApplication", "handlers": ["https://localhost:8080/diameterRequest", "https://localhost:8080/diameterRequest"]},
+	{"realm": "igorserver", "applicationId": "TestApplication", "handlers": ["https://localhost:8080/diameterRequest", "https://localhost:8080/diameterRequest"]},
 	{"realm": "igorserver", "applicationId": "Gx", "handlers": ["https://localhost:8080/diameterRequest", "https://localhost:8080/diameterRequest"]},
 	{"realm": "igorsuperserver", "applicationId": "*", "peers": ["superserver.igorsuperserver"], "policy": "fixed"},
 	{"realm": "*", "applicationId": "NASREQ"}

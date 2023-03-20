@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"text/template"
 	"time"
 
 	"github.com/francistor/igor/core"
@@ -97,7 +99,8 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 		logger := core.GetLogger()
 
 		// Get the Routable Diameter Request
-		jRequest, err := io.ReadAll(req.Body)
+		var jRequest []byte
+		jRequestRaw, err := io.ReadAll(req.Body)
 		if err != nil {
 			logger.Error("error reading request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
@@ -105,6 +108,41 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 			core.PushHttpRouterExchange(NETWORK_ERROR, req.RequestURI)
 			return
 		}
+
+		// Execute the template if exists
+		if len(req.URL.Query()) > 0 {
+			// Apply template with query parameters if defined
+			tmpl, err := template.New("request_template").Parse(string(jRequestRaw))
+			if err != nil {
+				logger.Errorf("error un-templating request: %s", err)
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+				core.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+				return
+			}
+
+			// Get only one value for each parameter
+			var parametersSet map[string]string = make(map[string]string)
+			for k, v := range req.URL.Query() {
+				parametersSet[k] = v[0]
+			}
+
+			// Apply the template
+			var tmplRes strings.Builder
+			if err := tmpl.Execute(&tmplRes, parametersSet); err != nil {
+				logger.Errorf("error un-templating request: %s", err)
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+				core.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+				return
+			}
+
+			jRequest = []byte(tmplRes.String())
+
+		} else {
+			jRequest = jRequestRaw
+		}
+
 		var request router.RoutableDiameterRequest
 		if err = json.Unmarshal(jRequest, &request); err != nil {
 			logger.Errorf("error unmarshalling request: %s", err)
@@ -154,13 +192,48 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 		logger := core.GetLogger()
 
 		// Get the Radius Request
-		jRequest, err := io.ReadAll(req.Body)
+		var jRequest []byte
+		jRequestRaw, err := io.ReadAll(req.Body)
 		if err != nil {
 			logger.Errorf("error reading request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			core.PushHttpRouterExchange(NETWORK_ERROR, req.RequestURI)
 			return
+		}
+
+		// Execute the template if exists
+		if len(req.URL.Query()) > 0 {
+			// Apply template with query parameters if defined
+			tmpl, err := template.New("request_template").Parse(string(jRequestRaw))
+			if err != nil {
+				logger.Errorf("error un-templating request: %s", err)
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+				core.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+				return
+			}
+
+			// Get only one value for each parameter
+			var parametersSet map[string]string = make(map[string]string)
+			for k, v := range req.URL.Query() {
+				parametersSet[k] = v[0]
+			}
+
+			// Apply the template
+			var tmplRes strings.Builder
+			if err := tmpl.Execute(&tmplRes, parametersSet); err != nil {
+				logger.Errorf("error un-templating request: %s", err)
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+				core.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+				return
+			}
+
+			jRequest = []byte(tmplRes.String())
+
+		} else {
+			jRequest = jRequestRaw
 		}
 
 		var request router.RoutableRadiusRequest

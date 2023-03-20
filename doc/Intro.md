@@ -241,6 +241,8 @@ An HttpRouter implements an Http server that receives Routable Diameter Requests
 
 A Routable Diameter/Radius request is an structure that encapsulates a Diameter/Radius request plus some metadata such as the timeout for the answer, and the destination of the packet and number of tries in case of Radius.
 
+The body of the request will be interpreted as a go template if there are parameters in the querystring, which will be used as template parameters
+
 ## The Drivers: Diameter Peers and Radius Client Sockets
 
 ### Diameter Peer
