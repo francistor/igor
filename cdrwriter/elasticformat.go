@@ -45,6 +45,9 @@ type ElasticFormatConf struct {
 	AttributeForIndex string
 	IndexDateFormat   string
 
+	// Multiple filed separator
+	separator string
+
 	// Parameters for the _id field
 	IdFields []string
 
@@ -73,6 +76,11 @@ func NewElasticFormat(conf ElasticFormatConf) *ElasticFormat {
 		conf.IndexTypeValue = ES_INDEX_TYPE_CURRENTDATE
 	} else {
 		panic("bad specification for index type: " + conf.IndexType)
+	}
+
+	// By default the separator for multiple instances of an avp is a ","
+	if conf.separator == "" {
+		conf.separator = ","
 	}
 
 	if len(conf.IdFields) == 0 {
@@ -172,10 +180,7 @@ func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 		if strings.Contains(v, ":") {
 			// Write the first not null
 			for _, attrName := range strings.Split(v, ":") {
-				if avp, err := rp.GetAVP(attrName); err != nil {
-					ew.writeStringAVP(&sb, avp, k, &first)
-					break
-				}
+				ew.writeStringAVP(&sb, rp.GetAllAVP(attrName), k, &first)
 			}
 		} else if strings.Contains(v, "+") {
 			// Add the values
@@ -207,9 +212,7 @@ func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 			}
 			ew.writeIntAVP(&sb, val, k, &first)
 		} else {
-			if avp, err := rp.GetAVP(v); err == nil {
-				ew.writeStringAVP(&sb, avp, k, &first)
-			}
+			ew.writeStringAVP(&sb, rp.GetAllAVP(v), k, &first)
 		}
 	}
 	sb.WriteString("}")
@@ -219,34 +222,58 @@ func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 }
 
 // Helper to write "esAttributeName": <attributeValue> from an AVP
-func (ew *ElasticFormat) writeStringAVP(sb *strings.Builder, avp core.RadiusAVP, attributeName string, first *bool) {
+func (ew *ElasticFormat) writeStringAVP(sb *strings.Builder, avps []core.RadiusAVP, attributeName string, first *bool) {
 
+	// Ignore empty set
+	if len(avps) == 0 {
+		return
+	}
+
+	// If not the first attribute, use a comma
 	if !*first {
 		sb.WriteString(", ")
 	} else {
 		*first = false
 	}
 
+	// Write the name of the attribute
 	sb.WriteString("\"")
 	sb.WriteString(attributeName)
 	sb.WriteString("\": ")
 
-	switch avp.DictItem.RadiusType {
+	// Write the value of the attribute, taking into account that it might be multi-valued
+	var values []string
+	var writeAsString = false
+	switch avps[0].DictItem.RadiusType {
 	case core.RadiusTypeInteger, core.RadiusTypeInteger64:
-		if val, found := avp.DictItem.EnumCodes[int(avp.GetInt())]; found {
-			// Write as string
-			sb.WriteString("\"")
-			sb.WriteString(val)
-			sb.WriteString("\"")
-		} else {
-			// Write as integer (yes, using GetString)
-			sb.WriteString(avp.GetString())
+		for i, avp := range avps {
+			if val, found := avp.DictItem.EnumCodes[int(avp.GetInt())]; found {
+				// Write as string
+				writeAsString = true
+				values = append(values, val)
+			} else {
+				// Write as integer (yes, using GetString)
+				// If an array, surely we must use separators and represent as string
+				if i > 0 {
+					writeAsString = true
+				}
+				values = append(values, avp.GetString())
+			}
 		}
 	default:
-		// Write as string
+		for _, avp := range avps {
+			// Write as string
+			writeAsString = true
+			values = append(values, avp.GetString())
+		}
+	}
+
+	if writeAsString {
 		sb.WriteString("\"")
-		sb.WriteString(avp.GetString())
+		sb.WriteString(strings.Join(values, ew.separator))
 		sb.WriteString("\"")
+	} else {
+		sb.WriteString(values[0])
 	}
 }
 

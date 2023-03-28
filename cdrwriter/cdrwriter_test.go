@@ -18,6 +18,8 @@ var cdrDirectoryName = "../cdr"
 var jElasticConfig = `
 {
 	"attributeMap": {
+		"IgorInt": "Igor-IntegerAttribute",
+		"IgorInt64": "Igor-Integer64Attribute",
 		"IgorOctets": "Igor-OctetsAttribute",
 		"IgorString": "Igor-StringAttribute",
 		"SessionTime": "Acct-Session-Time!Acct-Delay-Time",
@@ -165,19 +167,25 @@ func TestElasticFormat(t *testing.T) {
 	esCDR := ef.GetRadiusCDRString(&rp)
 
 	if !strings.Contains(esCDR, "\"_index\": \"cdr-1986-11\"") {
-		t.Fatal("bad index name")
+		t.Fatal("bad index name", esCDR)
 	}
 	if !strings.Contains(esCDR, "\"_id\": \"session-1|127.0.0.1|\"") {
-		t.Fatal("bad _id")
+		t.Fatal("bad _id", esCDR)
 	}
 	if !strings.Contains(esCDR, "\"version\": 200533360048") {
-		t.Fatal("bad version")
+		t.Fatal("bad version", esCDR)
 	}
 	if !strings.Contains(esCDR, "\"InputBytes\": 4294968296") {
-		t.Fatal("bad input bytes")
+		t.Fatal("bad input bytes", esCDR)
 	}
 	if !strings.Contains(esCDR, "\"Status\": \"Stop\"") {
-		t.Fatal("bad accounting status type")
+		t.Fatal("bad accounting status type", esCDR)
+	}
+	if !strings.Contains(esCDR, "\"IgorInt\": \"Zero,One,One\"") {
+		t.Fatal("bad int attribute", esCDR)
+	}
+	if !strings.Contains(esCDR, "\"IgorInt64\": 999999999999") {
+		t.Fatal("bad int64 attribute", esCDR)
 	}
 }
 
