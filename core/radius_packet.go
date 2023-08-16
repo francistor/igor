@@ -321,8 +321,8 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 func (rp *RadiusPacket) ToBytes(secret string, id byte) (data []byte, err error) {
 
 	// Will write the output here
-	var buffer = new(bytes.Buffer)
-	if _, err := rp.ToWriter(buffer, secret, id); err != nil {
+	var buffer bytes.Buffer
+	if _, err := rp.ToWriter(&buffer, secret, id); err != nil {
 		return buffer.Bytes(), err
 	}
 

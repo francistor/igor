@@ -58,7 +58,7 @@ type RadiusServerRequestEvent struct {
 	Key RadiusMetricKey
 }
 
-func PushRadiusServerRequest(endpoint string, Code string) {
+func IncrementRadiusServerRequest(endpoint string, Code string) {
 	MS.metricEventChan <- RadiusServerRequestEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
@@ -66,7 +66,7 @@ type RadiusServerResponseEvent struct {
 	Key RadiusMetricKey
 }
 
-func PushRadiusServerResponse(endpoint string, Code string) {
+func IncrementRadiusServerResponse(endpoint string, Code string) {
 	MS.metricEventChan <- RadiusServerResponseEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
@@ -74,7 +74,7 @@ type RadiusServerDropEvent struct {
 	Key RadiusMetricKey
 }
 
-func PushRadiusServerDrop(endpoint string, Code string) {
+func IncrementRadiusServerDrop(endpoint string, Code string) {
 	MS.metricEventChan <- RadiusServerDropEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
@@ -84,7 +84,7 @@ type RadiusClientRequestEvent struct {
 	Key RadiusMetricKey
 }
 
-func PushRadiusClientRequest(endpoint string, Code string) {
+func IncrementRadiusClientRequest(endpoint string, Code string) {
 	MS.metricEventChan <- RadiusClientRequestEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
@@ -92,7 +92,7 @@ type RadiusClientResponseEvent struct {
 	Key RadiusMetricKey
 }
 
-func PushRadiusClientResponse(endpoint string, Code string) {
+func IncrementRadiusClientResponse(endpoint string, Code string) {
 	MS.metricEventChan <- RadiusClientResponseEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
@@ -100,7 +100,7 @@ type RadiusClientTimeoutEvent struct {
 	Key RadiusMetricKey
 }
 
-func PushRadiusClientTimeout(endpoint string, Code string) {
+func IncrementRadiusClientTimeout(endpoint string, Code string) {
 	MS.metricEventChan <- RadiusClientTimeoutEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
@@ -108,7 +108,7 @@ type RadiusClientResponseStalledEvent struct {
 	Key RadiusMetricKey
 }
 
-func PushRadiusClientResponseStalled(endpoint string, Code string) {
+func IncrementRadiusClientResponseStalled(endpoint string, Code string) {
 	MS.metricEventChan <- RadiusClientResponseStalledEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
@@ -116,7 +116,7 @@ type RadiusClientResponseDropEvent struct {
 	Key RadiusMetricKey
 }
 
-func PushRadiusClientResponseDrop(endpoint string, Code string) {
+func IncrementRadiusClientResponseDrop(endpoint string, Code string) {
 	MS.metricEventChan <- RadiusClientResponseDropEvent{Key: RadiusMetricKey{Endpoint: endpoint, Code: Code}}
 }
 
@@ -134,6 +134,6 @@ type RadiusServersTableUpdatedEvent struct {
 	Table        RadiusServersTable
 }
 
-func PushRadiusServersTable(instanceName string, table RadiusServersTable) {
+func IncrementRadiusServersTable(instanceName string, table RadiusServersTable) {
 	MS.metricEventChan <- RadiusServersTableUpdatedEvent{InstanceName: instanceName, Table: table}
 }

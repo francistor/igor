@@ -67,7 +67,7 @@ func GetStateId(clean bool, next bool) int {
 			panic("environment variable IGOR_BASE undefined")
 		}
 	*/
-	stateIdFileName := IgorConfigBase + "../state-id"
+	stateIdFileName := igorConfigBase + "../state-id"
 
 	if clean {
 		os.Remove(stateIdFileName)
@@ -99,7 +99,7 @@ func writeStateId(stateId int) int {
 			panic("environment variable IGOR_BASE undefined")
 		}
 	*/
-	stateIdFileName := IgorConfigBase + "../state-id"
+	stateIdFileName := igorConfigBase + "../state-id"
 
 	if os.WriteFile(stateIdFileName, []byte(fmt.Sprintf("%d", stateId)), 0660) != nil {
 		panic("could not write state-id file")
@@ -137,18 +137,51 @@ func toInt64(value interface{}) (int64, error) {
 	case float64:
 		// Needed for unmarshaling JSON
 		return int64(v), nil
+	case string:
+		if i, err := strconv.ParseInt(v, 10, 64); err != nil {
+			return 0, err
+		} else {
+			return i, nil
+		}
+
 	default:
-		return 0, fmt.Errorf("cannot convert %T to int64", value)
+		return 0, fmt.Errorf("cannot convert %T %vto int64", value, value)
 	}
 }
 
 func toFloat64(value interface{}) (float64, error) {
 
 	switch v := value.(type) {
+	case int:
+		return float64(v), nil
+	case int8:
+		return float64(v), nil
+	case int16:
+		return float64(v), nil
+	case int32:
+		return float64(v), nil
+	case int64:
+		return float64(v), nil
+	case uint:
+		return float64(v), nil
+	case uint8:
+		return float64(v), nil
+	case uint16:
+		return float64(v), nil
+	case uint32:
+		return float64(v), nil
+	case uint64:
+		return float64(v), nil
 	case float32:
 		return float64(v), nil
 	case float64:
 		return float64(v), nil
+	case string:
+		if f, err := strconv.ParseFloat(v, 64); err != nil {
+			return 0, err
+		} else {
+			return f, nil
+		}
 	default:
 		return 0, fmt.Errorf("cannot convert %T to float64", value)
 	}

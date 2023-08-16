@@ -41,6 +41,16 @@ func TestOctetsDiameterAVP(t *testing.T) {
 	if !reflect.DeepEqual(rebuiltAVP.GetOctets(), []byte(password)) {
 		t.Errorf("Octets AVP not properly encoded after unmarshalling. Got %v instead of %v", rebuiltAVP.GetOctets(), []byte(password))
 	}
+
+	// Alernative way
+	var unmarshaledAVP DiameterAVP
+	unmarshaledAVP.UnmarshalBinary(binaryAVP)
+	if unmarshaledAVP.GetString() != fmt.Sprintf("%x", password) {
+		t.Errorf("Octets AVP not properly encoded after unmarshalling. Got %s", unmarshaledAVP.GetString())
+	}
+	if !reflect.DeepEqual(unmarshaledAVP.GetOctets(), []byte(password)) {
+		t.Errorf("Octets AVP not properly encoded after unmarshalling. Got %v instead of %v", unmarshaledAVP.GetOctets(), []byte(password))
+	}
 }
 
 func TestUTF8StringDiameterAVP(t *testing.T) {
@@ -624,8 +634,7 @@ func TestJSONDiameterAVP(t *testing.T) {
 	*/
 }
 
-/////////////////////////////////////////////////////////////////////////////////////
-
+// ///////////////////////////////////////////////////////////////////////////////////
 func TestDiameterMessage(t *testing.T) {
 
 	var ci = GetPolicyConfig()

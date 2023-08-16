@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+type RadiusAVPType int
+
 const (
 	RadiusTypeNone        = 0
 	RadiusTypeString      = 1
@@ -33,13 +35,13 @@ type RadiusAVPDictItem struct {
 	VendorId   uint32
 	Code       byte
 	Name       string
-	RadiusType int            // One of the constants above
+	RadiusType RadiusAVPType  // One of the constants above
 	EnumValues map[string]int // non nil only in enum type
 	EnumCodes  map[int]string // non  nil only in enum type
 	Encrypted  bool
 	Tagged     bool
 	Salted     bool
-	Withlen    bool
+	WithLen    bool
 	Concat     bool
 }
 
@@ -97,7 +99,7 @@ func newRadiusDictionaryFromJDict(jDict *jRadiusDict) *RadiusDict {
 		vendorId := vendorAVPs.VendorId
 		vendorName := dict.VendorById[vendorId]
 
-		// For a specific vendor
+		// Map all atttributtes from this vendor
 		for _, attr := range vendorAVPs.Attributes {
 			avpDictItem := attr.toAVPDictItem(vendorId, vendorName)
 			dict.AVPByCode[RadiusAVPCode{vendorId, attr.Code}] = &avpDictItem
@@ -133,7 +135,7 @@ type jRadiusAVP struct {
 	Encrypted  bool
 	Tagged     bool
 	Salted     bool
-	Withlen    bool
+	WithLen    bool
 	Concat     bool
 }
 
@@ -157,7 +159,7 @@ type jRadiusDict struct {
 func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) RadiusAVPDictItem {
 
 	// Sanity check
-	var radiusType int
+	var radiusType RadiusAVPType
 	switch javp.Type {
 	case "None":
 		radiusType = RadiusTypeNone
@@ -189,6 +191,7 @@ func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) RadiusAVPDictItem {
 		panic(javp.Name + " is concat but not of type Octets")
 	}
 
+	// Build the map for enum values
 	var codes map[int]string
 	if javp.EnumValues != nil {
 		codes = make(map[int]string)
@@ -212,7 +215,7 @@ func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) RadiusAVPDictItem {
 		Encrypted:  javp.Encrypted,
 		Tagged:     javp.Tagged,
 		Salted:     javp.Salted,
-		Withlen:    javp.Withlen,
+		WithLen:    javp.WithLen,
 		Concat:     javp.Concat,
 	}
 }

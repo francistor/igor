@@ -270,7 +270,7 @@
                     "type": "String",
                     "tagged": true,
                     "salted": true,
-                    "withlen": true
+                    "withLen": true
                 },
                 {
                     "code": 79,
@@ -424,7 +424,7 @@
                     "name": "LI-Action",
                     "type": "Integer",
                     "salted": true,
-                    "withlen": true,
+                    "withLen": true,
                     "enumValues": 
                     {
                         "off": 0,
@@ -436,7 +436,7 @@
                     "name": "Med-Ip-Address",
                     "type": "Address",
                     "salted": true,
-                    "withlen": true
+                    "withLen": true
                 }
             ]
         },
@@ -531,14 +531,14 @@
                     "name": "Pre-Shared-Secret",
                     "type": "Octets",
                     "salted": true,
-                    "withlen": true
+                    "withLen": true
                 },
                 {
                     "code": 58,
                     "name": "MN-HA-Shared-Key",
                     "type": "String",
                     "salted": true,
-                    "withlen": true
+                    "withLen": true
                 }
             ]
         },

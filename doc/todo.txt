@@ -1,0 +1,9 @@
+Replace contst by "enums"
+
+type Something int
+
+const(
+    firstValue Something = iota 
+    secondValue
+    thirdValue
+)

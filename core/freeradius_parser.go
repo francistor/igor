@@ -113,7 +113,7 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 			tagged := false
 			encrypted := false
 			salted := false
-			withlen := false
+			withLen := false
 			concat := false
 			if len(words) > 4 {
 				options := strings.Split(words[4], ",")
@@ -124,7 +124,7 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 						encrypted = true
 					} else if option == "encrypt=2" {
 						salted = true
-						withlen = true
+						withLen = true
 					} else if option == "encrypt=3" {
 						// Ascend propietary. Ignore
 						radiusType = "Octets"
@@ -155,7 +155,7 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 					Tagged:    tagged,
 					Encrypted: encrypted,
 					Salted:    salted,
-					Withlen:   withlen,
+					WithLen:   withLen,
 					Concat:    concat,
 				}
 				dict.Avps[currentVendorAVPsIndex].Attributes = append(dict.Avps[currentVendorAVPsIndex].Attributes, avp)

@@ -15,8 +15,9 @@ import (
 	"time"
 )
 
-var ipv6PrefixRegex = regexp.MustCompile(`[0-9a-zA-z:.]+/[0-9]+`)
+var ipv6PrefixRegex = regexp.MustCompile(`[0-9a-fA-F:\.]+/[0-9]+`)
 
+// Represents the contents of a Radius Attribute-Value pair
 type RadiusAVP struct {
 	Code     byte
 	VendorId uint32
@@ -24,33 +25,34 @@ type RadiusAVP struct {
 	Tag      byte
 
 	// Type mapping
-	// May be a []byte, string, int64, float64, net.IP, time.Time or []DiameterAVP
+	// May be a []byte, string, int64, float64, net.IP or time.Time
 	// If set to any other type, an error will be reported
 	Value interface{}
 
-	// Dictionary item
+	// Dictionary item corresponding to this attribute
 	DictItem *RadiusAVPDictItem
 }
 
-// AVP is
+// AVP in the wire is
 //    code: 1 byte
 //    length: 1 byte
 //    If code == 26
 //      vendorId: 4 bytes
 //      code: 1 byte
 //      length: 1 byte - the length of the code, length and value in the contents of the VSA
-//      value - may be prepended by a byte tag and 2 byte salt
+//      value - may be prepended by a 1 byte tag and 2 byte salt
 //    Else
 //      value
 
-// Encrypted attributes are padded with null when written, and those bytes are not removed when read from the Reader
+// Encrypted attributes are padded with 0s when written, and those bytes are not removed when read from the Reader
 // That means the contents will not match
 
+// Builds a radius AVP read from the specified reader.
 // Returns the number of bytes read
 func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secret string) (n int64, err error) {
 
 	var avpLen byte
-	var vendorCode byte = 0
+	var vendorCode byte = 0 // If vendor specific, will be not 26 but the specific vendor code
 	var vendorLen byte = 0
 	var dataLen byte
 	var salt [2]byte
@@ -92,22 +94,23 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		avp.Code = vendorCode
 
 		// SanityCheck
-		if !(vendorLen == avpLen-6) {
+		if !(vendorLen == avpLen-6) { // Substracting 4 bytes for vendorId, 1 byte for vendorCode and 1 byte for vendorLen
 			return currentIndex, fmt.Errorf("bad avp coding. Expected length of vendor specific attribute does not match")
 		}
 
-		dataLen = vendorLen - 2 // Substracting 4 bytes for vendorId, 1 byte for vendorCode and 1 byte for vendorLen
+		dataLen = vendorLen - 2 // Substracting 1 byte for vendor code and 1 byte for vendor length
 
 	} else {
 		dataLen = avpLen - 2 // Substracting 1 byte for code and 1 byte for length
 	}
 
 	// Get the relevant info from the dictionary
-	// If not in the dictionary, will get some defaults
+	// If not in the dictionary, will get some defaults (unknown code, treated as octect string).
+	// For this reason, the error is ignored
 	avp.DictItem, _ = GetRDict().GetFromCode(RadiusAVPCode{VendorId: avp.VendorId, Code: avp.Code})
 	avp.Name = avp.DictItem.Name
 
-	// Extract tag if necessary
+	// Extract tag if the attribute is tagged in the dictionary
 	if avp.DictItem.Tagged {
 		if err := binary.Read(reader, binary.BigEndian, &avp.Tag); err != nil {
 			return currentIndex, err
@@ -116,7 +119,8 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		dataLen = dataLen - 1
 	}
 
-	// Extract salt if necessary
+	// Extract salt if necessary. A salt is used to make encryption more difficult to crack, introducing
+	// randomness in each request
 	if avp.DictItem.Salted {
 		if err := binary.Read(reader, binary.BigEndian, &salt); err != nil {
 			return currentIndex, err
@@ -130,8 +134,8 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		return currentIndex, fmt.Errorf("invalid AVP data length")
 	}
 
-	// The contents of this variables will be replaced if Encrypted or Salted, so that
-	// we'll read from the intermediate buffer instead of the original
+	// The contents of the following variables will be replaced if Encrypted or Salted, so that
+	// we'll read from the intermediate buffer, with decrypted contents, instead of the original
 	var payloadLen = int(dataLen)
 	var payloadReader io.Reader = reader
 	var drained = false
@@ -155,17 +159,14 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		}
 
 		// If attribute contains its size internally, adjust the length
-		if avp.DictItem.Withlen {
+		if avp.DictItem.WithLen {
 			size := avpBytes[0]
 			if len(avpBytes) < int(size)+1 {
 				return currentIndex, fmt.Errorf("bad internal length value %d < int(%d)+1, Salted: %t", len(avpBytes), size, avp.DictItem.Salted)
 			}
-			avpBytes = avpBytes[1 : size+1]
+			avpBytes = avpBytes[1 : size+1] // The rest of the bytes are just padding
 
 			payloadLen = int(size)
-		} else {
-			payloadLen = len(avpBytes)
-
 		}
 
 		payloadReader = bytes.NewReader(avpBytes)
@@ -208,7 +209,8 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 
 			return currentIndex, err
 		} else {
-			// Standard attributes of this type have 3 bytes for the value only
+			// Standard attributes of this type have 3 bytes for the value only (tagged && not salted?)
+			// TODO: Check that only positive integers are represented
 			var valueHigh byte
 			var valueLow uint16
 			if err := binary.Read(payloadReader, binary.BigEndian, &valueHigh); err != nil {
@@ -327,15 +329,6 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 	return currentIndex, fmt.Errorf("unknown type: %d", avp.DictItem.RadiusType)
 }
 
-// Reads a Radius AVP from a buffer
-func RadiusAVPFromBytes(inputBytes []byte, authenticator [16]byte, secret string) (RadiusAVP, uint32, error) {
-	r := bytes.NewReader(inputBytes)
-
-	avp := RadiusAVP{}
-	n, err := avp.FromReader(r, authenticator, secret)
-	return avp, uint32(n), err
-}
-
 // Writes the AVP to the specified writer
 // Returns the number of bytes written including padding
 func (avp *RadiusAVP) ToWriter(writer io.Writer, authenticator [16]byte, secret string) (int64, error) {
@@ -409,12 +402,13 @@ func (avp *RadiusAVP) ToWriter(writer io.Writer, authenticator [16]byte, secret 
 	// If Encrypted or Salted, write to an intermediate buffer instead
 	var payloadWriter io.Writer
 	var encryptBuffer bytes.Buffer
-	var written = true
+	var written bool
 	if avp.DictItem.Encrypted || avp.DictItem.Salted {
 		payloadWriter = &encryptBuffer
 		written = false
 	} else {
 		payloadWriter = writer
+		written = true
 	}
 
 	// Write data
@@ -464,7 +458,7 @@ func (avp *RadiusAVP) ToWriter(writer io.Writer, authenticator [16]byte, secret 
 			if err = binary.Write(payloadWriter, binary.BigEndian, byte(highByte)); err != nil {
 				return int64(bytesWritten), err
 			}
-			bytesWritten += 1
+
 			if err = binary.Write(payloadWriter, binary.BigEndian, uint32(lowByte)); err != nil {
 				return int64(bytesWritten), err
 			}
@@ -535,7 +529,7 @@ func (avp *RadiusAVP) ToWriter(writer io.Writer, authenticator [16]byte, secret 
 			prefix, err := strconv.ParseUint(addrPrefix[1], 10, 8) // base 10, 8 bits
 			ipv6 := net.ParseIP(addrPrefix[0])
 			if err == nil && ipv6 != nil {
-				// To ignore
+				// Dummy byte
 				if err = binary.Write(payloadWriter, binary.BigEndian, byte(0)); err != nil {
 					return int64(bytesWritten), err
 				}
@@ -588,16 +582,16 @@ func (avp *RadiusAVP) ToWriter(writer io.Writer, authenticator [16]byte, secret 
 		}
 	}
 
-	// If it was written to intermediate buffer
+	// If it was written to intermediate buffer because encryption is needed
 	if !written {
 		var octetsValue []byte = encryptBuffer.Bytes()
 
 		// Write internal length if so required
-		if avp.DictItem.Withlen {
+		if avp.DictItem.WithLen {
 			octetsValue = append([]byte{byte(len(octetsValue))}, octetsValue...)
 		}
 
-		// Replace value
+		// Replace value with encrypted one
 		if avp.DictItem.Salted {
 			octetsValue = encrypt1(octetsValue, authenticator, secret, salt[:])
 		} else if avp.DictItem.Encrypted {
@@ -620,16 +614,23 @@ func (avp *RadiusAVP) ToWriter(writer io.Writer, authenticator [16]byte, secret 
 	return int64(bytesWritten), nil
 }
 
+// Reads a Radius AVP from a buffer
+func RadiusAVPFromBytes(inputBytes []byte, authenticator [16]byte, secret string) (RadiusAVP, uint32, error) {
+	r := bytes.NewReader(inputBytes)
+
+	avp := RadiusAVP{}
+	n, err := avp.FromReader(r, authenticator, secret)
+	return avp, uint32(n), err
+}
+
 // Returns a byte slice with the contents of the AVP
-func (avp *RadiusAVP) ToBytes(authenticator [16]byte, secret string) (data []byte, err error) {
+func (avp *RadiusAVP) ToBytes(authenticator [16]byte, secret string) ([]byte, error) {
 
 	// Will write the output here
-	var buffer = new(bytes.Buffer)
-	if _, err := avp.ToWriter(buffer, authenticator, secret); err != nil {
-		return buffer.Bytes(), err
-	}
+	var buffer bytes.Buffer
+	_, err := avp.ToWriter(&buffer, authenticator, secret)
 
-	return buffer.Bytes(), nil
+	return buffer.Bytes(), err
 }
 
 // Returns the size of the AVP
@@ -646,7 +647,7 @@ func (avp *RadiusAVP) Len() int {
 		}
 
 		// Add the internal length attribute
-		if avp.DictItem.Withlen {
+		if avp.DictItem.WithLen {
 			dataSize += 1
 		}
 
@@ -690,6 +691,7 @@ func (avp *RadiusAVP) Len() int {
 		}
 	}
 
+	// Add the header bytes. Only 2 if not VSA and 6 more if VSA
 	if avp.VendorId == 0 {
 		dataSize += 2
 	} else {
@@ -703,6 +705,7 @@ func (avp *RadiusAVP) Len() int {
 // Value Getters
 /////////////////////////////////////////////
 
+// Returns the value of the AVP as a byte slice, nil in case of any errors.
 func (avp *RadiusAVP) GetOctets() []byte {
 
 	var value, ok = avp.Value.([]byte)
@@ -714,7 +717,7 @@ func (avp *RadiusAVP) GetOctets() []byte {
 	return value
 }
 
-// Returns the value of the AVP as an string
+// Returns the value of the AVP as a string, empty in case of any errors
 func (avp *RadiusAVP) GetString() string {
 
 	switch avp.DictItem.RadiusType {
@@ -759,17 +762,23 @@ func (avp *RadiusAVP) GetTaggedString() string {
 	}
 }
 
-// Returns the value of the AVP as a number
+// Returns the value of the AVP as a number, 0 in case of any errors.
+// Handle with care.
 func (avp *RadiusAVP) GetInt() int64 {
 
 	switch avp.DictItem.RadiusType {
 	case RadiusTypeInteger, RadiusTypeInteger64:
-
-		return avp.Value.(int64)
+		value, _ := avp.Value.(int64)
+		return value
 
 	case RadiusTypeTime:
-		timeValue := avp.Value.(time.Time)
+		timeValue, _ := avp.Value.(time.Time)
 		return int64(timeValue.Sub(ZeroRadiusTime).Seconds())
+
+	case RadiusTypeString:
+		value, _ := avp.Value.(string)
+		i, _ := strconv.ParseInt(value, 10, 64)
+		return i
 
 	default:
 		GetLogger().Errorf("cannot convert value to int64 %T %v", avp.Value, avp.Value)
@@ -831,6 +840,8 @@ func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 	avp.Code = avp.DictItem.Code
 	avp.VendorId = avp.DictItem.VendorId
 
+	// Get the tag. Also leaves the work of parsing the interface{} values as string for later, when
+	// processing per RadiusAttribute type.
 	var stringValue, isString = value.(string)
 	if avp.DictItem.Tagged {
 		if !isString {
@@ -1078,12 +1089,12 @@ func decrypt1(payload []byte, authenticator [16]byte, secret string, salt []byte
 // JSON Encoding
 ///////////////////////////////////////////////////////////////
 
-// Encode as JSON using the map representation
+// Encode as JSON using the map representation. It will contain a single property with a single value.
 func (avp *RadiusAVP) MarshalJSON() ([]byte, error) {
-	return json.Marshal(avp.ToMap())
+	return json.Marshal(avp.toMap())
 }
 
-// Get a RadiusAVP from JSON
+// Get a RadiusAVP from JSON containing a single property with a single value.
 func (avp *RadiusAVP) UnmarshalJSON(b []byte) error {
 
 	theMap := make(map[string]interface{})
@@ -1091,13 +1102,13 @@ func (avp *RadiusAVP) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &theMap); err != nil {
 		return err
 	} else {
-		*avp, err = AVPFromMap(theMap)
+		*avp, err = aVPFromMap(theMap)
 		return err
 	}
 }
 
 // Generate a map for JSON encoding
-func (avp *RadiusAVP) ToMap() map[string]interface{} {
+func (avp *RadiusAVP) toMap() map[string]interface{} {
 	theMap := map[string]interface{}{}
 
 	switch avp.DictItem.RadiusType {
@@ -1118,7 +1129,7 @@ func (avp *RadiusAVP) ToMap() map[string]interface{} {
 }
 
 // Generates a RadiusAVP from its JSON representation
-func AVPFromMap(avpMap map[string]interface{}) (RadiusAVP, error) {
+func aVPFromMap(avpMap map[string]interface{}) (RadiusAVP, error) {
 
 	if len(avpMap) != 1 {
 		return RadiusAVP{}, fmt.Errorf("map contains more than one key in JSON representation of Diameter AVP")

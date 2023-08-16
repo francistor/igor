@@ -105,7 +105,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 			logger.Error("error reading request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
-			core.PushHttpRouterExchange(NETWORK_ERROR, req.RequestURI)
+			core.IncrementHttpRouterExchange(NETWORK_ERROR, req.RequestURI)
 			return
 		}
 
@@ -117,7 +117,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 				logger.Errorf("error un-templating request: %s", err)
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(err.Error()))
-				core.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+				core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
 				return
 			}
 
@@ -133,7 +133,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 				logger.Errorf("error un-templating request: %s", err)
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(err.Error()))
-				core.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+				core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
 				return
 			}
 
@@ -148,7 +148,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 			logger.Errorf("error unmarshalling request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
-			core.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+			core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
 			return
 		}
 		request.Message.Tidy()
@@ -158,7 +158,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 			logger.Error("error parsing Timeoutspec: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
-			core.PushHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
+			core.IncrementHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
 			return
 		}
 
@@ -168,7 +168,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 			logger.Errorf("error handling request: %s", err)
 			w.WriteHeader(http.StatusGatewayTimeout)
 			w.Write([]byte(err.Error()))
-			core.PushHttpRouterExchange(HANDLER_FUNCTION_ERROR, req.RequestURI)
+			core.IncrementHttpRouterExchange(HANDLER_FUNCTION_ERROR, req.RequestURI)
 			return
 		}
 		jAnswer, err := json.Marshal(answer)
@@ -176,13 +176,13 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 			logger.Errorf("error marshaling response: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			core.PushHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
+			core.IncrementHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		core.PushHttpRouterExchange(SUCCESS, req.RequestURI)
+		core.IncrementHttpRouterExchange(SUCCESS, req.RequestURI)
 	}
 }
 
@@ -198,7 +198,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 			logger.Errorf("error reading request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
-			core.PushHttpRouterExchange(NETWORK_ERROR, req.RequestURI)
+			core.IncrementHttpRouterExchange(NETWORK_ERROR, req.RequestURI)
 			return
 		}
 
@@ -210,7 +210,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 				logger.Errorf("error un-templating request: %s", err)
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(err.Error()))
-				core.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+				core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
 				return
 			}
 
@@ -226,7 +226,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 				logger.Errorf("error un-templating request: %s", err)
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(err.Error()))
-				core.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+				core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
 				return
 			}
 
@@ -241,7 +241,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 			logger.Errorf("error unmarshalling request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
-			core.PushHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+			core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
 			return
 		}
 
@@ -250,7 +250,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 			logger.Errorf("error parsing Timeoutspec: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
-			core.PushHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
+			core.IncrementHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
 			return
 		}
 
@@ -260,7 +260,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 			logger.Errorf("error handling request: %s", err)
 			w.WriteHeader(http.StatusGatewayTimeout)
 			w.Write([]byte(err.Error()))
-			core.PushHttpRouterExchange(HANDLER_FUNCTION_ERROR, req.RequestURI)
+			core.IncrementHttpRouterExchange(HANDLER_FUNCTION_ERROR, req.RequestURI)
 			return
 		}
 		jAnswer, err := json.Marshal(answer)
@@ -268,12 +268,12 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 			logger.Errorf("error marshaling response: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
-			core.PushHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
+			core.IncrementHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		core.PushHttpRouterExchange(SUCCESS, req.RequestURI)
+		core.IncrementHttpRouterExchange(SUCCESS, req.RequestURI)
 	}
 }

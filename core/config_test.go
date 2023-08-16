@@ -7,6 +7,7 @@ import (
 )
 
 func TestHttpRetrieval(t *testing.T) {
+	// This object name is configured to be got using http in searchrules.json
 	txt, err := GetPolicyConfig().CM.GetBytesConfigObject("template_http.txt")
 	if err != nil {
 		t.Fatalf("error using http to get config object: %s", err)
@@ -16,25 +17,26 @@ func TestHttpRetrieval(t *testing.T) {
 	}
 }
 
-// Uncomment to test
-// Requires to populate the PSBA database with
-// INSERT INTO accessNodes (AccessNodeId, Parameters) values ("RepublicaHW01", '{"ipAddress": "127.0.0.1", "secret": "mysecret", "attributes": [{"Redback-Client_DNS_Pri": "1.2.3.4"}, {"Session-Timeout": 3600}]}');
-// INSERT INTO accessNodes (AccessNodeId, Parameters) values ("RepublicaHW02", '{"ipAddress": "127.0.0.2", "secret": "mysecret", "attributes": [{"Redback-Client_DNS_Pri": "1.2.3.4"}, {"Session-Timeout": 7200}]}');
+// Requires that the test database is populated with
+// INSERT INTO accessNodes (AccessNodeId, Parameters) values ("RepublicaHW01", '{"originIP": "127.0.0.1", "secret": "mysecret", "attributes": [{"Redback-Client_DNS_Pri": "1.2.3.4"}, {"Session-Timeout": 3600}]}');
+// INSERT INTO accessNodes (AccessNodeId, Parameters) values ("RepublicaHW02", '{"originIP": "127.0.0.2", "secret": "mysecret", "attributes": [{"Redback-Client_DNS_Pri": "1.2.3.4"}, {"Session-Timeout": 7200}]}');
+// This is done in main_test.go
 func TestDatabaseObject(t *testing.T) {
 
 	type RadiusClientEntry struct {
-		Secret    string
-		IPAddress string
+		Secret   string
+		OriginIP string
 	}
 
 	var rcEntries map[string]RadiusClientEntry
 	err := GetPolicyConfig().CM.BuildJSONConfigObject("radiusclients.database", &rcEntries)
+
 	if err != nil {
 		t.Fatalf("could not read radiusclients.database: %s", err)
 	}
 
 	if rcEntries["127.0.0.1"].Secret != "mysecret" {
-		t.Fatalf("bad content in radiusclients.database")
+		t.Fatalf("bad secret in radiusclients.database")
 	}
 }
 
@@ -47,7 +49,7 @@ func TestParametrizedObject(t *testing.T) {
 	co := NewConfigObject[TestObject]("parametrized.json.templ")
 	err := co.Update(&GetPolicyConfig().CM)
 	if err != nil {
-		t.Fatal("could not retrieve parametrized.templ")
+		t.Fatalf("could not retrieve parametrized.templ %v", err)
 	}
 
 	// Values for this are set as environment variables at initialization of testing
@@ -98,7 +100,7 @@ func TestDiamConfig(t *testing.T) {
 	if !found {
 		t.Fatal(`Rule not found for {"realm": "igorsuperserver", "applicationId": "*", "peers": ["superserver.igorsuperserver"], "policy": "fixed"}`)
 	}
-	// Using the helper function
+	// Using the helper function matching "*" for application name
 	rule, _ := rr.FindDiameterRoutingRule("igorsuperserver", "Sp", false)
 	if rule.Realm != "igorsuperserver" || rule.ApplicationId != "*" {
 		t.Fatal(`Rule not found for realm "igorsuperserver" and applicaton "Sp"`)
@@ -123,14 +125,14 @@ func TestRadiusConfig(t *testing.T) {
 	if rc["127.0.0.1"].ClientProperties["scope"] != "default" {
 		t.Fatalf("property for scope not ok")
 	}
-	if rc["127.0.0.1"].IPAddress != "127.0.0.1" {
+	if rc["127.0.0.1"].OriginIP != "127.0.0.1/32" {
 		t.Fatalf("IPAddress was not in the radius client object")
 	}
 	if rc["127.0.0.1"].RadiusAttributes[0].GetInt() != 120 {
 		t.Fatalf("Bad Session-Timeout radius attribute")
 	}
 
-	// Find radius client
+	// Find radius client configured with a subnet
 	_, err := rc.FindRadiusClient(net.ParseIP("1.2.3.4"))
 	if err != nil {
 		t.Fatalf("Radius client 1.2.3.4 not found")

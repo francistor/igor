@@ -227,11 +227,11 @@ func (rcs *RadiusClientSocket) eventLoop() {
 			code := string(v.packetBytes[0])
 			radiusId := v.packetBytes[1]
 			if epReqMap, ok := rcs.requestsMap[endpoint]; !ok {
-				core.PushRadiusClientResponseStalled(endpoint, code)
+				core.IncrementRadiusClientResponseStalled(endpoint, code)
 				core.GetLogger().Debugf("unsolicited or stalled response from endpoint %s", endpoint)
 				continue
 			} else if requestContext, ok := epReqMap[radiusId]; !ok {
-				core.PushRadiusClientResponseStalled(endpoint, code)
+				core.IncrementRadiusClientResponseStalled(endpoint, code)
 				core.GetLogger().Debugf("unsolicited or stalled response from endpoint %s and id %d", endpoint, radiusId)
 				continue
 			} else {
@@ -253,7 +253,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 
 				// Check authenticator
 				if !core.ValidateResponseAuthenticator(v.packetBytes, requestContext.authenticator, requestContext.secret) {
-					core.PushRadiusClientResponseDrop(endpoint, code)
+					core.IncrementRadiusClientResponseDrop(endpoint, code)
 					core.GetLogger().Warnf("bad authenticator from %s", endpoint)
 
 					// Send the answer to the requester
@@ -265,7 +265,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				// Decode the packet
 				radiusPacket, err := core.RadiusPacketFromBytes(v.packetBytes, requestContext.secret, requestContext.authenticator)
 				if err != nil {
-					core.PushRadiusClientResponseDrop(endpoint, code)
+					core.IncrementRadiusClientResponseDrop(endpoint, code)
 					core.GetLogger().Errorf("error decoding packet from %s %s", endpoint, err)
 					// Send the answer to the requester
 					requestContext.rchan <- fmt.Errorf("could not decode packet")
@@ -273,7 +273,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 					continue
 				}
 
-				core.PushRadiusClientResponse(endpoint, strconv.Itoa(int(radiusPacket.Code)))
+				core.IncrementRadiusClientResponse(endpoint, strconv.Itoa(int(radiusPacket.Code)))
 				core.GetLogger().Debugf("<- Client received RadiusPacket %s\n", radiusPacket)
 
 				// Send the answer to the requester
@@ -347,7 +347,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 						rcs.wg.Add(1)
 						rcs.eventLoopChannel <- retriedClientRadiusRequest
 					}
-					core.PushRadiusClientTimeout(v.endpoint, strconv.Itoa(int(v.packet.Code)))
+					core.IncrementRadiusClientTimeout(v.endpoint, strconv.Itoa(int(v.packet.Code)))
 
 				}),
 				secret: v.secret,
@@ -355,7 +355,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				authenticator: v.packet.Authenticator,
 			}
 
-			core.PushRadiusClientRequest(v.endpoint, strconv.Itoa(int(v.packet.Code)))
+			core.IncrementRadiusClientRequest(v.endpoint, strconv.Itoa(int(v.packet.Code)))
 			core.GetLogger().Debugf("-> Client sent RadiusPacket with Identifier %d - %s\n", radiusId, v.packet)
 
 			// Corresponding to the Add(1) in SendRadiusRequest

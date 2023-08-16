@@ -6,7 +6,9 @@ import (
 	"strings"
 )
 
-// Manages the configuration items for policy
+// Manages the configuration items for policy (radius & diameter).
+// The calls to get the configuration objects return a copy. If Update
+// is called later, the copy returned is not modified.
 type PolicyConfigurationManager struct {
 	CM ConfigurationManager
 
@@ -23,15 +25,18 @@ type PolicyConfigurationManager struct {
 }
 
 // Slice of configuration managers
-// Except during testing, there will be only one instance, which will be retrieved by GetPolicyConfig().
+// Except during testing, there will be only one instance, which will be retrieved with GetPolicyConfig().
 // To retrieve a specific instance, use GetPolicyConfigInstance(<instance-name>)
 var policyConfigs []*PolicyConfigurationManager = make([]*PolicyConfigurationManager, 0)
 
 // Adds a Policy (Radius and Diameter) configuration object with the specified name to the list of policyConfigs
 // if isDefault is true, also initializes the logger and the dictionaries, which are shared among all instances
-func InitPolicyConfigInstance(bootstrapFile string, instanceName string, configParams map[string]string, isDefault bool) *PolicyConfigurationManager {
+func InitPolicyConfigInstance(bootstrapFile string, instanceName string,
+	configParams map[string]string, isDefault bool) *PolicyConfigurationManager {
 
-	// Check not already instantiated
+	// Check not already instantiated.Not perfect, since it is subject to race conditions,
+	// but anyway multiple configuration managers are only used for testing, where
+	// conditions are quite controlled
 	for i := range policyConfigs {
 		if policyConfigs[i].CM.instanceName == instanceName {
 			panic(instanceName + " already initalized")
@@ -118,7 +123,8 @@ func GetPolicyConfigInstance(instanceName string) *PolicyConfigurationManager {
 	panic("configuraton instance <" + instanceName + "> not configured")
 }
 
-// Retrieves the default configuration instance, which is the first one in the list
+// Retrieves the default configuration instance, which is the first one in the list.
+// Will panic if none is configured
 func GetPolicyConfig() *PolicyConfigurationManager {
 	return policyConfigs[0]
 }
@@ -136,12 +142,12 @@ type DiameterServerConfig struct {
 	PeerCheckTimeSeconds int
 }
 
-// Updates the diameter server configuration in the global variable
+// Updates the diameter server configuration in the corresponding configuration manager
 func (c *PolicyConfigurationManager) UpdateDiameterServerConfig() error {
 	return c.diameterServerConfig.Update(&c.CM)
 }
 
-// Retrieves the contents of the global variable containing the diameter server configuration
+// Retrieves the contents of the diameter server configuration for this configuration manager
 func (c *PolicyConfigurationManager) DiameterServerConf() DiameterServerConfig {
 	return c.diameterServerConfig.Get()
 }
@@ -156,12 +162,12 @@ type RadiusServerConfig struct {
 	HttpHandlerTimeoutSeconds int
 }
 
-// Updates the radius server configuration in the global variable
+// Updates the radius server configuration in the corresponding configuration manager
 func (c *PolicyConfigurationManager) UpdateRadiusServerConfig() error {
 	return c.radiusServerConfig.Update(&c.CM)
 }
 
-// Retrieves the contents of the global variable containing the radius server configuration
+// Retrieves the contents radius server configuration in the corresponding configuration manager
 func (c *PolicyConfigurationManager) RadiusServerConf() RadiusServerConfig {
 	return c.radiusServerConfig.Get()
 }
@@ -170,7 +176,7 @@ func (c *PolicyConfigurationManager) RadiusServerConf() RadiusServerConfig {
 // Key in the RadiusClients map will be the IPAddress
 type RadiusClient struct {
 	Name             string
-	IPAddress        string
+	OriginIP         string
 	Secret           string
 	ClientClass      string
 	ClientProperties map[string]string
@@ -183,24 +189,32 @@ type RadiusClient struct {
 // Holds the configuration of all Radius Clients, indexed by IP address
 type RadiusClients map[string]RadiusClient
 
-// Initializer to copy the IP address into the RadiusClient struct and
-// or parse the CIDR block
+// Initializer to generate the OriginNetworkCIDR and clean up the IPAddress field,
+// that could be a single IP address or a CIDR. If not present, the origin address
+// is assumed to be the key of the entry
 func (rc RadiusClients) initialize() error {
-	for name, radiusClient := range rc {
+	for key, radiusClient := range rc {
 
-		if addrAndMask := strings.Split(radiusClient.IPAddress, "/"); len(addrAndMask) == 2 {
-			// It is a CDIR block
-			_, ipNet, err := net.ParseCIDR(radiusClient.IPAddress)
-			if err != nil {
-				panic("bad cidr specification in radius clients " + radiusClient.IPAddress)
-			}
-			radiusClient.OriginNetworkCIDR = *ipNet
-		} else {
-			// Otherwise, just copy the entry name, which should be the IP address
-			radiusClient.IPAddress = name
+		// For completeness only, just copy the key, which should be the IP address
+		if radiusClient.OriginIP == "" {
+			radiusClient.OriginIP = key + "/32"
 		}
 
-		rc[name] = radiusClient
+		// Move to CIDR format, if only one IP address was specified
+		if !strings.Contains(radiusClient.OriginIP, "/") {
+			radiusClient.OriginIP = radiusClient.OriginIP + "/32"
+		}
+
+		// Parse and generate the origin network
+		_, ipNet, err := net.ParseCIDR(radiusClient.OriginIP)
+		if err != nil {
+			panic("bad cidr specification in radius clients " + radiusClient.OriginIP)
+		}
+		radiusClient.OriginNetworkCIDR = *ipNet
+		radiusClient.OriginIP = ipNet.String()
+
+		// Set the value with the new cooked radiusClient
+		rc[key] = radiusClient
 	}
 
 	return nil
@@ -331,7 +345,7 @@ func (c *PolicyConfigurationManager) DiameterRoutingRules() DiameterRoutingRules
 ///////////////////////////////////////////////////////////////////////////////
 
 // Holds the configuration of a Diameter Peer
-type DiameterPeer struct {
+type DiameterPeerConf struct {
 	IPAddress               string
 	Port                    int
 	ConnectionPolicy        string // May be "active" or "passive"
@@ -345,7 +359,7 @@ type DiameterPeer struct {
 }
 
 // Holds the configuration of all Diameter peers
-type DiameterPeers map[string]DiameterPeer
+type DiameterPeers map[string]DiameterPeerConf
 
 // Implements the Initializable interface
 // Performs the cooking of the just read configuration object

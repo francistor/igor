@@ -25,7 +25,7 @@ const (
 // Holds a SearchRule, which specifies where to look for a configuration object
 type SearchRule struct {
 	// Regex for the name of the object. If matching, we'll try to locate
-	// it prepending the Base property to compose the URL (file or http)
+	// it prepending the Origin property to compose the URL (file or http)
 	// The regex will contain a matching group that will be the part used to
 	// look for the object. For instance, in "Gy/(.*)", the part after "Gy/"
 	// will be taken as the resource name to look after when retreiving an object
@@ -39,7 +39,7 @@ type SearchRule struct {
 	Origin string
 }
 
-// The applicable Search Rules. Hold also the configuration for the configuration database
+// The applicable Search Rules. Holds also the configuration for the configuration database
 type SearchRules struct {
 	Rules []SearchRule
 	Db    struct {
@@ -52,6 +52,11 @@ type SearchRules struct {
 // Basic objects and methods to manage configuration files without yet
 // interpreting them. To be embedded in a handlerConfig or policyConfig object
 // Multiple "instances" can coexist in a single executable (mainly for testing)
+// The hierarchy is
+// - BuildJSONConfigObject or GetBytesConfigObject or GetRawBytesConfigObject
+// - Call getObject. Implements the logic to try first with instance name
+// - Call getResource. Reads from database, http or file
+// No cache is implemented. Any call to retreive an object will go to the source
 type ConfigurationManager struct {
 
 	// Configuration objects are to be searched for in a path that contains
@@ -66,7 +71,8 @@ type ConfigurationManager struct {
 	// The contents of the bootstrapFile are parsed here
 	searchRules SearchRules
 
-	// Global configuration parameters
+	// Global configuration parameters. Used as parameters for the configuration
+	// objects, if they retrieved as templates.
 	configParams map[string]string
 
 	// Database Handle for access to the configuration database
@@ -74,17 +80,18 @@ type ConfigurationManager struct {
 }
 
 // The home location for configuration files not referenced as absolute paths
-var IgorConfigBase string
+var igorConfigBase string
 
 // Creates and initializes a ConfigurationManager
 // The <params> argument is used as parameter to the objects, treated as templates
 func NewConfigurationManager(bootstrapFile string, instanceName string, params map[string]string) ConfigurationManager {
 
+	// To avoid null pointers, create an emtpy map if not passed
 	if params == nil {
 		params = make(map[string]string)
 	}
 
-	// Add environment variables to the params object
+	// Add relevant environment variables to the params object
 	for _, envKV := range os.Environ() {
 		if strings.HasPrefix(envKV, "igor_") || strings.HasPrefix(envKV, "IGOR_") {
 			envKV = strings.TrimPrefix(envKV, "igor_")
@@ -106,8 +113,8 @@ func NewConfigurationManager(bootstrapFile string, instanceName string, params m
 	return cm
 }
 
-// Parses the object as a template using the parameters
-func (c *ConfigurationManager) parseObject(obj []byte) ([]byte, error) {
+// Parses the object as a template using the parameters ofthe configuration instance.
+func (c *ConfigurationManager) untemplateObject(obj []byte) ([]byte, error) {
 
 	// Parse the template
 	tmpl, err := template.New("igor_template").Parse(string(obj))
@@ -134,7 +141,7 @@ func (c *ConfigurationManager) BuildJSONConfigObject(objectName string, obj any)
 		return err
 	}
 
-	parsed, err := c.parseObject(jb)
+	parsed, err := c.untemplateObject(jb)
 	if err != nil {
 		return err
 	}
@@ -152,7 +159,7 @@ func (c *ConfigurationManager) GetBytesConfigObject(objectName string) ([]byte, 
 		return nil, err
 	}
 
-	parsed, err := c.parseObject(cb)
+	parsed, err := c.untemplateObject(cb)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +217,6 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 			return nil, err
 		}
 	}
-
 }
 
 // Reads the configuration item from the specified location, which may be
@@ -219,7 +225,7 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 
 	if strings.HasPrefix(location, "database") {
 		// Format is database:table:keycolumn:paramscolumn
-		// The returned object is always a JSON whosw first level are properties, not arrays
+		// The returned object is always a JSON whose first level are properties, not arrays
 		// as per the values of the keycolumn
 		items := strings.Split(location, ":")
 		tableName := items[1]
@@ -233,6 +239,7 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error reading from database. %s, %w", location, err)
 		}
+		defer stmt.Close()
 		rows, err := stmt.Query()
 		if err != nil {
 			return nil, fmt.Errorf("error reading from database. %s, %w", location, err)
@@ -262,7 +269,7 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 		httpClient := http.Client{
 			Timeout: HTTP_TIMEOUT_SECONDS * time.Second,
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore invalid SSL certificates
 			},
 		}
 
@@ -283,7 +290,7 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 
 	} else {
 		// Read from file
-		if resp, err := os.ReadFile(IgorConfigBase + location); err != nil {
+		if resp, err := os.ReadFile(igorConfigBase + location); err != nil {
 			return nil, err
 		} else {
 			return resp, nil
@@ -305,7 +312,7 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	}
 
 	// Parse template
-	rules, err = c.parseObject(rules)
+	rules, err = c.untemplateObject(rules)
 	if err != nil {
 		panic("could not parse the bootstrap file in " + bootstrapFile + "due to " + err.Error())
 	}
@@ -313,7 +320,7 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	// Decode Search Rules and add them to the ConfigurationManager object
 	err = json.Unmarshal(rules, &c.searchRules)
 	if err != nil || len(c.searchRules.Rules) == 0 {
-		panic("could not decode the Search Rules or empty file")
+		panic("could not decode the Search Rules or the file was empty")
 	}
 
 	// Add the compiled regular expression for each rule and sanity check for base
@@ -353,7 +360,7 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	}
 }
 
-// Sets the core.IgorConfigBase variable as the directory where the bootstrap file resides
+// Sets the core.igorConfigBase variable as the directory where the bootstrap file resides
 // and returns the normalized location of that bootstrap file, looking for it in the current
 // directory and in the parent directory, which is useful for tests
 func (c *ConfigurationManager) fixBootstrapFileLocation(bootstrapFileName string, tryWithParent bool) string {
@@ -370,7 +377,7 @@ func (c *ConfigurationManager) fixBootstrapFileLocation(bootstrapFileName string
 		if err != nil {
 			panic(err)
 		}
-		IgorConfigBase = filepath.Dir(abs) + "/"
+		igorConfigBase = filepath.Dir(abs) + "/"
 		return fileInfo.Name()
 	}
 

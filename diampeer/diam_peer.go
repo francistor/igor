@@ -38,7 +38,7 @@ const (
 // still being executed and the TCP socket may still be in use.
 // The Router must call Close() on this object to wait for full finalization.
 type PeerDownEvent struct {
-	// Myself
+	// Myself, to be reported to the router
 	Sender *DiameterPeer
 
 	// Will be nil if the reason is not an error
@@ -92,7 +92,7 @@ type EgressDiameterMsg struct {
 }
 
 // Message received from a Diameter Peer. May be a Request or an Answer
-// Sent by the readLoop to the eventLoop
+// Sent by the readLoop (network socket reader) to the eventLoop
 type IngressDiameterMsg struct {
 	message *core.DiameterMessage
 }
@@ -129,7 +129,8 @@ type ConnectionErrorMsg struct {
 
 // Sent when the connection with the remote peer reports EOF
 // The peer will send a PeerDownMsg to be closed and recycled
-type ReadEOFMsg struct{}
+type ReadEOFMsg struct {
+}
 
 // Sent when the connection with the remote peer reports a reading error
 // The peer will send a PeerDownMsg to be closed and recycled
@@ -144,11 +145,13 @@ type WriteErrorMsg struct {
 }
 
 // Sent periodically for device watchdog implementation
-type WatchdogMsg struct{}
+type WatchdogMsg struct {
+}
 
 /////////////////////////////////////////////
 
 // Context data for an in flight request
+// Stored in the DiameterPeer.requestMap
 type RequestContext struct {
 
 	// Metric key. Used because the message will not be available in a timeout
@@ -170,8 +173,8 @@ type RequestContext struct {
 // did not terminate correctly, because an error reading or writting from the TCP socket happens,
 // or due to explicit termination (SetDown method). The DiameterPeer object is then set to
 // "Terminated" state, but the Close() method must be called explicitly to close the internal channel
-// for the event loop and to wait for goroutines to finalize. After the engagement process terminates
-// correctly, the PeerUp event is sent through the control channel
+// for the event loop and to wait for goroutines to finalize.
+// After the engagement process terminates correctly, the PeerUp event is sent through the control channel
 //
 // Peers may be "Active" or "Passive". An ActivePeer is created using NewActivePeer, and a Passive
 // Peer is created using NewPassivePeer. See those methods for details.
@@ -180,7 +183,7 @@ type DiameterPeer struct {
 	// Holds the Peer configuration
 	// Passed during instantiation if Peer is Active
 	// Filled after CER/CEA exchange if Peer is Passive
-	peerConfig core.DiameterPeer
+	peerConfig core.DiameterPeerConf
 
 	// Holds the configuration instance for this DiameterPeer
 	ci *core.PolicyConfigurationManager
@@ -196,7 +199,7 @@ type DiameterPeer struct {
 	// can be closed as far as the readLoop is concerned
 	readLoopDoneChannel chan bool
 
-	// Passed as parameter. To report events back to the Router
+	// Passed as parameter upon DiameterPeer creation. To report events back to the Router
 	routerControlChannel chan interface{}
 
 	// The Status of the object (one of the const defined above)
@@ -210,7 +213,7 @@ type DiameterPeer struct {
 	// Canceller of TCP connection with Peer
 	cancel context.CancelFunc
 
-	// Outstanding requests map
+	// Outstanding requests map.
 	// Maps HopByHopIds to a channel where the response or a timeout will be sent
 	requestsMap map[uint32]RequestContext
 
@@ -230,33 +233,32 @@ type DiameterPeer struct {
 
 // Creates a new DiameterPeer when we are expected to establish the connection with the other side
 // and initiate the CER/CEA handshake
-func NewActiveDiameterPeer(configInstanceName string, rc chan interface{}, peer core.DiameterPeer, handler core.DiameterMessageHandler) *DiameterPeer {
+func NewActiveDiameterPeer(configInstanceName string, rc chan interface{}, peerConf core.DiameterPeerConf, handler core.DiameterMessageHandler) *DiameterPeer {
 
 	// Create the Peer struct
 	dp := DiameterPeer{
 		ci:                   core.GetPolicyConfigInstance(configInstanceName),
 		eventLoopChannel:     make(chan interface{}, EVENTLOOP_CAPACITY),
 		routerControlChannel: rc,
-		peerConfig:           peer,
+		peerConfig:           peerConf,
 		requestsMap:          make(map[uint32]RequestContext),
 		handler:              handler,
 	}
 
-	core.GetLogger().Debugf("creating active diameter peer for %s", peer.DiameterHost)
+	core.GetLogger().Debugf("creating active diameter peer for %s", peerConf.DiameterHost)
 
 	dp.status = StatusConnecting
 
 	// Default value for connect timeout
-	timeoutMillis := peer.ConnectionTimeoutMillis
+	timeoutMillis := peerConf.ConnectionTimeoutMillis
 	if timeoutMillis == 0 {
 		timeoutMillis = 5000
 	}
 
 	// Do not close the Peer until the connecton thread finishes. Wait for this wg is in the Close() method
 	dp.wg.Add(1)
-
 	// This will eventually send a ConnectionEstablishedMsg or ConnectionErrorMsg to the event loop
-	go dp.connect(time.Duration(timeoutMillis)*time.Millisecond, peer.IPAddress, peer.Port)
+	go dp.connect(time.Duration(timeoutMillis)*time.Millisecond, peerConf.IPAddress, peerConf.Port)
 
 	// Start the event loop
 	go dp.eventLoop()
@@ -264,7 +266,7 @@ func NewActiveDiameterPeer(configInstanceName string, rc chan interface{}, peer 
 	return &dp
 }
 
-// Creates a new DiameterPeer when the connection has been alread accepted
+// Creates a new DiameterPeer when the connection has been alread accepted (the other side sent the request and we are acting as the server)
 func NewPassiveDiameterPeer(configInstanceName string, rc chan interface{}, conn net.Conn, handler core.DiameterMessageHandler) *DiameterPeer {
 
 	// Create the Peer Struct
@@ -299,7 +301,7 @@ func NewPassiveDiameterPeer(configInstanceName string, rc chan interface{}, conn
 func (dp *DiameterPeer) SetDown() {
 	dp.eventLoopChannel <- PeerSetDownCommandMsg{}
 
-	core.GetLogger().Debugf("peer %s terminating", dp.peerConfig.DiameterHost)
+	core.GetLogger().Debugf("peer %s in IP addrress %s terminating", dp.peerConfig.DiameterHost, dp.peerConfig.IPAddress)
 }
 
 // Closes the event loop channel
@@ -307,12 +309,15 @@ func (dp *DiameterPeer) SetDown() {
 // Takes some time to execute: all outstanding requests will be waited
 func (dp *DiameterPeer) Close() {
 
+	// TODO: Does make sense here to send a PeerSetDownCommandMsg, in order to avoid blocks and make the closing process easier for users?
+
 	// Wait for the readLoop to stop
 	if dp.readLoopDoneChannel != nil {
 		<-dp.readLoopDoneChannel
 	}
 
-	// Wait until all goroutines exit, including timers in outstanding requests
+	// Wait until all goroutines to exit, including timers in outstanding requests
+	core.GetLogger().Debugf("peer %s waiting for outstanding requests to be terminated", dp.peerConfig.DiameterHost)
 	dp.wg.Wait()
 
 	// Terminate the event loop
@@ -324,7 +329,7 @@ func (dp *DiameterPeer) Close() {
 }
 
 // To hide the internal variable for DiameterPeer configuration
-func (dp *DiameterPeer) GetPeerConfig() core.DiameterPeer {
+func (dp *DiameterPeer) GetPeerConfig() core.DiameterPeerConf {
 	return dp.peerConfig
 }
 
@@ -364,6 +369,7 @@ func (dp *DiameterPeer) eventLoop() {
 
 			case PeerCloseMsg:
 
+				// Terminate the event loop
 				return
 
 			// Connect goroutine reports connection established
@@ -384,12 +390,12 @@ func (dp *DiameterPeer) eventLoop() {
 
 				// Active Peer. We'll send the CER
 				cer, err := core.NewDiameterRequest("Base", "Capabilities-Exchange")
-				cer.AddOriginAVPs(dp.ci)
 				if err != nil {
 					panic("could not create a CER")
 				}
+				cer.AddOriginAVPs(dp.ci)
 				// Finish building the CER message
-				dp.pushCEAttributes(cer)
+				dp.pushCEAttrubutes(cer)
 
 				// Send the message to the peer. If no answer before first watchdog tick, will SetDown
 				dp.eventLoopChannel <- EgressDiameterMsg{message: cer}
@@ -476,24 +482,24 @@ func (dp *DiameterPeer) eventLoop() {
 				// If response, just send
 			case EgressDiameterMsg:
 
-				if dp.status == StatusConnected || dp.status == StatusEngaged {
+				if (dp.status == StatusConnected && v.message.ApplicationId == 0) || dp.status == StatusEngaged {
 
 					// If message is a response to a disconnect peer, set to disconnect now
 					if !v.message.IsRequest && v.message.ApplicationId == 0 && v.message.CommandCode == 282 {
-						dp.eventLoopChannel <- PeerSetDownCommandMsg{err: fmt.Errorf("received disconnect-peer")}
+						dp.eventLoopChannel <- PeerSetDownCommandMsg{err: fmt.Errorf("successfully disconnected peer")}
 						dp.status = StatusTerminating
 					}
 
 					// Check not duplicate request
-					hbhId := v.message.HopByHopId
 					if v.message.IsRequest {
-						if _, ok := dp.requestsMap[hbhId]; ok {
+						if _, found := dp.requestsMap[v.message.HopByHopId]; found {
 							panic("duplicated HopByHopId")
 						}
 					}
 
 					core.GetLogger().Debugf("-> Sending Message %s\n", v.message)
 
+					// Send the message
 					if _, err := v.message.WriteTo(dp.connWriter); err != nil {
 						// There was an error writing. Will close the connection
 						dp.eventLoopChannel <- WriteErrorMsg{err}
@@ -514,12 +520,12 @@ func (dp *DiameterPeer) eventLoop() {
 						// If it was a Request, store in the outstanding request map
 						// RChan may be nil if it is a base application message
 						if v.message.IsRequest {
-							core.PushPeerDiameterRequestSent(dp.peerConfig.DiameterHost, v.message)
+							core.IncrementPeerDiameterRequestSent(dp.peerConfig.DiameterHost, v.message)
 							if v.rchan != nil {
 								// Set timer
 								dp.wg.Add(1)
 								timer := time.AfterFunc(v.timeout, func() {
-									// This will be called if the timer expires. If canceled, Done() will be called when doing that
+									// This will be called if the timer expires. If canceled, wg.Done() will be called when doing that
 									dp.eventLoopChannel <- CancelRequestMsg{hopByHopId: v.message.HopByHopId, reason: fmt.Errorf("Timeout")}
 									defer dp.wg.Done()
 								})
@@ -532,14 +538,14 @@ func (dp *DiameterPeer) eventLoop() {
 								}
 							}
 						} else {
-							core.PushPeerDiameterAnswerSent(dp.peerConfig.DiameterHost, v.message)
+							core.IncrementPeerDiameterAnswerSent(dp.peerConfig.DiameterHost, v.message)
 						}
 					}
 
 				} else {
-					core.GetLogger().Errorf("%s <%s %s> message was not sent because status is %d", dp.peerConfig.DiameterHost, v.message.ApplicationName, v.message.CommandName, dp.status)
+					core.GetLogger().Errorf("message with application %s and command %s to %s was not sent because peer status is %d", v.message.ApplicationName, v.message.CommandName, dp.status)
 					if v.rchan != nil {
-						v.rchan <- fmt.Errorf("%s message not sent. Status is not Engaged", dp.peerConfig.DiameterHost)
+						v.rchan <- fmt.Errorf("message not sent to %s. Status is not Engaged", dp.peerConfig.DiameterHost)
 						close(v.rchan)
 					}
 				}
@@ -556,7 +562,7 @@ func (dp *DiameterPeer) eventLoop() {
 
 				if v.message.IsRequest {
 
-					core.PushPeerDiameterRequestReceived(dp.peerConfig.DiameterHost, v.message)
+					core.IncrementPeerDiameterRequestReceived(dp.peerConfig.DiameterHost, v.message)
 
 					// Check if it is a Base application message (code for Base application is 0)
 					// In this case, handling is done here
@@ -576,16 +582,18 @@ func (dp *DiameterPeer) eventLoop() {
 							}
 
 						case "Device-Watchdog":
+							// Send response
 							dwa := core.NewDiameterAnswer(v.message)
 							dwa.AddOriginAVPs(dp.ci)
 							dwa.Add("Result-Code", core.DIAMETER_SUCCESS)
 							dp.eventLoopChannel <- EgressDiameterMsg{message: dwa}
 
 						case "Disconnect-Peer":
+							// Send response
 							dpa := core.NewDiameterAnswer(v.message)
 							dpa.AddOriginAVPs(dp.ci)
 							dp.eventLoopChannel <- EgressDiameterMsg{message: dpa}
-							core.GetLogger().Warnf("%s received Disconnect-Peer message", dp.peerConfig.DiameterHost)
+							core.GetLogger().Infof("%s received Disconnect-Peer message", dp.peerConfig.DiameterHost)
 
 						default:
 							core.GetLogger().Warnf("command %d for base applicaton not found", v.message.CommandCode)
@@ -612,7 +620,7 @@ func (dp *DiameterPeer) eventLoop() {
 					}
 				} else {
 					// Received an answer
-					core.PushPeerDiameterAnswerReceived(dp.peerConfig.DiameterHost, v.message)
+					core.IncrementPeerDiameterAnswerReceived(dp.peerConfig.DiameterHost, v.message)
 
 					if v.message.ApplicationId == 0 {
 						// Base answer
@@ -634,7 +642,7 @@ func (dp *DiameterPeer) eventLoop() {
 
 							if ceaError {
 								dp.status = StatusTerminating
-								dp.eventLoopChannel <- PeerSetDownCommandMsg{err: fmt.Errorf("CER/CEA error %w", err)}
+								dp.eventLoopChannel <- PeerSetDownCommandMsg{err: fmt.Errorf("CER/CEA error")}
 							} else {
 								dp.eventLoopChannel <- PeerUpMsg{diameterHost: dp.peerConfig.DiameterHost}
 							}
@@ -645,8 +653,11 @@ func (dp *DiameterPeer) eventLoop() {
 								core.GetLogger().Errorf("bad result code in answer to DWR: %d", v.message.GetResultCode())
 								dp.status = StatusTerminating
 								dp.eventLoopChannel <- PeerSetDownCommandMsg{err: fmt.Errorf("watchdog answer is not DIAMETER_SUCCESS")}
+
 							} else {
-								dp.outstandingDWA--
+								if dp.outstandingDWA > 0 {
+									dp.outstandingDWA--
+								}
 							}
 						default:
 							core.GetLogger().Warnf("command %d for base applicaton not found in dictionary", v.message.CommandCode)
@@ -655,8 +666,8 @@ func (dp *DiameterPeer) eventLoop() {
 						// Non base answer
 						if requestContext, ok := dp.requestsMap[v.message.HopByHopId]; !ok {
 							// Request not found in the requests map
-							core.PushPeerDiameterAnswerStalled(dp.peerConfig.DiameterHost, v.message)
-							core.GetLogger().Errorf("stalled diameter answer: '%v'", *v.message)
+							core.IncrementPeerDiameterAnswerStalled(dp.peerConfig.DiameterHost, v.message)
+							core.GetLogger().Errorf("stalled diameter answer: '%v'", v.message)
 						} else {
 							// Cancel timer
 							if requestContext.timer.Stop() {
@@ -670,7 +681,7 @@ func (dp *DiameterPeer) eventLoop() {
 								default:
 								}
 							}
-							// Send the response
+							// Publish the response to the caller in the response channel
 							requestContext.rchan <- v.message
 							close(requestContext.rchan)
 							delete(dp.requestsMap, v.message.HopByHopId)
@@ -690,7 +701,7 @@ func (dp *DiameterPeer) eventLoop() {
 					// Delete the requestmap entry
 					delete(dp.requestsMap, v.hopByHopId)
 					// Update metric
-					core.PushPeerDiameterRequestTimeout(requestContext.key)
+					core.IncrementPeerDiameterRequestTimeout(requestContext.key)
 				}
 
 			case WatchdogMsg:
@@ -705,10 +716,10 @@ func (dp *DiameterPeer) eventLoop() {
 
 				// Create request
 				dwr, err := core.NewDiameterRequest("Base", "Device-Watchdog")
-				dwr.AddOriginAVPs(dp.ci)
 				if err != nil {
 					panic("could not create a DWR")
 				}
+				dwr.AddOriginAVPs(dp.ci)
 				dp.eventLoopChannel <- EgressDiameterMsg{message: dwr}
 				dp.outstandingDWA++
 			}
@@ -777,10 +788,6 @@ func (dp *DiameterPeer) DiameterExchange(dm *core.DiameterMessage, timeout time.
 		rchan <- fmt.Errorf("should not use this method to send a Base Application message")
 		return
 	}
-	if dp.status != StatusEngaged {
-		rchan <- fmt.Errorf("tried to send a diameter request in a non engaged DiameterPeer. Status is %d", dp.status)
-		return
-	}
 	if !(*dm).IsRequest {
 		rchan <- fmt.Errorf("diameter message is not a request")
 		return
@@ -801,7 +808,7 @@ func (dp *DiameterPeer) handleCER(request *core.DiameterMessage) (string, error)
 		return "", fmt.Errorf("received CER when status in not connected, but %d", dp.status)
 	}
 
-	// Check at least that the peer exists and the origin IP address is valid
+	// Check at least that the peer exists and the origin IP address is valid for that peer
 	originHostAVP, err := request.GetAVP("Origin-Host")
 	if err == nil {
 		originHost := originHostAVP.GetString()
@@ -819,7 +826,7 @@ func (dp *DiameterPeer) handleCER(request *core.DiameterMessage) (string, error)
 				cea := core.NewDiameterAnswer(request)
 				cea.AddOriginAVPs(dp.ci)
 				cea.Add("Result-Code", core.DIAMETER_SUCCESS)
-				dp.pushCEAttributes(cea)
+				dp.pushCEAttrubutes(cea)
 				dp.eventLoopChannel <- EgressDiameterMsg{message: cea}
 
 				// All good returns here
@@ -843,8 +850,8 @@ func (dp *DiameterPeer) handleCER(request *core.DiameterMessage) (string, error)
 	return "", fmt.Errorf("bad CEA")
 }
 
-// Helper function to build CEA message
-func (dp *DiameterPeer) pushCEAttributes(cer *core.DiameterMessage) {
+// Helper function to build CE messages
+func (dp *DiameterPeer) pushCEAttrubutes(cer *core.DiameterMessage) {
 	serverConf := dp.ci.DiameterServerConf()
 
 	if serverConf.BindAddress != "0.0.0.0" {
@@ -859,7 +866,7 @@ func (dp *DiameterPeer) pushCEAttributes(cer *core.DiameterMessage) {
 
 	// Add supported applications
 	routingRules := dp.ci.DiameterRoutingRules()
-	var relaySet = false
+	var relaySet = false // To add the "Relay" application only once
 	for _, rule := range routingRules {
 		if rule.ApplicationId != "*" {
 			if appDict, ok := core.GetDDict().AppByName[rule.ApplicationId]; ok {
@@ -899,7 +906,7 @@ func (dp *DiameterPeer) cancelAll() {
 			}
 		}
 		// Send the error
-		requestContext.rchan <- fmt.Errorf("request cancelled due to Peer down")
+		requestContext.rchan <- fmt.Errorf("request cancelled. Peer is shuting down")
 		close(requestContext.rchan)
 		delete(dp.requestsMap, hopId)
 	}
@@ -913,7 +920,7 @@ func (dp *DiameterPeer) terminateActions(e error) {
 		dp.connection.Close()
 	}
 
-	// Cancels all outstanding requests with error
+	// Cancels all outstanding requests
 	dp.cancelAll()
 
 	// Tell the router that we are down

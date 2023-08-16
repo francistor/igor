@@ -10,6 +10,8 @@ import (
 	"fmt"
 )
 
+type DiameterAVPType int
+
 // One for each Diamter AVP Type
 const (
 	DiameterTypeNone         = 0
@@ -57,7 +59,7 @@ type DiameterAVPDictItem struct {
 	VendorId     uint32 // 3 bytes required according to RFC 6733
 	Code         uint32 // 3 bytes required according to RFC 6733
 	Name         string
-	DiameterType int                          // One of the constants above
+	DiameterType DiameterAVPType              // One of the constants above
 	EnumValues   map[string]int               // non nil only in enum type
 	EnumCodes    map[int]string               // non  nil only in enum type
 	Group        map[string]GroupedProperties // non nil only in grouped type
@@ -125,20 +127,24 @@ func (dd *DiameterDict) GetAVPFromName(name string) (*DiameterAVPDictItem, error
 }
 
 // Returns a DiameterAppplication given the appid and command code
-func (dd *DiameterDict) GetApplication(appId uint32, commandCode uint32) (*DiameterApplication, error) {
-	if command, ok := dd.AppByCode[appId]; !ok {
+func (dd *DiameterDict) GetApplication(appId uint32) (*DiameterApplication, error) {
+	if app, ok := dd.AppByCode[appId]; !ok {
 		return nil, fmt.Errorf("appId %d not found", appId)
 	} else {
-		return command, nil
+		return app, nil
 	}
 }
 
 // Returns a DiameterCommand given the appid and command code
 func (dd *DiameterDict) GetCommand(appId uint32, commandCode uint32) (*DiameterCommand, error) {
-	if command, ok := dd.AppByCode[appId].CommandByCode[commandCode]; !ok {
-		return nil, fmt.Errorf("appId %d and command %d not found", appId, commandCode)
+	if app, found := dd.AppByCode[appId]; found {
+		if command, ok := app.CommandByCode[commandCode]; ok {
+			return command, nil
+		} else {
+			return nil, fmt.Errorf("appId %d and command %d not found", appId, commandCode)
+		}
 	} else {
-		return command, nil
+		return nil, fmt.Errorf("appId %d not found", appId)
 	}
 }
 
@@ -169,7 +175,7 @@ func NewDiameterDictionaryFromJSON(data []byte) *DiameterDict {
 		vendorId := vendorAVPs.VendorId
 		vendorName := dict.VendorById[vendorId]
 
-		// For a specific vendor
+		// Map all atttributtes from this vendor
 		for _, attr := range vendorAVPs.Attributes {
 			avpDictItem := attr.toAVPDictItem(vendorId, vendorName)
 			dict.AVPByCode[DiameterAVPCode{vendorId, attr.Code}] = &avpDictItem
@@ -228,7 +234,7 @@ type jDiameterDict struct {
 }
 
 func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) DiameterAVPDictItem {
-	var diameterType int
+	var diameterType DiameterAVPType
 	switch javp.Type {
 	case "None":
 		diameterType = DiameterTypeNone

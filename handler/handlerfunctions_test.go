@@ -233,7 +233,7 @@ func TestTemplatedConfigObject(t *testing.T) {
 	var v CParam
 	fmt.Println(v)
 
-	var o = core.NewTemplatedConfigObject[RadiusUserFile, CParam]("template.txt", "templateParameters.json")
+	var o = core.NewTemplatedMapConfigObject[RadiusUserFile, CParam]("template.txt", "templateParameters.json")
 	if err := o.Update(&core.GetPolicyConfig().CM); err != nil {
 		t.Fatalf("could not get templated configuration object: %s", err)
 	}

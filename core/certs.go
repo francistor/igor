@@ -36,14 +36,14 @@ func EnsureCertificates() (string, string) {
 		if path.IsAbs(certFile) {
 			return certFile, keyFile
 		} else {
-			return IgorConfigBase + certFile, IgorConfigBase + keyFile
+			return igorConfigBase + certFile, igorConfigBase + keyFile
 		}
 	}
 
 	// Locations of the files to be created are relative to the base config directory (bootstrap file)
-	if IgorConfigBase != "" {
-		certFile = IgorConfigBase + "../cert.pem"
-		keyFile = IgorConfigBase + "../key.pem"
+	if igorConfigBase != "" {
+		certFile = igorConfigBase + "../cert.pem"
+		keyFile = igorConfigBase + "../key.pem"
 	} else {
 		certFile = "cert.pem"
 		keyFile = "key.pem"

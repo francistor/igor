@@ -16,6 +16,7 @@ import (
 type DiameterAVP struct {
 	Code        uint32
 	IsMandatory bool
+	IsProtected bool
 	VendorId    uint32
 	Name        string
 
@@ -28,19 +29,21 @@ type DiameterAVP struct {
 	DictItem *DiameterAVPDictItem
 }
 
-// AVP Header is
+// AVP Header in the wire is
 //    code: 4 byte
-//    flags: 1 byte (vendor, mandatory, proxy)
+//    flags: 1 byte (vendor, mandatory, protected)
 //    length: 3 byte
 //    vendorId: 0 / 4 byte
 //    data: rest of bytes
+// Total length is always padded to a multiple of 4 bytes
 
-// Returns the number of bytes read, including padding
+// Build a DiameterAVP from a binary byte reader.
+// Returns the number of bytes read, plus padding
 func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	var lenHigh uint8
 	var lenLow uint16
 	var avpLen uint32 // Only 24 bytes are relevant. Does not take into account 4 byte padding
-	var padLen uint32 // Length of paddding for multiple of 4 bytes
+	var padLen uint32 // Length of paddding to make multiple of 4 bytes
 	var dataLen uint32
 	var flags uint8
 	var avpBytes []byte
@@ -61,6 +64,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	}
 	isVendorSpecific = flags&0x80 != 0
 	avp.IsMandatory = flags&0x40 != 0
+	avp.IsProtected = flags&0x20 != 0
 	currentIndex += 1
 
 	// Get Len
@@ -82,10 +86,9 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 		padLen = 4 - (avpLen % 4)
 	}
 
-	// Get VendorId and data length
+	// Get VendorId and data length.
 	// The size of the data is the size of the AVP minus size of the the headers, which is
 	// different depending on whether the attribute is vendor specific or not.
-
 	if isVendorSpecific {
 		if err := binary.Read(reader, binary.BigEndian, &avp.VendorId); err != nil {
 			return currentIndex, err
@@ -97,7 +100,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	}
 
 	// Get the relevant info from the dictionary
-	// If not in the dictionary, will get some defaults
+	// If not in the dictionary, will get some defaults (error is ignored)
 	avp.DictItem, _ = GetDDict().GetAVPFromCode(DiameterAVPCode{VendorId: avp.VendorId, Code: avp.Code})
 	avp.Name = avp.DictItem.Name
 
@@ -166,6 +169,7 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 			if err != nil {
 				return currentIndex + bytesRead, err
 			}
+			// Make array if this is the first attribute we are inserting
 			if avp.Value == nil {
 				avp.Value = make([]DiameterAVP, 0)
 			}
@@ -180,12 +184,13 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	case DiameterTypeAddress:
 		var addrType uint16
 		var padding uint16
+
 		if err := binary.Read(reader, binary.BigEndian, &addrType); err != nil {
 			return currentIndex, err
 		}
 		if addrType == 1 {
 			var ipv4Addr [4]byte
-			// IPv4
+
 			if err := binary.Read(reader, binary.BigEndian, &ipv4Addr); err != nil {
 				return currentIndex + 2, err
 			}
@@ -266,15 +271,6 @@ func (avp *DiameterAVP) ReadFrom(reader io.Reader) (n int64, err error) {
 	return currentIndex, fmt.Errorf("unknown type: %d", avp.DictItem.DiameterType)
 }
 
-// Reads a DiameterAVP from a buffer
-func DiameterAVPFromBytes(inputBytes []byte) (DiameterAVP, uint32, error) {
-	r := bytes.NewReader(inputBytes)
-
-	avp := DiameterAVP{}
-	n, err := avp.ReadFrom(r)
-	return avp, uint32(n), err
-}
-
 // Writes the AVP to the specified writer
 // Returns the number of bytes written including padding
 func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
@@ -296,6 +292,9 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 	if avp.IsMandatory {
 		flags += 0x40
 	}
+	if avp.IsProtected {
+		flags += 0x20
+	}
 	if err = binary.Write(buffer, binary.BigEndian, flags); err != nil {
 		return int64(bytesWritten), err
 	}
@@ -303,10 +302,20 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 
 	// Write Len (this is without padding)
 	avpLen := avp.DataLen()
-	if err = binary.Write(buffer, binary.BigEndian, uint8(avpLen/65535)); err != nil {
+	// Optimization to avoid division in most cases
+	var lenHighByte uint8
+	var lenLowWord uint16
+	if avpLen < 65535 {
+		lenHighByte = 0
+		lenLowWord = uint16(avpLen)
+	} else {
+		lenHighByte = uint8(avpLen / 65535)
+		lenLowWord = uint16(avpLen % 65535)
+	}
+	if err = binary.Write(buffer, binary.BigEndian, lenHighByte); err != nil {
 		return int64(bytesWritten), err
 	}
-	if err = binary.Write(buffer, binary.BigEndian, uint16(avpLen%65535)); err != nil {
+	if err = binary.Write(buffer, binary.BigEndian, lenLowWord); err != nil {
 		return int64(bytesWritten), err
 	}
 	bytesWritten += 3
@@ -402,7 +411,6 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 			} else {
 				bytesWritten += int(n)
 			}
-
 		}
 
 	case DiameterTypeAddress:
@@ -529,15 +537,31 @@ func (avp *DiameterAVP) WriteTo(buffer io.Writer) (int64, error) {
 	return int64(avpLen + padSize), nil
 }
 
+// To implement the BinaryMarshaler interface
 func (avp *DiameterAVP) MarshalBinary() (data []byte, err error) {
 
 	// Will write the output here
-	var buffer = new(bytes.Buffer)
-	if _, err := avp.WriteTo(buffer); err != nil {
+	var buffer bytes.Buffer
+	if _, err := avp.WriteTo(&buffer); err != nil {
 		return buffer.Bytes(), err
 	}
 
 	return buffer.Bytes(), nil
+}
+
+// To implement the BinaryUnmarshaler interface
+func (avp *DiameterAVP) UnmarshalBinary(data []byte) error {
+	_, err := avp.ReadFrom(bytes.NewReader(data))
+	return err
+}
+
+// Reads a DiameterAVP from a buffer
+func DiameterAVPFromBytes(inputBytes []byte) (*DiameterAVP, uint32, error) {
+	r := bytes.NewReader(inputBytes)
+
+	avp := DiameterAVP{}
+	n, err := avp.ReadFrom(r)
+	return &avp, uint32(n), err
 }
 
 // Returns the size of the AVP without padding
@@ -570,7 +594,7 @@ func (avp *DiameterAVP) DataLen() int {
 	case DiameterTypeGrouped:
 		values := avp.Value.([]DiameterAVP)
 		for i := range values {
-			dataSize += values[i].Len()
+			dataSize += values[i].Len() // With padding
 		}
 
 	case DiameterTypeAddress:
@@ -634,6 +658,7 @@ func (avp *DiameterAVP) Len() int {
 // Value Getters
 /////////////////////////////////////////////
 
+// Returns the value of the AVP as an octet string
 func (avp *DiameterAVP) GetOctets() []byte {
 
 	var value, ok = avp.Value.([]byte)
@@ -668,11 +693,11 @@ func (avp *DiameterAVP) GetString() string {
 		var sb strings.Builder
 
 		sb.WriteString("{")
-		keyValues := make([]string, 0, len(groupedValue))
+		stringValues := make([]string, 0, len(groupedValue))
 		for i := range groupedValue {
-			keyValues = append(keyValues, groupedValue[i].Name+"="+groupedValue[i].GetString())
+			stringValues = append(stringValues, groupedValue[i].Name+"="+groupedValue[i].GetString())
 		}
-		sb.WriteString(strings.Join(keyValues, ","))
+		sb.WriteString(strings.Join(stringValues, ","))
 		sb.WriteString("}")
 
 		return sb.String()
@@ -685,37 +710,22 @@ func (avp *DiameterAVP) GetString() string {
 		var timeValue = avp.Value.(time.Time)
 		return timeValue.Format(TimeFormatString)
 
-	case DiameterTypeUTF8String:
-		var stringValue, _ = avp.Value.(string)
-		return stringValue
-
-	case DiameterTypeDiamIdent:
-		var stringValue, _ = avp.Value.(string)
-		return stringValue
-
-	case DiameterTypeDiameterURI:
+	case DiameterTypeUTF8String, DiameterTypeDiamIdent, DiameterTypeDiameterURI, DiameterTypeIPFilterRule, DiameterTypeIPv6Prefix:
 		var stringValue, _ = avp.Value.(string)
 		return stringValue
 
 	case DiameterTypeEnumerated:
 		var intValue, _ = avp.Value.(int64)
-		return avp.DictItem.EnumCodes[int(intValue)]
+		if value, found := avp.DictItem.EnumCodes[int(intValue)]; !found {
+			// If no string representation defined, return the string representation as it is
+			return fmt.Sprintf("%d", intValue)
+		} else {
+			return value
+		}
 
-	case DiameterTypeIPFilterRule:
-		var stringValue, _ = avp.Value.(string)
-		return stringValue
-
-	case DiameterTypeIPv4Address:
+	case DiameterTypeIPv4Address, DiameterTypeIPv6Address:
 		var ipAddress, _ = avp.Value.(net.IP)
 		return ipAddress.String()
-
-	case DiameterTypeIPv6Address:
-		var ipAddress, _ = avp.Value.(net.IP)
-		return ipAddress.String()
-
-	case DiameterTypeIPv6Prefix:
-		var stringValue, _ = avp.Value.(string)
-		return stringValue
 	}
 
 	return ""
@@ -773,11 +783,12 @@ func (avp *DiameterAVP) GetIPAddress() net.IP {
 // Creates a new AVP
 // If the type of value is not compatible with the Diameter type in the dictionary, an error is returned
 // If grouped, the value may be an array of AVPs or a single AVP or a pointer to an AVP
+// Time, if passed as string, must be formatted as TimeFormatString
 func NewDiameterAVP(name string, value interface{}) (*DiameterAVP, error) {
 	var avp = DiameterAVP{}
 
-	di, e := GetDDict().GetAVPFromName(name)
-	if e != nil {
+	di, err := GetDDict().GetAVPFromName(name)
+	if err != nil {
 		return &avp, fmt.Errorf("%s not found in dictionary", name)
 	}
 
@@ -786,6 +797,7 @@ func NewDiameterAVP(name string, value interface{}) (*DiameterAVP, error) {
 	avp.Code = avp.DictItem.Code
 	avp.VendorId = avp.DictItem.VendorId
 
+	// Will try to coerce the value to the most appropriate type in turn, before giving up
 	switch avp.DictItem.DiameterType {
 
 	case DiameterTypeOctetString:
@@ -876,21 +888,7 @@ func NewDiameterAVP(name string, value interface{}) (*DiameterAVP, error) {
 			avp.Value = timeValue
 		}
 
-	case DiameterTypeUTF8String:
-		var stringValue, ok = value.(string)
-		if !ok {
-			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
-		}
-		avp.Value = stringValue
-
-	case DiameterTypeDiamIdent:
-		var stringValue, ok = value.(string)
-		if !ok {
-			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
-		}
-		avp.Value = stringValue
-
-	case DiameterTypeDiameterURI:
+	case DiameterTypeUTF8String, DiameterTypeDiamIdent, DiameterTypeDiameterURI, DiameterTypeIPFilterRule:
 		var stringValue, ok = value.(string)
 		if !ok {
 			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
@@ -916,13 +914,6 @@ func NewDiameterAVP(name string, value interface{}) (*DiameterAVP, error) {
 			// Specified as an int
 			avp.Value = int64Value
 		}
-
-	case DiameterTypeIPFilterRule:
-		var stringValue, ok = value.(string)
-		if !ok {
-			return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
-		}
-		avp.Value = stringValue
 
 	case DiameterTypeIPv6Prefix:
 		var stringValue, ok = value.(string)
@@ -950,11 +941,13 @@ func BuildDiameterAVP(name string, value interface{}) *DiameterAVP {
 	}
 }
 
+// Checks that it AVP is in the dictionary
 // If grouped, checks that the embedded AVPs are in the dictionary
 func (avp *DiameterAVP) Check() error {
 
 	// Do something only if grouped
-	if avp.DictItem.DiameterType == DiameterTypeGrouped {
+	diameterType := avp.DictItem.DiameterType
+	if diameterType == DiameterTypeGrouped {
 		avps := avp.Value.([]DiameterAVP)
 		group := avp.DictItem.Group
 
@@ -968,14 +961,22 @@ func (avp *DiameterAVP) Check() error {
 			}
 		}
 
-		// Check that all attribues are allowed
+		// Check that all attribues are allowed (that is, specified in the group)
 		for i := range avps {
 			if _, found := group[avps[i].Name]; !found {
 				return fmt.Errorf("%s is not allowed in %s", avps[i].Name, avp.Name)
 			}
+			// Check recursively
 			if err := avps[i].Check(); err != nil {
 				return err
 			}
+		}
+	} else {
+		// If not grouped, check that it is in the dictonary
+		if diameterType == DiameterTypeNone {
+			return fmt.Errorf("code %d and vendor %d not found in dictionary", avp.Code, avp.VendorId)
+		} else {
+			return nil
 		}
 	}
 
@@ -987,6 +988,8 @@ func (avp *DiameterAVP) Check() error {
 ///////////////////////////////////////////////////////////////
 
 // Adds a new AVP to the Grouped AVP. Does nothing if the current value is not grouped
+// Attributes not specified in the group may be added. Check() should be called on the
+// final result.
 func (avp *DiameterAVP) AddAVP(gavp *DiameterAVP) *DiameterAVP {
 
 	if gavp == nil {
@@ -998,7 +1001,7 @@ func (avp *DiameterAVP) AddAVP(gavp *DiameterAVP) *DiameterAVP {
 		GetLogger().Error("value is not of type grouped")
 		return avp
 	}
-	// TODO: verify allowed in dictionary
+
 	avp.Value = append(groupedValue, *gavp)
 	return avp
 }
@@ -1012,6 +1015,7 @@ func (avp *DiameterAVP) AddAVPs(avps ...*DiameterAVP) *DiameterAVP {
 }
 
 // Adds a new AVP to the Grouped AVP, specified using name and value. Does nothing if the current value is not grouped
+// or if the attribute could not be built
 func (avp *DiameterAVP) Add(name string, value interface{}) *DiameterAVP {
 	avp, err := NewDiameterAVP(name, value)
 	if err != nil {
@@ -1039,7 +1043,7 @@ func (avp *DiameterAVP) DeleteAll(name string) *DiameterAVP {
 }
 
 // Finds and returns the first AVP found in the group with the specified name
-// Notice that a COPY is returned
+// Notice that a copy is returned
 func (avp *DiameterAVP) GetAVP(name string) (DiameterAVP, error) {
 	var groupedValue, ok = avp.Value.([]DiameterAVP)
 	if !ok {
@@ -1075,8 +1079,8 @@ func (avp *DiameterAVP) GetAllAVP(name string) []DiameterAVP {
 // JSON Encoding
 ///////////////////////////////////////////////////////////////
 
-// Generate a map for JSON encoding
-func (avp *DiameterAVP) ToMap() map[string]interface{} {
+// Generate a map of name to the underlaying object for JSON encoding. It is a map with a single key (the name of the AVP)
+func (avp *DiameterAVP) toMap() map[string]interface{} {
 	theMap := map[string]interface{}{}
 
 	switch avp.DictItem.DiameterType {
@@ -1091,7 +1095,7 @@ func (avp *DiameterAVP) ToMap() map[string]interface{} {
 		targetGroup := make([]map[string]interface{}, 0)
 		if avpGroup, ok := avp.Value.([]DiameterAVP); ok {
 			for i := range avpGroup {
-				targetGroup = append(targetGroup, avpGroup[i].ToMap())
+				targetGroup = append(targetGroup, avpGroup[i].toMap())
 			}
 			theMap[avp.Name] = targetGroup
 		}
@@ -1101,11 +1105,11 @@ func (avp *DiameterAVP) ToMap() map[string]interface{} {
 
 // Encode as JSON using the map representation
 func (avp *DiameterAVP) MarshalJSON() ([]byte, error) {
-	return json.Marshal(avp.ToMap())
+	return json.Marshal(avp.toMap())
 }
 
-// Generates a DiameterAVP from its JSON representation
-func FromMap(avpMap map[string]interface{}) (DiameterAVP, error) {
+// Generates a DiameterAVP from a map of name to the contents of the AVP. Used for JSON decoding
+func fromMap(avpMap map[string]interface{}) (DiameterAVP, error) {
 
 	if len(avpMap) != 1 {
 		return DiameterAVP{}, fmt.Errorf("map contains more than one key in JSON representation of Diameter AVP")
@@ -1123,7 +1127,7 @@ func FromMap(avpMap map[string]interface{}) (DiameterAVP, error) {
 			}
 			// Add inner AVPs
 			for i := range avpValue {
-				innerAVP, e2 := FromMap(avpValue[i].(map[string]interface{}))
+				innerAVP, e2 := fromMap(avpValue[i].(map[string]interface{}))
 				if e2 != nil {
 					return DiameterAVP{}, e2
 				}
@@ -1149,7 +1153,7 @@ func (avp *DiameterAVP) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	*avp, err = FromMap(theMap)
+	*avp, err = fromMap(theMap)
 	return err
 }
 

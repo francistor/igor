@@ -63,6 +63,7 @@ type DiameterMessage struct {
 	AVPs []DiameterAVP
 }
 
+// Fills a DiameterMessage with the contents of the stream read in the argument
 func (dm *DiameterMessage) ReadFrom(reader io.Reader) (n int64, err error) {
 	var version byte
 	var lenHigh uint8
@@ -121,7 +122,9 @@ func (dm *DiameterMessage) ReadFrom(reader io.Reader) (n int64, err error) {
 	diameterApplication, ok := GetDDict().AppByCode[dm.ApplicationId]
 	if ok {
 		dm.ApplicationName = diameterApplication.Name
-		dm.CommandName = diameterApplication.CommandByCode[dm.CommandCode].Name
+		if command, found := diameterApplication.CommandByCode[dm.CommandCode]; found {
+			dm.CommandName = command.Name
+		}
 	}
 
 	// Get the E2EndId
@@ -159,6 +162,7 @@ func (dm *DiameterMessage) ReadFrom(reader io.Reader) (n int64, err error) {
 	return int64(messageLength), nil
 }
 
+// Returns a DiameterMessage decoded from the specified input bytes
 func DiameterMessageFromBytes(inputBytes []byte) (DiameterMessage, uint32, error) {
 	reader := bytes.NewReader(inputBytes)
 
@@ -205,11 +209,21 @@ func (m *DiameterMessage) WriteTo(buffer io.Writer) (int64, error) {
 	messageLen := m.Len()
 
 	// Write Len
-	if err = binary.Write(buffer, binary.BigEndian, byte(messageLen/65535)); err != nil {
+	// Optimization to avoid division in most cases
+	var lenHighByte uint8
+	var lenLowWord uint16
+	if messageLen < 65535 {
+		lenHighByte = 0
+		lenLowWord = uint16(messageLen)
+	} else {
+		lenHighByte = uint8(messageLen / 65535)
+		lenLowWord = uint16(messageLen % 65535)
+	}
+	if err = binary.Write(buffer, binary.BigEndian, lenHighByte); err != nil {
 		return currentIndex, err
 	}
 	currentIndex += 1
-	if err = binary.Write(buffer, binary.BigEndian, uint16(messageLen%65535)); err != nil {
+	if err = binary.Write(buffer, binary.BigEndian, lenLowWord); err != nil {
 		return currentIndex, err
 	}
 	currentIndex += 2
@@ -259,9 +273,18 @@ func (m *DiameterMessage) WriteTo(buffer io.Writer) (int64, error) {
 	}
 	currentIndex += 4
 
+	// Get the command to be used to enforce the mandatory bit
+	command, errNotInDict := GetDDict().GetCommand(m.ApplicationId, m.CommandCode)
+
 	// Write avps
 	for i := range m.AVPs {
-		// TODO: Need to enforce mandatory here
+		// Enforce the mandatory bit
+		if m.IsRequest && errNotInDict != nil {
+			if group, found := command.Request[m.AVPs[i].Name]; found && group.Mandatory {
+				m.AVPs[i].IsMandatory = true
+			}
+		}
+
 		n, err := m.AVPs[i].WriteTo(buffer)
 		if err != nil {
 			return currentIndex, err
@@ -277,10 +300,17 @@ func (m *DiameterMessage) WriteTo(buffer io.Writer) (int64, error) {
 	return currentIndex, nil
 }
 
+// Implement the BinaryMarshaler interface
 func (dm *DiameterMessage) MarshalBinary() ([]byte, error) {
-	var buffer = new(bytes.Buffer)
-	_, err := dm.WriteTo(buffer)
+	var buffer bytes.Buffer
+	_, err := dm.WriteTo(&buffer)
 	return buffer.Bytes(), err
+}
+
+// Implement the BinaryUnmarshaler interface
+func (dm *DiameterMessage) UnmarshalBinary(data []byte) error {
+	_, err := dm.ReadFrom(bytes.NewReader(data))
+	return err
 }
 
 func (dm *DiameterMessage) Len() int {
@@ -311,7 +341,7 @@ func (m *DiameterMessage) CheckAttributes() error {
 		attrSpec = command.Response
 	}
 
-	// Check that the number of instaces of each atribute conforms to the specification
+	// Check that the number of instances of each atribute conforms to the specification
 	for attrName, groupSpec := range attrSpec {
 		nOfInstances := len(m.GetAllAVP(attrName))
 		if groupSpec.MinOccurs > 0 && nOfInstances < groupSpec.MinOccurs {
@@ -328,7 +358,7 @@ func (m *DiameterMessage) CheckAttributes() error {
 			return fmt.Errorf("%s not valid for command %s and application %s", attrName, m.ApplicationName, m.CommandName)
 		}
 
-		// Check the AVP itself (useful for grouped attributes)
+		// Check the AVP itself
 		err := m.AVPs[i].Check()
 		if err != nil {
 			return err
@@ -354,10 +384,10 @@ func (m *DiameterMessage) Add(name string, value interface{}) *DiameterMessage {
 		return m
 	}
 
-	avp, error := NewDiameterAVP(name, value)
+	avp, err := NewDiameterAVP(name, value)
 
-	if error != nil {
-		GetLogger().Errorf("avp could not be added %s: %v, %s", name, value, error)
+	if err != nil {
+		GetLogger().Errorf("avp could not be added %s: %v, %s", name, value, err)
 		return m
 	}
 
@@ -365,7 +395,8 @@ func (m *DiameterMessage) Add(name string, value interface{}) *DiameterMessage {
 	return m
 }
 
-// Retrieves the first AVP with the specified name from the message
+// Retrieves the first AVP with the specified name from the message,
+// and error if not found
 func (m *DiameterMessage) GetAVP(avpName string) (DiameterAVP, error) {
 	// Iterate through message avps
 	for i := range m.AVPs {
@@ -432,17 +463,17 @@ func (m *DiameterMessage) DeleteAllAVP(avpName string) *DiameterMessage {
 }
 
 // Gets the Result-Code, or 0 if not found
-func (m *DiameterMessage) GetResultCode() int64 {
+func (m *DiameterMessage) GetResultCode() int {
 	rc, err := m.GetAVP("Result-Code")
 	if err != nil {
 		return 0
 	}
 
-	return rc.GetInt()
+	return int(rc.GetInt())
 }
 
 // Retrieves the specified AVP name as a string, or the string default value
-// if not found (instead of returning an error. Use with care)
+// if not found (instead of returning an error. Use with care).
 // The AVP name may be a path including grouped attributes, that is
 // avpname1.avpname2, etc.
 func (m *DiameterMessage) GetStringAVP(avpName string) string {
@@ -454,7 +485,10 @@ func (m *DiameterMessage) GetStringAVP(avpName string) string {
 	return avp.GetString()
 }
 
-// Same, for int
+// Retrieves the specified AVP name as an integer, or 0
+// if not found (instead of returning an error. Use with care).
+// The AVP name may be a path including grouped attributes, that is
+// avpname1.avpname2, etc.
 func (m *DiameterMessage) GetIntAVP(avpName string) int64 {
 	avp, err := m.GetAVPFromPath(avpName)
 	if err != nil {
@@ -463,7 +497,10 @@ func (m *DiameterMessage) GetIntAVP(avpName string) int64 {
 	return avp.GetInt()
 }
 
-// Same, for float
+// Retrieves the specified AVP name as a float, or 0
+// if not found (instead of returning an error. Use with care).
+// The AVP name may be a path including grouped attributes, that is
+// avpname1.avpname2, etc.
 func (m *DiameterMessage) GetFloatAVP(avpName string) float64 {
 	avp, err := m.GetAVPFromPath(avpName)
 	if err != nil {
@@ -472,7 +509,10 @@ func (m *DiameterMessage) GetFloatAVP(avpName string) float64 {
 	return avp.GetFloat()
 }
 
-// Same for IPAddress
+// Retrieves the specified AVP name as a IP Address, or the IPAddr default value
+// if not found (instead of returning an error. Use with care).
+// The AVP name may be a path including grouped attributes, that is
+// avpname1.avpname2, etc.
 func (m *DiameterMessage) GetIPAddressAVP(avpName string) net.IP {
 	avp, err := m.GetAVPFromPath(avpName)
 	if err != nil {
@@ -481,7 +521,10 @@ func (m *DiameterMessage) GetIPAddressAVP(avpName string) net.IP {
 	return avp.GetIPAddress()
 }
 
-// Same for Time
+// Retrieves the specified AVP name as a time.Time, or the Time default value
+// if not found (instead of returning an error. Use with care).
+// The AVP name may be a path including grouped attributes, that is
+// avpname1.avpname2, etc.
 func (m *DiameterMessage) GetDateAVP(avpName string) time.Time {
 	avp, err := m.GetAVPFromPath(avpName)
 	if err != nil {
@@ -530,9 +573,12 @@ func NewDiameterRequest(appName string, commandName string) (*DiameterMessage, e
 	return &diameterMessage, nil
 }
 
+// Builds a new answer diameter message, corresponding to the request passed
+// as attribute, that is, same application id and command code, same
+// end-to-end id and hop-by-hop id
 func NewDiameterAnswer(diameterRequest *DiameterMessage) *DiameterMessage {
 
-	diameterMessage := DiameterMessage{}
+	diameterMessage := DiameterMessage{IsRequest: false}
 
 	diameterMessage.ApplicationId = diameterRequest.ApplicationId
 	diameterMessage.ApplicationName = diameterRequest.ApplicationName
@@ -549,8 +595,20 @@ func NewDiameterAnswer(diameterRequest *DiameterMessage) *DiameterMessage {
 // or removing the attributes in the negativeFilter argument.If nil, no filter is applied.
 func (dm *DiameterMessage) Copy(positiveFilter []string, negativeFilter []string) *DiameterMessage {
 
-	copiedMessage := *dm
-	copiedMessage.AVPs = make([]DiameterAVP, 0)
+	// Build from scratch instead of copying, which will be less efficient
+	copiedMessage := DiameterMessage{
+		IsRequest:        dm.IsRequest,
+		IsProxyable:      dm.IsProxyable,
+		IsError:          dm.IsError,
+		IsRetransmission: dm.IsRetransmission,
+		CommandCode:      dm.CommandCode,
+		ApplicationId:    dm.ApplicationId,
+		E2EId:            dm.E2EId,
+		HopByHopId:       dm.HopByHopId,
+		CommandName:      dm.CommandName,
+		ApplicationName:  dm.ApplicationName,
+		AVPs:             make([]DiameterAVP, 0),
+	}
 
 	for i := range dm.AVPs {
 		if positiveFilter != nil {
@@ -570,6 +628,8 @@ func (dm *DiameterMessage) Copy(positiveFilter []string, negativeFilter []string
 	return &copiedMessage
 }
 
+// Implementation of the stringer interface
+// Prints the message as JSON
 func (dm DiameterMessage) String() string {
 	b, error := json.Marshal(dm)
 	if error != nil {

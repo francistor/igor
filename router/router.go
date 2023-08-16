@@ -154,26 +154,26 @@ func HttpDiameterRequest(client http.Client, endpoint string, diameterRequest *c
 	// Serialize the message
 	jsonRequest, err := json.Marshal(diameterRequest)
 	if err != nil {
-		core.PushHttpClientExchange(endpoint, constants.SERIALIZATION_ERROR)
+		core.IncrementHttpClientExchange(endpoint, constants.SERIALIZATION_ERROR)
 		return nil, fmt.Errorf("unable to marshal message to json %s", err)
 	}
 
 	// Send the request to the Handler
 	httpResp, err := client.Post(endpoint, "application/json", bytes.NewReader(jsonRequest))
 	if err != nil {
-		core.PushHttpClientExchange(endpoint, constants.NETWORK_ERROR)
+		core.IncrementHttpClientExchange(endpoint, constants.NETWORK_ERROR)
 		return nil, fmt.Errorf("handler %s error %s", endpoint, err)
 	}
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != 200 {
-		core.PushHttpClientExchange(endpoint, constants.HTTP_RESPONSE_ERROR)
+		core.IncrementHttpClientExchange(endpoint, constants.HTTP_RESPONSE_ERROR)
 		return nil, fmt.Errorf("handler %s returned status code %d", endpoint, httpResp.StatusCode)
 	}
 
 	jsonAnswer, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		core.PushHttpClientExchange(endpoint, constants.NETWORK_ERROR)
+		core.IncrementHttpClientExchange(endpoint, constants.NETWORK_ERROR)
 		return nil, fmt.Errorf("error reading response from %s: %s", endpoint, err)
 	}
 
@@ -181,12 +181,12 @@ func HttpDiameterRequest(client http.Client, endpoint string, diameterRequest *c
 	var diameterAnswer core.DiameterMessage
 	err = json.Unmarshal(jsonAnswer, &diameterAnswer)
 	if err != nil {
-		core.PushHttpClientExchange(endpoint, constants.UNSERIALIZATION_ERROR)
+		core.IncrementHttpClientExchange(endpoint, constants.UNSERIALIZATION_ERROR)
 		return nil, fmt.Errorf("error unmarshaling response from %s: %s", endpoint, err)
 	}
 	diameterAnswer.Tidy()
 
-	core.PushHttpClientExchange(endpoint, constants.SUCCESS)
+	core.IncrementHttpClientExchange(endpoint, constants.SUCCESS)
 	return &diameterAnswer, nil
 }
 
@@ -195,26 +195,26 @@ func HttpRadiusRequest(client http.Client, endpoint string, packet *core.RadiusP
 	// Serialize the message
 	jsonRequest, err := json.Marshal(packet)
 	if err != nil {
-		core.PushHttpClientExchange(endpoint, constants.SERIALIZATION_ERROR)
+		core.IncrementHttpClientExchange(endpoint, constants.SERIALIZATION_ERROR)
 		return nil, fmt.Errorf("unable to marshal message to json %s", err)
 	}
 
 	// Send the request to the Handler
 	httpResp, err := client.Post(endpoint, "application/json", bytes.NewReader(jsonRequest))
 	if err != nil {
-		core.PushHttpClientExchange(endpoint, constants.NETWORK_ERROR)
+		core.IncrementHttpClientExchange(endpoint, constants.NETWORK_ERROR)
 		return nil, fmt.Errorf("handler %s error %s", endpoint, err)
 	}
 	defer httpResp.Body.Close()
 
 	if httpResp.StatusCode != 200 {
-		core.PushHttpClientExchange(endpoint, constants.HTTP_RESPONSE_ERROR)
+		core.IncrementHttpClientExchange(endpoint, constants.HTTP_RESPONSE_ERROR)
 		return nil, fmt.Errorf("handler %s returned status code %d", endpoint, httpResp.StatusCode)
 	}
 
 	jsonResponse, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		core.PushHttpClientExchange(endpoint, constants.NETWORK_ERROR)
+		core.IncrementHttpClientExchange(endpoint, constants.NETWORK_ERROR)
 		return nil, fmt.Errorf("error reading response from %s: %s", endpoint, err)
 	}
 
@@ -222,10 +222,10 @@ func HttpRadiusRequest(client http.Client, endpoint string, packet *core.RadiusP
 	var radiusResponse core.RadiusPacket
 	err = json.Unmarshal(jsonResponse, &radiusResponse)
 	if err != nil {
-		core.PushHttpClientExchange(endpoint, constants.UNSERIALIZATION_ERROR)
+		core.IncrementHttpClientExchange(endpoint, constants.UNSERIALIZATION_ERROR)
 		return nil, fmt.Errorf("error unmarshaling response from %s: %s", endpoint, err)
 	}
 
-	core.PushHttpClientExchange(endpoint, constants.SUCCESS)
+	core.IncrementHttpClientExchange(endpoint, constants.SUCCESS)
 	return &radiusResponse, nil
 }

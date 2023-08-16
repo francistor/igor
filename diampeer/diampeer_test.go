@@ -1,7 +1,5 @@
 package diampeer
 
-// TODO: connection cannot be established with peer. DWA not neceived
-
 import (
 	"net"
 	"os"
@@ -18,7 +16,7 @@ import (
 func MyMessageHandler(request *core.DiameterMessage) (*core.DiameterMessage, error) {
 
 	answer := core.NewDiameterAnswer(request).
-		AddOriginAVPs(core.GetPolicyConfig()).
+		AddOriginAVPs(core.GetPolicyConfig()). // TODO: Is this correct?
 		Add("Class", "TestUserNameEcho")
 
 	command := request.GetStringAVP("Igor-Command")
@@ -49,59 +47,12 @@ func TestMain(m *testing.M) {
 
 func TestDiameterPeerOK(t *testing.T) {
 
-	var passivePeer *DiameterPeer
-	var activePeer *DiameterPeer
-
-	activePeerConfig := core.DiameterPeer{
-		DiameterHost:            "server.igorserver",
-		IPAddress:               "127.0.0.1",
-		Port:                    3868,
-		ConnectionPolicy:        "active",
-		OriginNetwork:           "127.0.0.0/8",
-		WatchdogIntervalMillis:  300, // Small DWR interval!
-		ConnectionTimeoutMillis: 3000,
-	}
-
-	var passiveControlChannel = make(chan interface{}, 16)
-	var activeControlChannel = make(chan interface{}, 16)
-
-	// Open socket for receiving Peer connections and spawning DiameterPeer objects.
-	// This emulates the code to be found in the DiameterRouter
-	listener, err := net.Listen("tcp", ":3868")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer listener.Close()
-	go func() {
-		conn, _ := listener.Accept()
-		passivePeer = NewPassiveDiameterPeer("testServer", passiveControlChannel, conn, MyMessageHandler)
-	}()
-
-	// The configuration of the Peer is set above, with a small watchdog interval
-	activePeer = NewActiveDiameterPeer("testClient", activeControlChannel, activePeerConfig, MyMessageHandler)
-
-	// PeerUp event sent by the passive DiameterPeer
-	// Check that it is a PeerUpEvent and that the reported Origin-Host is client.igorclient
-	passiveUp := <-passiveControlChannel
-	if pu, ok := passiveUp.(PeerUpEvent); !ok {
-		t.Fatal("received non PeerUpEvent for passive peer")
-	} else if pu.DiameterHost != "client.igorclient" {
-		t.Fatalf("received %s as Origin-Host", pu.DiameterHost)
-	}
-
-	// PeerUp event sent by the active DiameterPeer
-	// Check that it is a PeerUpEvent and that the reported Origin-Host is server.igorserver
-	activeUp := <-activeControlChannel
-	if au, ok := activeUp.(PeerUpEvent); !ok {
-		t.Fatal("received non PeerUpEvent for active peer")
-	} else if au.DiameterHost != "server.igorserver" {
-		t.Fatalf("received %s as Origin-Host", au.DiameterHost)
-	}
+	activePeer, activeControlChannel, passivePeer, passiveControlChannel := setupSunnyDayDiameterPeers(t)
 
 	// Wait a while to have some DWR exchanged
 	time.Sleep(1 * time.Second)
 
-	// Correct response
+	// Correct request/response exchange
 	request, _ := core.NewDiameterRequest("TestApplication", "TestRequest")
 	request.AddOriginAVPs(core.GetPolicyConfigInstance("testClient"))
 	request.Add("User-Name", "TestUserNameRequest")
@@ -112,10 +63,10 @@ func TestDiameterPeerOK(t *testing.T) {
 	a1 := <-rc1
 	switch v := a1.(type) {
 	case error:
-		t.Fatal("bad response", err)
+		t.Fatalf("response was an error: %v", v.Error())
 	case *core.DiameterMessage:
-		classAVP, error := v.GetAVP("Class")
-		if error != nil {
+		classAVP, err := v.GetAVP("Class")
+		if err != nil {
 			t.Fatal("bad AVP", err)
 		}
 		if classAVP.GetString() != "TestUserNameEcho" {
@@ -135,7 +86,9 @@ func TestDiameterPeerOK(t *testing.T) {
 		t.Fatalf("should have got a timeout but got %v", v)
 	}
 
-	// Check metrics. Getting the metrics aggregating by application and command
+	// Check metrics. Getting the metrics aggregating by application and command.
+	// Notice that there is only one metrics server and thus both diameter peers report
+	// to the same. The metrics values are the sum for both
 	metrics := core.MS.DiameterQuery("DiameterRequestsReceived", nil, []string{"AP", "CM"})
 	// Should have received two TestApplication / TestRequest messages
 	if metric, ok := metrics[core.PeerDiameterMetricKey{AP: "TestApplication", CM: "TestRequest"}]; !ok {
@@ -191,7 +144,7 @@ func TestDiameterPeerBadServerName(t *testing.T) {
 
 	// The passive peer will receive a connection from client.igor that will succeed
 	// The active peer will establish a connection with unkserver.igorserver but the CEA will report server.igor
-	activePeerConfig := core.DiameterPeer{
+	activePeerConfig := core.DiameterPeerConf{
 		DiameterHost:            "unkserver.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
@@ -245,7 +198,7 @@ func TestDiameterPeerBadClientName(t *testing.T) {
 
 	// The active client reports itself as unkclient.igor, which is not recongized by the server
 	// The passive peer reports an error (unkclient.igor not known),
-	activePeerConfig := core.DiameterPeer{
+	activePeerConfig := core.DiameterPeerConf{
 		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
@@ -291,7 +244,7 @@ func TestDiameterPeerUnableToConnect(t *testing.T) {
 	var activePeer *DiameterPeer
 
 	// The active client tries to connect to an unavailable server
-	activePeerConfig := core.DiameterPeer{
+	activePeerConfig := core.DiameterPeerConf{
 		DiameterHost:            "server.igorserver",
 		IPAddress:               "1.0.0.1",
 		Port:                    3868,
@@ -319,7 +272,7 @@ func TestBadOriginNetwork(t *testing.T) {
 	var passivePeer *DiameterPeer
 	var activePeer *DiameterPeer
 
-	activePeerConfig := core.DiameterPeer{
+	activePeerConfig := core.DiameterPeerConf{
 		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
@@ -363,48 +316,8 @@ func TestBadOriginNetwork(t *testing.T) {
 }
 
 func TestRequestsCancellation(t *testing.T) {
-	var passivePeer *DiameterPeer
-	var activePeer *DiameterPeer
 
-	activePeerConfig := core.DiameterPeer{
-		DiameterHost:            "server.igorserver",
-		IPAddress:               "127.0.0.1",
-		Port:                    3868,
-		ConnectionPolicy:        "active",
-		OriginNetwork:           "127.0.0.0/8",
-		WatchdogIntervalMillis:  300, // Small DWR interval!
-		ConnectionTimeoutMillis: 3000,
-	}
-
-	var passiveControlChannel = make(chan interface{}, 16)
-	var activeControlChannel = make(chan interface{}, 16)
-
-	// Open socket for receiving Peer connections
-	listener, err := net.Listen("tcp", ":3868")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer listener.Close()
-	go func() {
-		conn, _ := listener.Accept()
-		passivePeer = NewPassiveDiameterPeer("testServer", passiveControlChannel, conn, MyMessageHandler)
-	}()
-
-	activePeer = NewActiveDiameterPeer("testClient", activeControlChannel, activePeerConfig, MyMessageHandler)
-
-	// Get both PeerUp events
-	passiveUp := <-passiveControlChannel
-	if pu, ok := passiveUp.(PeerUpEvent); !ok {
-		t.Fatal("received non PeerUpEvent for passive peer")
-	} else if pu.DiameterHost != "client.igorclient" {
-		t.Fatalf("received %s as Origin-Host", pu.DiameterHost)
-	}
-	activeUp := <-activeControlChannel
-	if au, ok := activeUp.(PeerUpEvent); !ok {
-		t.Fatal("received non PeerUpEvent for active peer")
-	} else if au.DiameterHost != "server.igorserver" {
-		t.Fatalf("received %s as Origin-Host", au.DiameterHost)
-	}
+	activePeer, activeControlChannel, passivePeer, passiveControlChannel := setupSunnyDayDiameterPeers(t)
 
 	// Simulate two long requests
 	request1, _ := core.NewDiameterRequest("TestApplication", "TestRequest")
@@ -449,49 +362,7 @@ func TestRequestsCancellation(t *testing.T) {
 }
 
 func TestSocketError(t *testing.T) {
-	var passivePeer *DiameterPeer
-	var activePeer *DiameterPeer
-
-	activePeerConfig := core.DiameterPeer{
-		DiameterHost:            "server.igorserver",
-		IPAddress:               "127.0.0.1",
-		Port:                    3868,
-		ConnectionPolicy:        "active",
-		OriginNetwork:           "127.0.0.0/8",
-		WatchdogIntervalMillis:  300, // Small DWR interval!
-		ConnectionTimeoutMillis: 3000,
-	}
-
-	var passiveControlChannel = make(chan interface{}, 16)
-	var activeControlChannel = make(chan interface{}, 16)
-
-	// Open socket for receiving Peer connections
-	listener, err := net.Listen("tcp", ":3868")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer listener.Close()
-	go func() {
-		conn, _ := listener.Accept()
-		passivePeer = NewPassiveDiameterPeer("testServer", passiveControlChannel, conn, MyMessageHandler)
-	}()
-
-	activePeer = NewActiveDiameterPeer("testClient", activeControlChannel, activePeerConfig, MyMessageHandler)
-
-	// Get both PeerUp events
-	passiveUp := <-passiveControlChannel
-	if pu, ok := passiveUp.(PeerUpEvent); !ok {
-		t.Fatal("received non PeerUpEvent for passive peer")
-	} else if pu.DiameterHost != "client.igorclient" {
-		t.Fatalf("received %s as Origin-Host", pu.DiameterHost)
-	}
-	activeUp := <-activeControlChannel
-	if au, ok := activeUp.(PeerUpEvent); !ok {
-		t.Fatal("received non PeerUpEvent for active peer")
-	} else if au.DiameterHost != "server.igorserver" {
-		t.Fatalf("received %s as Origin-Host", au.DiameterHost)
-	}
-
+	activePeer, activeControlChannel, passivePeer, passiveControlChannel := setupSunnyDayDiameterPeers(t)
 	// Force error in client
 	activePeer.tstForceSocketError()
 
@@ -512,10 +383,33 @@ func TestSocketError(t *testing.T) {
 }
 
 func TestDisconnectMessage(t *testing.T) {
+
+	activePeer, activeControlChannel, passivePeer, passiveControlChannel := setupSunnyDayDiameterPeers(t)
+
+	// Force disconnect peer
+	activePeer.tstSendDisconnectPeer()
+
+	// Both peers get peer down event
+	msg1 := <-activeControlChannel
+	if _, ok := msg1.(PeerDownEvent); !ok {
+		t.Fatal("received non PeerDownEvent in active peer")
+	}
+
+	msg2 := <-passiveControlChannel
+	if _, ok := msg2.(PeerDownEvent); !ok {
+		t.Fatal("received non PeerDownEvent in passive peer")
+	}
+
+	// Close
+	activePeer.Close()
+	passivePeer.Close()
+}
+
+func setupSunnyDayDiameterPeers(t *testing.T) (*DiameterPeer, chan interface{}, *DiameterPeer, chan interface{}) {
 	var passivePeer *DiameterPeer
 	var activePeer *DiameterPeer
 
-	activePeerConfig := core.DiameterPeer{
+	activePeerConfig := core.DiameterPeerConf{
 		DiameterHost:            "server.igorserver",
 		IPAddress:               "127.0.0.1",
 		Port:                    3868,
@@ -555,21 +449,5 @@ func TestDisconnectMessage(t *testing.T) {
 		t.Fatalf("received %s as Origin-Host", au.DiameterHost)
 	}
 
-	// Force disconnect peer
-	activePeer.tstSendDisconnectPeer()
-
-	// Both peers get peer down event
-	msg1 := <-activeControlChannel
-	if _, ok := msg1.(PeerDownEvent); !ok {
-		t.Fatal("received non PeerDownEvent in active peer")
-	}
-
-	msg2 := <-passiveControlChannel
-	if _, ok := msg2.(PeerDownEvent); !ok {
-		t.Fatal("received non PeerDownEvent in passive peer")
-	}
-
-	// Close
-	activePeer.Close()
-	passivePeer.Close()
+	return activePeer, activeControlChannel, passivePeer, passiveControlChannel
 }

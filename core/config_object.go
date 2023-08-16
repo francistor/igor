@@ -53,22 +53,22 @@ func (co *ConfigObject[T]) Get() T {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Represents an object that will be populated from the configuration resources
-// Those configuration resources are a template and a set of parameters for that template
+// Represents an object that will be populated from two configuration resources.
+// Those configuration resources are a template and a set of parameters for that template.
 // T is the type of the template object, P is the type of the parameter object
 // The parametersObject is a map of strings to P.
 // For instance, T may be a RadiusUserFile, and P a struct holding parameters such as speed and timeouts
 // The end result will be a map of the keys in the ParametersObject to RadiusUserFile built from
 // the specified template and parameters replaced.
-type TemplatedConfigObject[T, P any] struct {
+type TemplatedMapConfigObject[T, P any] struct {
 	o                    *map[string]T
 	templateObjectName   string
 	parametersObjectName string
 }
 
 // Creates an uninitialized templated configuration object
-func NewTemplatedConfigObject[T, P any](templateObjectName string, parametersObjectName string) *TemplatedConfigObject[T, P] {
-	var tco TemplatedConfigObject[T, P]
+func NewTemplatedMapConfigObject[T, P any](templateObjectName string, parametersObjectName string) *TemplatedMapConfigObject[T, P] {
+	var tco TemplatedMapConfigObject[T, P]
 	tco.templateObjectName = templateObjectName
 	tco.parametersObjectName = parametersObjectName
 	return &tco
@@ -76,9 +76,9 @@ func NewTemplatedConfigObject[T, P any](templateObjectName string, parametersObj
 
 // Reads the configuration from the associated resource and initializes it,
 // if an initialize() method is defined
-func (tco *TemplatedConfigObject[T, P]) Update(cm *ConfigurationManager) error {
+func (tco *TemplatedMapConfigObject[T, P]) Update(cm *ConfigurationManager) error {
 
-	// Retrieve the template
+	// Retrieve and build the template
 	tmplBytes, err := cm.GetRawBytesConfigObject(tco.templateObjectName)
 	if err != nil {
 		return err
@@ -117,12 +117,12 @@ func (tco *TemplatedConfigObject[T, P]) Update(cm *ConfigurationManager) error {
 }
 
 // Provides access to the configuration object.
-func (tco *TemplatedConfigObject[T, P]) Get() map[string]T {
+func (tco *TemplatedMapConfigObject[T, P]) Get() map[string]T {
 	return *tco.o
 }
 
-// Provides access to the configuration object.
-func (tco *TemplatedConfigObject[T, P]) GetKey(key string) (T, error) {
+// Provides access to the specified entry of the configuration object.
+func (tco *TemplatedMapConfigObject[T, P]) GetKey(key string) (T, error) {
 	var theMap = *tco.o
 	if co, found := theMap[key]; !found {
 		return co, fmt.Errorf("key %s not found", key)

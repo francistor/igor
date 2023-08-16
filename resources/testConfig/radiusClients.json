@@ -12,7 +12,7 @@
 	},
 	"all_origins":{
 		"name": "all_origins",
-		"IPAddress": "1.2.3.0/24",
+		"originIP": "1.2.3.0/24",
 		"secret": "secret"
 	}
 }

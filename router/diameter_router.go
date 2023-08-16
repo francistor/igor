@@ -300,7 +300,7 @@ func (router *DiameterRouter) eventLoop() {
 				}
 
 				// Update the PeersTable in core.
-				core.PushDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
+				core.IncrementDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
 
 			case diampeer.PeerDownEvent:
 				// Closing may take time. Do it in the background
@@ -327,7 +327,7 @@ func (router *DiameterRouter) eventLoop() {
 					delete(router.diameterPeersTable, peer.DiameterHost)
 				}
 
-				core.PushDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
+				core.IncrementDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
 
 				// Check if we must exit
 				if atomic.LoadInt32(&router.status) == StatusTerminated {
@@ -353,7 +353,7 @@ func (router *DiameterRouter) eventLoop() {
 				false)
 
 			if err != nil {
-				core.PushRouterRouteNotFound("", rdr.Message)
+				core.IncrementRouterRouteNotFound("", rdr.Message)
 				rdr.RChan <- fmt.Errorf("request not sent: no route found")
 				close(rdr.RChan)
 			} else {
@@ -386,7 +386,7 @@ func (router *DiameterRouter) eventLoop() {
 					}
 
 					// If here, could not find a peer
-					core.PushRouterNoAvailablePeer("", rdr.Message)
+					core.IncrementRouterNoAvailablePeer("", rdr.Message)
 					rdr.RChan <- fmt.Errorf("resquest not sent: no engaged peer")
 					close(rdr.RChan)
 
@@ -408,7 +408,7 @@ func (router *DiameterRouter) eventLoop() {
 
 						if answer, err := HttpDiameterRequest(router.http2Client, url, diameterRequest); err != nil {
 							logger.Errorf("http handler %s returned error: %s", url, err.Error())
-							core.PushRouterHandlerError("", diameterRequest)
+							core.IncrementRouterHandlerError("", diameterRequest)
 							rchan <- err
 						} else {
 							// Add the Origin-Host and Origin-Realm, that are not set by the handler
@@ -431,7 +431,7 @@ func (router *DiameterRouter) eventLoop() {
 						answer, err := router.localHandler(diameterRequest)
 						if err != nil {
 							logger.Errorf("local handler returned error: %s", err.Error())
-							core.PushRouterHandlerError("", diameterRequest)
+							core.IncrementRouterHandlerError("", diameterRequest)
 							rchan <- err
 						} else {
 							// Add the Origin-Host and Origin-Realm, that are not set by the handler
@@ -545,7 +545,7 @@ func (router *DiameterRouter) updatePeersTable() {
 		}
 	}
 
-	core.PushDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
+	core.IncrementDiameterPeersStatus(router.instanceName, router.buildPeersStatusTable())
 }
 
 // Generates the DiameterPeersTableEntry for instrumetation purposes, using the current
