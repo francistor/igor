@@ -14,6 +14,8 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+type RadiusPacketType byte
+
 const (
 	// Success
 	ACCESS_REQUEST = 1
@@ -37,6 +39,7 @@ var Zero_authenticator = [16]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 // Type for functions that handle the diameter requests received
 type RadiusPacketHandler func(request *RadiusPacket) (*RadiusPacket, error)
 
+// Radius packet in the wire
 // code: 1 byte
 // identifier: 1 byte
 // length: 2: 2 byte
@@ -47,13 +50,13 @@ type RadiusPacketHandler func(request *RadiusPacket) (*RadiusPacket, error)
 type RadiusPacket struct {
 
 	// Radius code
-	Code byte
+	Code RadiusPacketType
 
-	// Identifier of the request, if this is a response packet.
+	// Identifier of the request/response pair.
 	Identifier byte
 
 	// The authenticator is auto-generated in an access request, used for encryption, and calculated
-	// as the md5 of the packet in other requests
+	// as the md5 of the packet fields in other requests.
 	// In responses it is calculated as md5 of the response where the authenticator bytes are those
 	// of the request
 	Authenticator [16]byte
@@ -62,7 +65,7 @@ type RadiusPacket struct {
 	AVPs []RadiusAVP
 }
 
-// Reads the RadiusPacket from a Reader interface, such as a network connection
+// Reads the RadiusPacket from a Reader interface, such as a network connection.
 // If reading a response, the relevant authenticator for encryption will be the one of the request, passed in the ra paramter
 func (rp *RadiusPacket) FromReader(reader io.Reader, secret string, ra [16]byte) (n int64, err error) {
 
@@ -94,7 +97,8 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string, ra [16]byte)
 	}
 	currentIndex += 16
 
-	// Build the relevant authenticator
+	// Build the relevant authenticator, which is the one received if it is a request, and the
+	// one passed as parameter otherwise
 	var authenticator [16]byte
 	if rp.IsRequest() {
 		authenticator = rp.Authenticator
@@ -102,6 +106,7 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string, ra [16]byte)
 		authenticator = ra
 	}
 
+	// Read the AVPs
 	rp.AVPs = make([]RadiusAVP, 0)
 	for currentIndex < int64(packetLen) {
 		nextAVP := RadiusAVP{}
@@ -130,20 +135,10 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string, ra [16]byte)
 	}
 
 	if int64(packetLen) != currentIndex {
-		panic("assert failed. Bad radius packet")
+		panic("assert failed. Bad radius packet. Sizes do not match")
 	}
 
 	return int64(packetLen), nil
-}
-
-// Builds a Radius Packet from a Byte slice
-func RadiusPacketFromBytes(inputBytes []byte, secret string, ra [16]byte) (*RadiusPacket, error) {
-	reader := bytes.NewReader(inputBytes)
-
-	radiusPacket := RadiusPacket{}
-	_, err := radiusPacket.FromReader(reader, secret, ra)
-
-	return &radiusPacket, err
 }
 
 // code: 1 byte
@@ -159,7 +154,7 @@ func RadiusPacketFromBytes(inputBytes []byte, secret string, ra [16]byte) (*Radi
 //
 // OTHER REQUEST
 //
-//	Authenticator is md5(code+identifier+zeroed_authenticator+request_attributes+secret)
+//	Authenticator is md5(code+identifier+length+zeroed_authenticator+request_attributes+secret)
 //
 // RESPONSE
 //
@@ -174,7 +169,14 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 	// If not an ACCESS_REQUEST, the authenticator is calculated based on a hash
 	// of the full packet, so it cannot be written beforehand
 	// Using this buffer as a temporary scratch pad
-	var writer bytes.Buffer
+	var scratchWriter io.Writer
+	if rp.Code == ACCESS_REQUEST {
+		// Writer directly
+		scratchWriter = outWriter
+	} else {
+		// Write to intermediate buffer
+		scratchWriter = new(bytes.Buffer)
+	}
 
 	// Normalize AVPs to fit in 256 bytes
 	// This mutates the RadiusPacket
@@ -216,7 +218,7 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 	}
 
 	// Write code
-	if err = binary.Write(&writer, binary.BigEndian, rp.Code); err != nil {
+	if err = binary.Write(scratchWriter, binary.BigEndian, rp.Code); err != nil {
 		return 0, err
 	}
 	currentIndex += 1
@@ -229,14 +231,14 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 		// The parameter is ignored. We use the one in the object
 		identifier = rp.Identifier
 	}
-	if err = binary.Write(&writer, binary.BigEndian, identifier); err != nil {
+	if err = binary.Write(scratchWriter, binary.BigEndian, identifier); err != nil {
 		return 0, err
 	}
 	currentIndex += 1
 
 	// Write length
 	packetLen := rp.Len()
-	if err = binary.Write(&writer, binary.BigEndian, packetLen); err != nil {
+	if err = binary.Write(scratchWriter, binary.BigEndian, packetLen); err != nil {
 		return 0, err
 	}
 	currentIndex += 2
@@ -245,19 +247,19 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 	// If it is a response, authenticator will be set to the request authenticator.
 	// Otherwise, set to a new one or to zero
 	if rp.Code == ACCESS_REQUEST {
-		rp.Authenticator = GetAuthenticator()
+		rp.Authenticator = BuildRandomAuthenticator()
 	} else if rp.Code == ACCOUNTING_REQUEST || rp.Code == DISCONNECT_REQUEST || rp.Code == COA_REQUEST {
 		rp.Authenticator = Zero_authenticator
 	}
 	// else Do nothing. Authenticator will be set to the one in the request
-	if err = binary.Write(&writer, binary.BigEndian, rp.Authenticator); err != nil {
+	if err = binary.Write(scratchWriter, binary.BigEndian, rp.Authenticator); err != nil {
 		return 0, err
 	}
 	currentIndex += 16
 
 	// Write all the AVP
 	for i := 0; i < len(rp.AVPs); i++ {
-		n, err := rp.AVPs[i].ToWriter(&writer, rp.Authenticator, secret)
+		n, err := rp.AVPs[i].ToWriter(scratchWriter, rp.Authenticator, secret)
 		if err != nil {
 			return 0, err
 		}
@@ -273,22 +275,24 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 	// Calculate final authenticator and write to stream
 	var writtenBytes int64
 	if rp.Code == ACCESS_REQUEST {
-		n, err := writer.WriteTo(outWriter)
-		if err != nil {
-			return n, err
-		}
-		writtenBytes = n
+		// Was already written directly to outwriter
+		writtenBytes = currentIndex
 	} else {
 		// Authenticator is md5(code+identifier+(current authenticator in Authenticator field)+request_attributes+secret)
 		//                                      (wich is a generated one (auth request) zero (other requests) or the authenticator in the request (response))
+
+		// The writer is a bytes buffer but was casted as a simple writer.Uncast
+		byteWriter := scratchWriter.(*bytes.Buffer)
+		tmpPacketBytes := byteWriter.Bytes()
+
+		// Calculate the authenticator, which is the md5 of the bytes in the packet with the secret appended
 		hasher := md5.New()
-		hasher.Write(writer.Bytes())
+		hasher.Write(tmpPacketBytes)
 		hasher.Write([]byte(secret))
 		auth := hasher.Sum(nil)
 
 		// Write first bytes in the header
-		bytesToWrite := writer.Bytes()
-		n1, err := outWriter.Write(bytesToWrite[0:4])
+		n1, err := outWriter.Write(tmpPacketBytes[0:4])
 		if err != nil {
 			return int64(n1), err
 		}
@@ -301,7 +305,7 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 		rp.Authenticator = *(*[16]byte)(auth)
 
 		// Write AVPs
-		n3, err := outWriter.Write(bytesToWrite[20:])
+		n3, err := outWriter.Write(tmpPacketBytes[20:])
 		if err != nil {
 			return int64(n1 + n2 + n3), err
 		}
@@ -315,6 +319,16 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 	}
 
 	return int64(packetLen), nil
+}
+
+// Builds a Radius Packet from a Byte slice
+func NewRadiusPacketFromBytes(inputBytes []byte, secret string, ra [16]byte) (*RadiusPacket, error) {
+	reader := bytes.NewReader(inputBytes)
+
+	radiusPacket := RadiusPacket{}
+	_, err := radiusPacket.FromReader(reader, secret, ra)
+
+	return &radiusPacket, err
 }
 
 // Returns a byte slice with the contents of the AVP
@@ -336,12 +350,14 @@ func (rp *RadiusPacket) Len() uint16 {
 		avpLen += uint16(rp.AVPs[i].Len())
 	}
 
+	// Header always has 20 bytes
 	return 20 + avpLen
 }
 
+// Returns true if any type of access request
 func (rp *RadiusPacket) IsRequest() bool {
 	switch rp.Code {
-	case ACCESS_REQUEST, ACCOUNTING_REQUEST, COA_REQUEST:
+	case ACCESS_REQUEST, ACCOUNTING_REQUEST, COA_REQUEST, DISCONNECT_REQUEST:
 		return true
 	default:
 		return false
@@ -359,7 +375,7 @@ func (rp *RadiusPacket) AddAVP(avp *RadiusAVP) *RadiusPacket {
 }
 
 // Adds a new AVP to the message if does not already exist
-func (rp *RadiusPacket) MergeAVP(avp *RadiusAVP) *RadiusPacket {
+func (rp *RadiusPacket) AddIfNotPresentAVP(avp *RadiusAVP) *RadiusPacket {
 
 	// Iterate through message avps and do nothing if found
 	for i := range rp.AVPs {
@@ -397,10 +413,10 @@ func (rp *RadiusPacket) AddAVPs(avps []RadiusAVP) *RadiusPacket {
 	return rp
 }
 
-// Adds a list of AVP to the message using a merge strategy
-func (rp *RadiusPacket) MergeAVPs(avps []RadiusAVP) *RadiusPacket {
+// Adds a list of AVP to the message, if the attrubite is not aleady present
+func (rp *RadiusPacket) AddIfNotPresentAVPs(avps []RadiusAVP) *RadiusPacket {
 	for i := range avps {
-		rp.MergeAVP(&avps[i])
+		rp.AddIfNotPresentAVP(&avps[i])
 	}
 	return rp
 }
@@ -431,7 +447,7 @@ func (rp *RadiusPacket) Add(name string, value interface{}) *RadiusPacket {
 }
 
 // Merges the AVP specified by name in the packet
-func (rp *RadiusPacket) Merge(name string, value interface{}) *RadiusPacket {
+func (rp *RadiusPacket) AddIfNotPresent(name string, value interface{}) *RadiusPacket {
 	// If avp to add is nil, do nothing
 	if value == nil {
 		return rp
@@ -441,7 +457,7 @@ func (rp *RadiusPacket) Merge(name string, value interface{}) *RadiusPacket {
 		GetLogger().Errorf("avp %s could not be merged: %v, due to %s", name, value, err)
 		return rp
 	} else {
-		return rp.MergeAVP(avp)
+		return rp.AddIfNotPresentAVP(avp)
 	}
 }
 
@@ -468,7 +484,6 @@ func (rp *RadiusPacket) GetAVP(avpName string) (RadiusAVP, error) {
 		}
 	}
 	return RadiusAVP{}, fmt.Errorf("avp named %s not found", avpName)
-
 }
 
 // Retrieves all AVP with the specified name from the message
@@ -599,14 +614,14 @@ func (rp *RadiusPacket) Auth(password string) (bool, error) {
 ///////////////////////////////////////////////////////////////
 
 // Creates a new radius request with the specified code
-func NewRadiusRequest(code byte) *RadiusPacket {
+func NewRadiusRequest(code RadiusPacketType) *RadiusPacket {
 	return &RadiusPacket{Code: code}
 }
 
 // Creates a radius answer for the specified packet
 // id is the same as for the request
 func NewRadiusResponse(request *RadiusPacket, isSuccess bool) *RadiusPacket {
-	var code byte
+	var code RadiusPacketType
 	if isSuccess {
 		code = request.Code + 1
 	} else {

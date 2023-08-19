@@ -162,16 +162,6 @@ func (dm *DiameterMessage) ReadFrom(reader io.Reader) (n int64, err error) {
 	return int64(messageLength), nil
 }
 
-// Returns a DiameterMessage decoded from the specified input bytes
-func DiameterMessageFromBytes(inputBytes []byte) (DiameterMessage, uint32, error) {
-	reader := bytes.NewReader(inputBytes)
-
-	diameterMessage := DiameterMessage{}
-	n, err := diameterMessage.ReadFrom(reader)
-
-	return diameterMessage, uint32(n), err
-}
-
 // Makes sure both codes and names are set for ApplicationId and CommandCode
 func (m *DiameterMessage) Tidy() *DiameterMessage {
 
@@ -298,6 +288,16 @@ func (m *DiameterMessage) WriteTo(buffer io.Writer) (int64, error) {
 	}
 
 	return currentIndex, nil
+}
+
+// Returns a DiameterMessage decoded from the specified input bytes
+func NewDiameterMessageFromBytes(inputBytes []byte) (*DiameterMessage, uint32, error) {
+	reader := bytes.NewReader(inputBytes)
+
+	diameterMessage := DiameterMessage{}
+	n, err := diameterMessage.ReadFrom(reader)
+
+	return &diameterMessage, uint32(n), err
 }
 
 // Implement the BinaryMarshaler interface

@@ -26,13 +26,11 @@ func TestAVPNotFound(t *testing.T) {
 func TestPasswordAVP(t *testing.T) {
 
 	var password = "'my-password! and a very long one indeed %&$"
-	//var password = "1234567890123456"
-	//var password = "0"
 
 	// Create avp
 	avp, err := NewRadiusAVP("User-Password", password)
 	if err != nil {
-		t.Errorf("error creating AVP: %v", err)
+		t.Fatalf("error creating AVP: %v", err)
 		return
 	}
 	if avp.GetString() != password {
@@ -44,7 +42,7 @@ func TestPasswordAVP(t *testing.T) {
 	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP, authenticator, secret)
 	rebuiltPassword := rebuiltAVP.GetString()
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Fatalf(err.Error())
 	} else if rebuiltPassword != password {
 		t.Errorf("password does not match. Got %s", rebuiltPassword)
 	}
@@ -58,7 +56,7 @@ func TestTunnelPasswordAVP(t *testing.T) {
 	// Create avp
 	avp, err := NewRadiusAVP("Tunnel-Password", password+":1")
 	if err != nil {
-		t.Errorf("error creating AVP: %v", err)
+		t.Fatalf("error creating AVP: %v", err)
 		return
 	}
 	if avp.GetString() != password {
@@ -70,7 +68,7 @@ func TestTunnelPasswordAVP(t *testing.T) {
 	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP, authenticator, secret)
 	rebuiltPassword := rebuiltAVP.GetString()
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Fatalf(err.Error())
 	} else if rebuiltPassword != password {
 		t.Errorf("password does not match. Got %s", rebuiltPassword)
 	}
@@ -83,7 +81,7 @@ func TestStringAVP(t *testing.T) {
 	// Create avp
 	avp, err := NewRadiusAVP("User-Name", theValue)
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 	if avp.GetString() != theValue {
@@ -105,7 +103,7 @@ func TestVendorStringAVP(t *testing.T) {
 	// Create avp
 	avp, err := NewRadiusAVP("Igor-StringAttribute", theValue)
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 	if avp.GetString() != theValue {
@@ -127,7 +125,7 @@ func TestVendorIntegerAVP(t *testing.T) {
 	// Create avp
 	avp, err := NewRadiusAVP("Igor-IntegerAttribute", theValue)
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 	if int(avp.GetInt()) != theValue {
@@ -152,7 +150,7 @@ func TestVendorTaggedAVP(t *testing.T) {
 	// Create avp
 	avp, err := NewRadiusAVP("Igor-TaggedStringAttribute", theValue+":1")
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 	if avp.GetString() != theValue {
@@ -174,7 +172,7 @@ func TestVendorIPv6AddressAVP(t *testing.T) {
 	// Create avp
 	avp, err := NewRadiusAVP("Igor-IPv6AddressAttribute", theValue)
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 
@@ -197,7 +195,7 @@ func TestIPv6PrefixAVP(t *testing.T) {
 	// Create avp
 	avp, err := NewRadiusAVP("Framed-IPv6-Prefix", theValue)
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 
@@ -224,7 +222,7 @@ func TestVendorTimeAVP(t *testing.T) {
 	// Create avp
 	avp, err := NewRadiusAVP("Igor-TimeAttribute", theValue)
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 
@@ -247,7 +245,7 @@ func TestInterfaceIdAVP(t *testing.T) {
 	// Create avp
 	avp, err := NewRadiusAVP("Framed-Interface-Id", theValue)
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 
@@ -259,18 +257,21 @@ func TestInterfaceIdAVP(t *testing.T) {
 	binaryAVP, _ := avp.ToBytes(authenticator, secret)
 	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP, authenticator, secret)
 	if rebuiltAVP.GetString() != fmt.Sprintf("%x", theValue) {
-		t.Errorf("value does not match after unmarshalling. Got <%v>", avp.GetDate())
+		t.Errorf("value does not match after unmarshalling. Got <%v>", avp.GetString())
+	}
+	if rebuiltAVP.GetOctets()[2] != 0x03 {
+		t.Errorf("value does not match after unmarshalling. Got <%v>", avp.GetOctets()[2])
 	}
 }
 
 func TestVendorInteger64AVP(t *testing.T) {
 
-	var theValue = -9000
+	var theValue = -900000000000000000
 
 	// Create avp
 	avp, err := NewRadiusAVP("Igor-Integer64Attribute", theValue)
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 	if int(avp.GetInt()) != theValue {
@@ -292,7 +293,7 @@ func TestTaggedAVP(t *testing.T) {
 	// Create 0
 	avp, err := NewRadiusAVP("Igor-TaggedStringAttribute", theValue+":1")
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 
@@ -305,16 +306,22 @@ func TestTaggedAVP(t *testing.T) {
 	if rebuiltAVP.GetString() != theValue {
 		t.Errorf("value does not match after unmarshalling. Got <%v>", rebuiltAVP.GetString())
 	}
+	if rebuiltAVP.GetTaggedString() != theValue+":1" {
+		t.Errorf("value does not match after unmarshalling. Got <%v>", rebuiltAVP.GetString())
+	}
+	if rebuiltAVP.GetTag() != 1 {
+		t.Errorf("tag does not match. Got <%v>", rebuiltAVP.GetTag())
+	}
 }
 
-func TestSaltedAVP(t *testing.T) {
+func TestSaltedOctetsAVP(t *testing.T) {
 
 	theValue := []byte("this is a salted attribute! and a very long one indeed!")
 
 	// Create 0
 	avp, err := NewRadiusAVP("Igor-SaltedOctetsAttribute", theValue)
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 
@@ -341,7 +348,7 @@ func TestSaltedIntegerAVP(t *testing.T) {
 	// Create 0
 	avp, err := NewRadiusAVP("Unisphere-LI-Action", value)
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 
@@ -362,7 +369,7 @@ func TestSaltedAddressAVP(t *testing.T) {
 	// Create
 	avp, err := NewRadiusAVP("Unisphere-Med-Ip-Address", value)
 	if err != nil {
-		t.Errorf("error creating avp: %v", err)
+		t.Fatalf("error creating avp: %v", err)
 		return
 	}
 
@@ -377,7 +384,7 @@ func TestSaltedAddressAVP(t *testing.T) {
 }
 
 func TestEncryptFunction(t *testing.T) {
-	authenticator := GetAuthenticator()
+	authenticator := BuildRandomAuthenticator()
 	password := "__! $? this is the - ñ long password  '            7887"
 
 	cipherText := encrypt1([]byte(password), authenticator, "mysecret", nil)
@@ -403,13 +410,13 @@ func TestAccessRequest(t *testing.T) {
 	// Serialize
 	packetBytes, err := request.ToBytes(secret, 0)
 	if err != nil {
-		t.Errorf("could not serialize packet: %s", err)
+		t.Fatalf("could not serialize packet: %s", err)
 	}
 
 	// Unserialize
-	recoveredPacket, err := RadiusPacketFromBytes(packetBytes, secret, Zero_authenticator)
+	recoveredPacket, err := NewRadiusPacketFromBytes(packetBytes, secret, Zero_authenticator)
 	if err != nil {
-		t.Errorf("could not unserialize packet: %s", err)
+		t.Fatalf("could not unserialize packet: %s", err)
 	}
 
 	if userName := recoveredPacket.GetStringAVP("User-Name"); userName != theUserName {
@@ -441,13 +448,13 @@ func TestAccountingRequest(t *testing.T) {
 	// Serialize
 	packetBytes, err := request.ToBytes(secret, 0)
 	if err != nil {
-		t.Errorf("could not serialize packet: %s", err)
+		t.Fatalf("could not serialize packet: %s", err)
 	}
 
 	// Unserialize
-	recoveredPacket, err := RadiusPacketFromBytes(packetBytes, secret, Zero_authenticator)
+	recoveredPacket, err := NewRadiusPacketFromBytes(packetBytes, secret, Zero_authenticator)
 	if err != nil {
-		t.Errorf("could not unserialize packet: %s", err)
+		t.Fatalf("could not unserialize packet: %s", err)
 	}
 
 	if class := recoveredPacket.GetStringAVP("Class"); class != theClass {
@@ -571,7 +578,7 @@ func TestLongAttribute(t *testing.T) {
 	}
 
 	// Unserialize
-	recoveredPacket, err := RadiusPacketFromBytes(packetBytes, secret, Zero_authenticator)
+	recoveredPacket, err := NewRadiusPacketFromBytes(packetBytes, secret, Zero_authenticator)
 	if err != nil {
 		t.Fatalf("could not unserialize packet: %s", err)
 	}
@@ -587,5 +594,49 @@ func TestCiscoAVPair(t *testing.T) {
 
 	if packet.GetCiscoAVPair("subscriber:sa") != "internet(shape-rate=1000)" {
 		t.Fatalf("bad Cisco AVPair <%s>", packet.GetCiscoAVPair("subscriber:sa"))
+	}
+}
+
+func TestAddIfNotPresent(t *testing.T) {
+	jsonPacket := `{
+		"Code": 1,
+		"AVPs":[
+			{"Igor-OctetsAttribute": "0102030405060708090a0b"},
+			{"Igor-StringAttribute": "stringvalue"},
+			{"Igor-IntegerAttribute": "Zero"},
+			{"Igor-IntegerAttribute": "1"},
+			{"Igor-IntegerAttribute": 1},
+			{"Igor-AddressAttribute": "127.0.0.1"},
+			{"Igor-TimeAttribute": "1966-11-26T03:34:08 UTC"},
+			{"Igor-IPv6AddressAttribute": "bebe:cafe::0"},
+			{"Igor-IPv6PrefixAttribute": "bebe:cafe:cccc::0/64"},
+			{"Igor-InterfaceIdAttribute": "00aabbccddeeff11"},
+			{"Igor-Integer64Attribute": 999999999999},
+			{"Igor-TaggedStringAttribute": "myString:1"},
+			{"Igor-SaltedOctetsAttribute": "1122aabbccdd"},
+			{"User-Name":"MyUserName"},
+			{"Tunnel-Password":"secretpassword:2"}
+		]
+	}`
+
+	// Read JSON to Radius Packet
+	rp := RadiusPacket{}
+	if err := json.Unmarshal([]byte(jsonPacket), &rp); err != nil {
+		t.Fatalf("unmarshal error for radius packet: %s", err)
+	}
+
+	// AddIfNotPresent
+	avp1, _ := NewRadiusAVP("Class", "the-class")
+	avp2, _ := NewRadiusAVP("Igor-StringAttribute", "tried-to-change")
+	avps := []RadiusAVP{*avp1, *avp2}
+	rp.AddIfNotPresentAVPs(avps)
+	if rp.GetStringAVP("Class") != "the-class" {
+		t.Errorf("added class name not found")
+	}
+	if len(rp.GetAllAVP("Igor-StringAttribute")) != 1 {
+		t.Errorf("number of Igor-StringAttribute should be 1")
+	}
+	if rp.GetStringAVP("Igor-StringAttribute") != "stringvalue" {
+		t.Errorf("added already present attribute")
 	}
 }

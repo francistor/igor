@@ -8,7 +8,14 @@ import (
 	"strings"
 )
 
+// Reads a radius dictionary in free radius format and generates a jRadiusDict object, used
+// to generate the final radius dictionary to be used in the application
 func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *jRadiusDict) error {
+
+	// Sanity check
+	if dict == nil {
+		panic("the pointer to the jRadius dictionary was null")
+	}
 
 	// Retrieve the config object
 	dictBytes, err := c.GetBytesConfigObject(configObj)
@@ -108,7 +115,7 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 
 			// Options: comma separated value
 			// We only support the has_tag and encrypt attributes
-			// <vendor-name>,has_tag,encrypt=[1,2,3]
+			// <type>,has_tag,encrypt=[1,2,3]
 			radiusType := parseRadiusType(words[3])
 			tagged := false
 			encrypted := false

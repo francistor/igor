@@ -1,0 +1,15 @@
+VENDOR		SessionStore				30002
+
+BEGIN-VENDOR	SessionStore
+
+ATTRIBUTE	Expires			        1	integer64
+ATTRIBUTE	LastUpdated			    2   integer64
+ATTRIBUTE	PacketType     		    3	integer
+ATTRIBUTE	Id               		4	string
+
+VALUE       PacketType                AccessRequest 1
+VALUE       PacketType                AccountingStart 2
+VALUE       PacketType                AccountingInterim 3
+VALUE       PacketType                AccountingStop 4
+
+END-VENDOR	SessionStore

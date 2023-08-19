@@ -23,17 +23,19 @@ func initRadiusDict(cm *ConfigurationManager) {
 	// Radius
 	// First try freeradius dictionary
 	var jDict jRadiusDict
-	err := ParseFreeradiusDictionary(cm, "dictionary", &jDict)
-	if err != nil {
-		// If not found, try native format
-		radiusDictJSON, err := cm.GetBytesConfigObject("radiusDictionary.json")
-		if err != nil {
+
+	if err := ParseFreeradiusDictionary(cm, "dictionary", &jDict); err == nil {
+		// Try first with radius dictionary
+		radiusDict = newRadiusDictionaryFromJDict(&jDict)
+		GetLogger().Info("freeradius dictionary found")
+	} else {
+		GetLogger().Info("freeradius dictionary not found")
+		if radiusDictJSON, err := cm.GetBytesConfigObject("radiusDictionary.json"); err == nil {
+			// Otherwise, build from native format
+			radiusDict = NewRadiusDictionaryFromJSON([]byte(radiusDictJSON))
+		} else {
 			panic("Could not read radiusDictionary.json or dictionary (freeradius format)")
 		}
-
-		radiusDict = NewRadiusDictionaryFromJSON([]byte(radiusDictJSON))
-	} else {
-		radiusDict = newRadiusDictionaryFromJDict(&jDict)
 	}
 }
 

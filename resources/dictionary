@@ -334,5 +334,6 @@ $INCLUDE freeradius_dictionaries/dictionary.zyxel
 
 $INCLUDE freeradius_dictionaries/dictionary.igor
 $INCLUDE freeradius_dictionaries/dictionary.psa
+$INCLUDE freeradius_dictionaries/dictionary.sessionstore
 
 END-PROTOCOL RADIUS

@@ -11,7 +11,8 @@
         {"vendorId": 6527, "vendorName": "Alc"},   
         {"vendorId": 10415, "vendorName": "3GPP"},    
         {"vendorId": 21100, "vendorName": "PSA"},  
-        {"vendorId": 30001, "vendorName": "Igor"}  
+        {"vendorId": 30001, "vendorName": "Igor"},
+        {"vendorId": 30002, "vendorName": "SessionStore"} 
     ],
 	"avps":
 	[
@@ -634,6 +635,39 @@
                     "name": "LongMessage",
                     "type": "Octets",
                     "concat": true
+                }
+            ]
+        },
+        {
+            "vendorId": 30002,
+            "attributes":
+            [
+                {
+                    "code": 1,
+                    "name": "Expires",
+                    "type": "Integer64"
+                },
+                {
+                    "code": 2,
+                    "name": "LastUpdated",
+                    "type": "Integer64"
+                },
+                {
+                    "code": 3,
+                    "name": "PacketType",
+                    "type": "Integer",
+                    "enumValues": 
+                    {
+                        "AccessRequest": 1,
+                        "AccountingStart": 2,
+                        "AccountingInterim": 3,
+                        "AccountingStop": 4
+                    }
+                },
+                {
+                    "code": 4,
+                    "name": "Id",
+                    "type": "String"
                 }
             ]
         }
