@@ -21,34 +21,34 @@ const (
 )
 
 // Size of the channel for getting messages to route
-// TODO: Anything other than 0 or 1 should be explained
+// Allow some buffering. TODO: Evaluate if 64 is a good number
 const RADIUS_REQUESTS_QUEUE_SIZE = 64
 
 // Size of the channel for getting messages to route
-// TODO: Anything other than 0 or 1 should be explained
+// Allow some buffering. TODO: Evaluate if 64 is a good number
 const DIAMETER_REQUESTS_QUEUE_SIZE = 64
 
 // Size of the channel for getting peer control messages
-// TODO: Anything other than 0 or 1 should be explained
+// Allow some buffering. TODO: Evaluate if 16 is a good number
 const CONTROL_QUEUE_SIZE = 16
 
 // Timeout in seconds for http2 handlers
 const HTTP_TIMEOUT_SECONDS = 10
 
-// TIcker for Diameter Peer checking
+// Ticker for Diameter Peer checking
 const DEFAULT_PEER_CHECK_INTERVAL_SECONDS = 120
 
 // Default timeout for requests, when not specified in the origin of the request
 // (e.g. diameter request that is routed to another peer instead of being handled)
-const DEFAULT_REQUEST_TIMEOUT_SECONDS = 10
+const DEFAULT_REQUEST_TIMEOUT_SECONDS = 6
 
-// Represents a Diameter Message to be routed, either to a handler
+// Represents a Diameter Message to be routed, either to a Handler
 // or to another Diameter Peer
 type RoutableDiameterRequest struct {
 	// Pointer to the actual Diameter message
 	Message *core.DiameterMessage
 
-	// Timeout in string format, for JSON encoding
+	// Timeout in string format, for JSON encoding.
 	// Format is <number><units> where
 	// <units> may be "s" for seconds and "ms" for milliseconds
 	TimeoutSpec string
@@ -63,8 +63,8 @@ type RoutableDiameterRequest struct {
 // Represents a Radius Packet to be handled or proxyed
 type RoutableRadiusRequest struct {
 
-	// Can be a radius server group name or an <IPaddress>:<Port>
-	// If zero, the packet is to be handled locally
+	// Can be a radius server group name or an <IPaddress>:<Port>.
+	// If empty, the packet is to be handled locally
 	Destination string
 
 	// Has a value if the endpoint is an IPAddress:Port
@@ -119,9 +119,15 @@ func parseTimeout(timeoutSpec string) (time.Duration, error) {
 	return 0, fmt.Errorf("bad timespec format")
 }
 
-// Fills the timeout parameter with the specified in the timeoutspec, which is
-// unserializable from JSON
-func (rdr *RoutableDiameterRequest) ParseTimeout() error {
+// Need custom function to parse the timeout
+func (rdr *RoutableDiameterRequest) FromJson(bytes []byte) error {
+
+	// Unmarshal from json
+	if err := json.Unmarshal(bytes, rdr); err != nil {
+		return err
+	}
+
+	// Parse duration
 	if duration, err := parseTimeout(rdr.TimeoutSpec); err != nil {
 		return err
 	} else {
@@ -130,9 +136,15 @@ func (rdr *RoutableDiameterRequest) ParseTimeout() error {
 	}
 }
 
-// Fills the timeout parameter with the specified in the timeoutspec, which is
-// unserializable from JSON
-func (rrr *RoutableRadiusRequest) ParseTimeout() error {
+// Need custom function to parse the timeout
+func (rrr *RoutableRadiusRequest) FromJson(bytes []byte) error {
+
+	// Unmarshal from json
+	if err := json.Unmarshal(bytes, rrr); err != nil {
+		return err
+	}
+
+	// Parse duration
 	if duration, err := parseTimeout(rrr.PerRequestTimeoutSpec); err != nil {
 		return err
 	} else {
@@ -151,6 +163,7 @@ type RouterCloseCommand struct {
 
 // Helper function to serialize, send request, get response and unserialize Diameter Request
 func HttpDiameterRequest(client http.Client, endpoint string, diameterRequest *core.DiameterMessage) (*core.DiameterMessage, error) {
+
 	// Serialize the message
 	jsonRequest, err := json.Marshal(diameterRequest)
 	if err != nil {
@@ -192,6 +205,7 @@ func HttpDiameterRequest(client http.Client, endpoint string, diameterRequest *c
 
 // Helper function to serialize, send request, get response and unserialize Radius Request
 func HttpRadiusRequest(client http.Client, endpoint string, packet *core.RadiusPacket) (*core.RadiusPacket, error) {
+
 	// Serialize the message
 	jsonRequest, err := json.Marshal(packet)
 	if err != nil {

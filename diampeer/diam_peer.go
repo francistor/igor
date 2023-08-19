@@ -786,10 +786,12 @@ func (dp *DiameterPeer) DiameterExchange(dm *core.DiameterMessage, timeout time.
 	// Validations
 	if dm.ApplicationId == 0 {
 		rchan <- fmt.Errorf("should not use this method to send a Base Application message")
+		close(rchan)
 		return
 	}
 	if !(*dm).IsRequest {
 		rchan <- fmt.Errorf("diameter message is not a request")
+		close(rchan)
 		return
 	}
 

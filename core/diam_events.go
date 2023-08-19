@@ -197,6 +197,6 @@ type DiameterPeersTableUpdatedEvent struct {
 	Table        DiameterPeersTable
 }
 
-func IncrementDiameterPeersStatus(instanceName string, table DiameterPeersTable) {
+func PushDiameterPeersStatus(instanceName string, table DiameterPeersTable) {
 	MS.metricEventChan <- DiameterPeersTableUpdatedEvent{InstanceName: instanceName, Table: table}
 }

@@ -144,7 +144,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 		}
 
 		var request router.RoutableDiameterRequest
-		if err = json.Unmarshal(jRequest, &request); err != nil {
+		if err = request.FromJson(jRequest); err != nil {
 			logger.Errorf("error unmarshalling request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
@@ -152,15 +152,6 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 			return
 		}
 		request.Message.Tidy()
-
-		// Fill the timeout
-		if err = request.ParseTimeout(); err != nil {
-			logger.Error("error parsing Timeoutspec: %s", err)
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
-			return
-		}
 
 		// Generate the Diameter Answer, passing it to the router
 		answer, err := diameterRouter.RouteDiameterRequest(request.Message, request.Timeout)
@@ -237,20 +228,11 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 		}
 
 		var request router.RoutableRadiusRequest
-		if err = json.Unmarshal(jRequest, &request); err != nil {
+		if err = request.FromJson(jRequest); err != nil {
 			logger.Errorf("error unmarshalling request: %s", err)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
 			core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
-			return
-		}
-
-		// Fill the timeout
-		if err = request.ParseTimeout(); err != nil {
-			logger.Errorf("error parsing Timeoutspec: %s", err)
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
 			return
 		}
 

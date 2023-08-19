@@ -317,7 +317,8 @@ type DiameterRoutingRule struct {
 type DiameterRoutingRules []DiameterRoutingRule
 
 // Finds the appropriate route, taking into account wildcards.
-// If remote is true, force that the route is not local (has no nandler, it is sent to other peer)
+// If remote is true, force that the route is not local (return a route that has no nandler, so that it is sent to other peer,
+// used for locally generated requests)
 func (rr DiameterRoutingRules) FindDiameterRoutingRule(realm string, application string, remote bool) (DiameterRoutingRule, error) {
 	for _, rule := range rr {
 		if rule.Realm == "*" || rule.Realm == realm {
