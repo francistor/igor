@@ -14,6 +14,13 @@ const (
 	ES_INDEX_TYPE_CURRENTDATE = 2
 )
 
+const (
+	VERSION_ALGORITHM_NONE              = 0
+	VERSION_ALGORITHM_SIMPLEVALUE       = 1
+	VERSION_ALGORITHM_TIMEANDTYPE       = 2
+	VERSION_ALGORITHM_ADJUSTEDSTARTTIME = 3
+)
+
 // The attribute map defines the names of the JSON attribues to be written, taking the values from the specified AVP
 // Multiple AVP may be combined in a single attribute using the following operators
 // : -> Take the first that is present
@@ -21,16 +28,23 @@ const (
 // ! -> Subtract the values (valid for integers)
 // < -> Add with multiplication by Giga
 
+// This formatter includes some logic for intelligent updating of the CDR, insted of just
+// inserting them all.
+//
 // The _id is generated as a concatenation of the specified fields. Typically it is the
 // AccountingSessionId + NAS-IP-Address, or the IP address in case of a sessions table
 //
-// The version is calculated as the value of the specified attribute, normaly a Time
-// attribute, or as the current Time. In both cases are converted to seconds since the
-// epoch 1.673.107.886, and an offset is added for taking into account that a stop takes
-// higher precedence than an interim, that takes higher predecence than a start
-// That offset is 200.000.000.000 for stop and 100.000.000.000 for Interim.
-// It may also be calculated as the current time, and the same treatment of accounting-
-// status-type is performed
+// The version may be calculated using different algorithms, to account for different
+// use cases. For instance, in pure CDR, if two records have the same timestamp, the stop
+// must have overwrite the interim. or the start But for a sessions table (e.g. where the
+// _id is the IP address), the opposite is true.
+//
+// Algorithm: 1 -> simplevalue. Uses the provided int value without further adjustments
+// Algorithm: 2 -> timeandtype. Uses the provided value as timestamp, adding an offset
+// for interim and another one for stop (offset is 200.000.000.000 for stop and
+// 100.000.000.000 for Interim.)
+// Algorithm: 3 -> adjustedstarttime. Uses two values, the timestamp and a session time
+// to calculate the start time, but reduced by 1/2 for interim and for 1/3 for stop
 //
 // The index may be as specified in the indexType element
 // "fixed" -> ES_INDEX_TYPE_FIXED
@@ -44,6 +58,8 @@ type ElasticFormatConf struct {
 	IndexName         string
 	AttributeForIndex string
 	IndexDateFormat   string
+	// Cooked
+	IndexTypeValue int
 
 	// Multiple filed separator
 	separator string
@@ -52,12 +68,15 @@ type ElasticFormatConf struct {
 	IdFields []string
 
 	// Parameters for the version field
-	VersionField string
-
+	VersionAlgorithm string
+	VersionField1    string
+	VersionField2    string
 	// Cooked
-	IndexTypeValue int
+	VersionAlgorithmValue int
 }
 
+// A JSON format is in charge of parsing CDRs and producing a string representation
+// to be used in an Elastic database
 type ElasticFormat struct {
 	ElasticFormatConf
 }
@@ -65,6 +84,7 @@ type ElasticFormat struct {
 // Creates an instance of ElasticWriter with the specified configuration
 func NewElasticFormat(conf ElasticFormatConf) *ElasticFormat {
 
+	// Index type
 	if strings.EqualFold(conf.IndexType, "fixed") {
 		conf.IndexTypeValue = ES_INDEX_TYPE_FIXED
 	} else if strings.EqualFold(conf.IndexType, "field") {
@@ -76,6 +96,19 @@ func NewElasticFormat(conf ElasticFormatConf) *ElasticFormat {
 		conf.IndexTypeValue = ES_INDEX_TYPE_CURRENTDATE
 	} else {
 		panic("bad specification for index type: " + conf.IndexType)
+	}
+
+	// Version type
+	if strings.EqualFold(conf.VersionAlgorithm, "simplevalue") {
+		conf.VersionAlgorithmValue = VERSION_ALGORITHM_SIMPLEVALUE
+	} else if strings.EqualFold(conf.VersionAlgorithm, "timeandtype") {
+		conf.VersionAlgorithmValue = VERSION_ALGORITHM_TIMEANDTYPE
+	} else if strings.EqualFold(conf.VersionAlgorithm, "adjustedstarttime") {
+		conf.VersionAlgorithmValue = VERSION_ALGORITHM_ADJUSTEDSTARTTIME
+	} else if strings.EqualFold(conf.VersionAlgorithm, "none") {
+		conf.VersionAlgorithmValue = VERSION_ALGORITHM_NONE
+	} else {
+		panic("no valid algorithm specified for version")
 	}
 
 	// By default the separator for multiple instances of an avp is a ","
@@ -100,14 +133,6 @@ func (ew *ElasticFormat) GetDiameterCDRString(dm *core.DiameterMessage) string {
 // Writes the CDR in JSON format applying the format
 // In case of error, returns zero string
 func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
-
-	// Calculate offset for version
-	var versionOffset int64
-	if rp.GetIntAVP("Acct-Status-Type") == 2 {
-		versionOffset = 200000000000 // Stop
-	} else if rp.GetIntAVP("Acct-Status-Type") == 3 {
-		versionOffset = 100000000000 // Interim
-	}
 
 	// Make the index
 	var indexName string
@@ -135,21 +160,51 @@ func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 		_id += rp.GetStringAVP(s) + "|"
 	}
 
-	// Make the version
 	var version int64
-	if ew.VersionField == "" {
-		version = int64(time.Since(core.ZeroRadiusTime).Seconds()) + versionOffset
-	} else {
-		if versionAVP, err := rp.GetAVP(ew.VersionField); err != nil {
-			core.GetLogger().Errorf("version attribute %s not found", ew.VersionField)
-			return ""
+	switch ew.VersionAlgorithmValue {
+	case VERSION_ALGORITHM_NONE:
+		// Do nothing. Version will be a fixed 0
+	case VERSION_ALGORITHM_SIMPLEVALUE:
+		// Will use 0 as version if attribute not found
+		version = rp.GetIntAVP(ew.VersionField1)
+	case VERSION_ALGORITHM_TIMEANDTYPE:
+		// Calculate offset for version
+		var versionOffset int64
+		if rp.GetIntAVP("Acct-Status-Type") == 2 {
+			versionOffset = 200000000000 // Stop
+		} else if rp.GetIntAVP("Acct-Status-Type") == 3 {
+			versionOffset = 100000000000 // Interim
+		}
+		// Make the version
+		if ew.VersionField1 == "" {
+			version = int64(time.Since(core.ZeroRadiusTime).Seconds()) + versionOffset
 		} else {
-			version = versionAVP.GetInt()
-			if version == 0 {
-				core.GetLogger().Errorf("version attribute cannot be exrpessed as integer", ew.VersionField)
+			if versionAVP, err := rp.GetAVP(ew.VersionField1); err != nil {
+				core.GetLogger().Errorf("version attribute %s not found", ew.VersionField1)
 				return ""
+			} else {
+				version = versionAVP.GetInt()
+				if version == 0 {
+					core.GetLogger().Errorf("version attribute cannot be expressed as integer %v", ew.VersionField1)
+					return ""
+				}
+				version += versionOffset
 			}
-			version += versionOffset
+		}
+	case VERSION_ALGORITHM_ADJUSTEDSTARTTIME:
+		// Get the event time
+		eventTime := rp.GetIntAVP(ew.VersionField1)
+		if eventTime == 0 {
+			core.GetLogger().Errorf("event time version attribute cannot be expressed as integer %v", ew.VersionField1)
+			return ""
+		}
+		// Get the session time
+		sessionTime := rp.GetIntAVP(ew.VersionField2)
+		// Calculate the version
+		if rp.GetIntAVP("Acct-Status-Type") == 2 { // Stop
+			version = eventTime - sessionTime/3
+		} else if rp.GetIntAVP("Acct-Status-Type") == 3 { // Interim
+			version = eventTime - sessionTime/2
 		}
 	}
 

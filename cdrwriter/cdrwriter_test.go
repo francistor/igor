@@ -2,6 +2,7 @@ package cdrwriter
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -31,7 +32,9 @@ var jElasticConfig = `
 	"attributeForIndex": "Igor-TimeAttribute",
 	"indexDateFormat": "2006-01",
 	"idFields": ["Acct-Session-Id", "NAS-IP-Address"],
-	"versionField": "Igor-TimeAttribute"
+	"versionField1": "Igor-TimeAttribute",
+	"versionAlgorithm": "timeandtype"
+
 }`
 
 // Initializer of the test suite.
@@ -219,6 +222,7 @@ func TestFileWriter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error reading cdr file %s", err)
 	}
+	fmt.Println(string(cdrbytes))
 	if !strings.Contains(string(cdrbytes), "0102030405060708090a0b") {
 		t.Fatal("bad cdr contents")
 	}
@@ -267,9 +271,9 @@ func TestElasticWriter(t *testing.T) {
 	if err := json.Unmarshal([]byte(jElasticConfig), &conf); err != nil {
 		t.Fatalf("bad ElasticWriterConf format: %s", err)
 	}
-	ew := NewElasticFormat(conf)
+	ef := NewElasticFormat(conf)
 
-	ecdrw := NewElasticCDRWriter("http://elasticdatabase:9200/_doc/_bulk?filter_path=took,errors", "", "", ew, 1 /* Timeout */, 2 /* GlitchSeconds */)
+	ecdrw := NewElasticCDRWriter("http://elasticdatabase:9200/_doc/_bulk?filter_path=took,errors", "", "", ef, 1 /* Timeout */, 2 /* GlitchSeconds */, "../cdr/elastic.backup")
 
 	rp := buildSimpleRadiusPacket(t)
 	ecdrw.WriteRadiusCDR(&rp)

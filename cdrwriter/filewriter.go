@@ -26,7 +26,7 @@ type FileCDRWriter struct {
 	// Externally created, holding the method to format the CDR
 	formatter CDRFormatter
 
-	// Timestamp in unix seconds for the file currently being used
+	// Timestamp in unix seconds for the date of creation of the file currently being used
 	currentFileTimestamp int64
 
 	// For sanity check
@@ -42,6 +42,7 @@ type FileCDRWriter struct {
 }
 
 // Builds a writer
+// The fileNameFormat is a (golang) date format string
 func NewFileCDRWriter(filePath string, fileNameFormat string, formatter CDRFormatter, rotateSeconds int64) *FileCDRWriter {
 
 	if err := os.MkdirAll(filePath, 0770); err != nil {
@@ -122,8 +123,9 @@ func (w *FileCDRWriter) rotateFile() {
 		panic("File name not changed when rotating: " + fileName)
 	}
 
-	// Will fail if the file already exists
-	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0770)
+	// Adding O_APPEND to avoid failure if the file already exists (e.g. program
+	// terminated and started again quickly)
+	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0770)
 	if err != nil {
 		panic("while rotating, could not create " + fileName + " due to " + err.Error())
 	}
@@ -139,5 +141,7 @@ func (w *FileCDRWriter) Close() {
 	// Consume all the pending CDR in the buffer
 	<-w.doneChan
 
-	w.file.Close()
+	if w.file != nil {
+		w.file.Close()
+	}
 }

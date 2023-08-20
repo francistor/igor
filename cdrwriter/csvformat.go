@@ -8,6 +8,8 @@ import (
 	"github.com/francistor/igor/core"
 )
 
+// A CSV format is in charge of parsing CDRs and producing a string representation
+// to be stored in file or in a database
 type CSVFormat struct {
 	// The attribute names of the fields to write
 	fields []string
@@ -19,13 +21,14 @@ type CSVFormat struct {
 	attributeDateFormat string
 	// Whether to surround strings by quotes
 	quoteStrings bool
-	// Whether to parse ints as strings
+	// Whether to format ints as strings (will be quoted if so specified)
 	parseInts bool
 }
 
-// Creates a new instance of a Livinstone Writer
+// Creates a new instance of a CSV Writer
 func NewCSVFormat(fields []string, fieldSeparator string, attributeSeparator string, attributeDateFormat string, quoteStrings bool, parseInts bool) *CSVFormat {
-	lw := CSVFormat{
+
+	return &CSVFormat{
 		fields:              fields,
 		fieldSeparator:      fieldSeparator,
 		attributeSeparator:  attributeSeparator,
@@ -33,8 +36,6 @@ func NewCSVFormat(fields []string, fieldSeparator string, attributeSeparator str
 		quoteStrings:        quoteStrings,
 		parseInts:           parseInts,
 	}
-
-	return &lw
 }
 
 // Not implemented

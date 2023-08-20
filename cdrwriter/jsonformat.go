@@ -8,25 +8,26 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// A JSON format is in charge of parsing CDRs and producing a string representation
+// to be stored in file or in a database
 type JSONFormat struct {
 	positiveFilter []string
 	negativeFilter []string
 }
 
-// Creates a new instance of a Livinstone Writer
+// Creates a new instance of a JSON Formatter
 func NewJSONFormat(positiveFilter []string, negativeFilter []string) *JSONFormat {
-	lw := JSONFormat{
+	return &JSONFormat{
 		positiveFilter: positiveFilter,
 		negativeFilter: negativeFilter,
 	}
-
-	return &lw
 }
 
 // There is no specific field for the Timestamp. If needed, the attribute must be already present
-// in the packet/message. A Timestamp attribute may be added in the handler if not sent by the BRAS
+// in the packet/message. A Timestamp attribute may be added in the handler if not sent by the
+// access device
 
-// Writes the Diameter CDR in JSON format
+// Writes the Diameter CDR in JSON format, as the list of AVPs
 func (w *JSONFormat) GetDiameterCDRString(dm *core.DiameterMessage) string {
 	toSerialize := make([]*core.DiameterAVP, 0)
 
