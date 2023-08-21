@@ -756,98 +756,17 @@ func (ms *MetricsServer) ResetMetrics() {
 	ms.metricEventChan <- ResetMetricsEvent{}
 }
 
-/*
-// Wrapper to get Diameter Metrics
-func (ms *MetricsServer) DiameterQuery(name string, filter map[string]string, aggLabels []string) PeerDiameterMetrics {
-	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
-	ms.queryChan <- query
-	v, ok := (<-query.RChan).(PeerDiameterMetrics)
-	if ok {
-		return v
-	} else {
-		return PeerDiameterMetrics{}
-	}
-}
-
-// Wrapper to get Radius Metrics
-func (ms *MetricsServer) RadiusQuery(name string, filter map[string]string, aggLabels []string) RadiusMetrics {
-	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
-	ms.queryChan <- query
-	v, ok := (<-query.RChan).(RadiusMetrics)
-	if ok {
-		return v
-	} else {
-		return RadiusMetrics{}
-	}
-}
-
-// Wrapper to get HttpClient metrics
-func (ms *MetricsServer) HttpClientQuery(name string, filter map[string]string, aggLabels []string) HttpClientMetrics {
-	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
-	ms.queryChan <- query
-	v, ok := (<-query.RChan).(HttpClientMetrics)
-	if ok {
-		return v
-	} else {
-		return HttpClientMetrics{}
-	}
-}
-
-// Wrapper to get HttpHandler metrics
-func (ms *MetricsServer) HttpHandlerQuery(name string, filter map[string]string, aggLabels []string) HttpHandlerMetrics {
-	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
-	ms.queryChan <- query
-	v, ok := (<-query.RChan).(HttpHandlerMetrics)
-	if ok {
-		return v
-	} else {
-		return HttpHandlerMetrics{}
-	}
-}
-
-// Wrapper to get HttpRouter metrics
-func (ms *MetricsServer) HttpRouterQuery(name string, filter map[string]string, aggLabels []string) HttpRouterMetrics {
-	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
-	ms.queryChan <- query
-	v, ok := (<-query.RChan).(HttpRouterMetrics)
-	if ok {
-		return v
-	} else {
-		return HttpRouterMetrics{}
-	}
-}
-
-// Wrapper to get SessionQuery metrics
-func (ms *MetricsServer) SessionQueryQuery(name string, filter map[string]string, aggLabels []string) SessionQueryMetrics {
-	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
-	ms.queryChan <- query
-	v, ok := (<-query.RChan).(SessionQueryMetrics)
-	if ok {
-		return v
-	} else {
-		return SessionQueryMetrics{}
-	}
-}
-
-// Wrapper to get SessionQuery metrics
-func (ms *MetricsServer) SessionUpdateQuery(name string, filter map[string]string, aggLabels []string) SessionUpdateMetrics {
-	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
-	ms.queryChan <- query
-	v, ok := (<-query.RChan).(SessionUpdateMetrics)
-	if ok {
-		return v
-	} else {
-		return SessionUpdateMetrics{}
-	}
-}
-
-*/
-
 // Generic wrapper for getting metrics
 func MetricQuery[T any](ms *MetricsServer, name string, filter map[string]string, aggLabels []string) T {
 	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
 	ms.queryChan <- query
-	return (<-query.RChan).(T)
+	v, ok := (<-query.RChan).(T)
+	if ok {
+		return v
+	} else {
+		// Avoid the case that v could be nil if simply got the value from the channel
+		return *new(T)
+	}
 }
 
 // Wrapper to get PeersTable
@@ -989,163 +908,77 @@ func (ms *MetricsServer) metricServerLoop() {
 
 			// Diameter Events
 			case PeerDiameterRequestReceivedEvent:
-				if curr, ok := ms.diameterRequestsReceived[e.Key]; !ok {
-					ms.diameterRequestsReceived[e.Key] = 1
-				} else {
-					ms.diameterRequestsReceived[e.Key] = curr + 1
-				}
+				safeIncrement[PeerDiameterMetricKey](ms.diameterRequestsReceived, e.Key)
+
 			case PeerDiameterAnswerSentEvent:
-				if curr, ok := ms.diameterAnswersSent[e.Key]; !ok {
-					ms.diameterAnswersSent[e.Key] = 1
-				} else {
-					ms.diameterAnswersSent[e.Key] = curr + 1
-				}
+				safeIncrement[PeerDiameterMetricKey](ms.diameterAnswersSent, e.Key)
 
 			case PeerDiameterRequestSentEvent:
-				if curr, ok := ms.diameterRequestsSent[e.Key]; !ok {
-					ms.diameterRequestsSent[e.Key] = 1
-				} else {
-					ms.diameterRequestsSent[e.Key] = curr + 1
-				}
+				safeIncrement[PeerDiameterMetricKey](ms.diameterRequestsSent, e.Key)
 
 			case PeerDiameterAnswerReceivedEvent:
-				if curr, ok := ms.diameterAnswersReceived[e.Key]; !ok {
-					ms.diameterAnswersReceived[e.Key] = 1
-				} else {
-					ms.diameterAnswersReceived[e.Key] = curr + 1
-				}
+				safeIncrement[PeerDiameterMetricKey](ms.diameterAnswersReceived, e.Key)
 
 			case PeerDiameterRequestTimeoutEvent:
-				if curr, ok := ms.diameterRequestsTimeout[e.Key]; !ok {
-					ms.diameterRequestsTimeout[e.Key] = 1
-				} else {
-					ms.diameterRequestsTimeout[e.Key] = curr + 1
-				}
+				safeIncrement[PeerDiameterMetricKey](ms.diameterRequestsTimeout, e.Key)
+
+			case PeerDiameterAnswerStalledEvent:
+				safeIncrement[PeerDiameterMetricKey](ms.diameterAnswersStalled, e.Key)
 
 			// Radius Events
-			case PeerDiameterAnswerStalledEvent:
-				if curr, ok := ms.diameterAnswersStalled[e.Key]; !ok {
-					ms.diameterAnswersStalled[e.Key] = 1
-				} else {
-					ms.diameterAnswersStalled[e.Key] = curr + 1
-				}
-
 			case RadiusServerRequestEvent:
-				if curr, ok := ms.radiusServerRequests[e.Key]; !ok {
-					ms.radiusServerRequests[e.Key] = 1
-				} else {
-					ms.radiusServerRequests[e.Key] = curr + 1
-				}
+				safeIncrement[RadiusMetricKey](ms.radiusServerRequests, e.Key)
 
 			case RadiusServerResponseEvent:
-				if curr, ok := ms.radiusServerResponses[e.Key]; !ok {
-					ms.radiusServerResponses[e.Key] = 1
-				} else {
-					ms.radiusServerResponses[e.Key] = curr + 1
-				}
+				safeIncrement[RadiusMetricKey](ms.radiusServerResponses, e.Key)
 
 			case RadiusServerDropEvent:
-				if curr, ok := ms.radiusServerDrops[e.Key]; !ok {
-					ms.radiusServerDrops[e.Key] = 1
-				} else {
-					ms.radiusServerDrops[e.Key] = curr + 1
-				}
+				safeIncrement[RadiusMetricKey](ms.radiusServerDrops, e.Key)
 
 			case RadiusClientRequestEvent:
-				if curr, ok := ms.radiusClientRequests[e.Key]; !ok {
-					ms.radiusClientRequests[e.Key] = 1
-				} else {
-					ms.radiusClientRequests[e.Key] = curr + 1
-				}
+				safeIncrement[RadiusMetricKey](ms.radiusClientRequests, e.Key)
 
 			case RadiusClientResponseEvent:
-				if curr, ok := ms.radiusClientResponses[e.Key]; !ok {
-					ms.radiusClientResponses[e.Key] = 1
-				} else {
-					ms.radiusClientResponses[e.Key] = curr + 1
-				}
+				safeIncrement[RadiusMetricKey](ms.radiusClientResponses, e.Key)
 
 			case RadiusClientTimeoutEvent:
-				if curr, ok := ms.radiusClientTimeouts[e.Key]; !ok {
-					ms.radiusClientTimeouts[e.Key] = 1
-				} else {
-					ms.radiusClientTimeouts[e.Key] = curr + 1
-				}
+				safeIncrement[RadiusMetricKey](ms.radiusClientTimeouts, e.Key)
 
 			case RadiusClientResponseStalledEvent:
-				if curr, ok := ms.radiusClientResponsesStalled[e.Key]; !ok {
-					ms.radiusClientResponsesStalled[e.Key] = 1
-				} else {
-					ms.radiusClientResponsesStalled[e.Key] = curr + 1
-				}
+				safeIncrement[RadiusMetricKey](ms.radiusClientResponsesStalled, e.Key)
 
 			case RadiusClientResponseDropEvent:
-				if curr, ok := ms.radiusClientResponsesDrops[e.Key]; !ok {
-					ms.radiusClientResponsesDrops[e.Key] = 1
-				} else {
-					ms.radiusClientResponsesDrops[e.Key] = curr + 1
-				}
+				safeIncrement[RadiusMetricKey](ms.radiusClientResponsesDrops, e.Key)
 
 			// Router Events
-
 			case RouterRouteNotFoundEvent:
-				if curr, ok := ms.diameterRouteNotFound[e.Key]; !ok {
-					ms.diameterRouteNotFound[e.Key] = 1
-				} else {
-					ms.diameterRouteNotFound[e.Key] = curr + 1
-				}
+				safeIncrement[PeerDiameterMetricKey](ms.diameterRouteNotFound, e.Key)
+
 			case RouterNoAvailablePeerEvent:
-				if curr, ok := ms.diameterNoAvailablePeer[e.Key]; !ok {
-					ms.diameterNoAvailablePeer[e.Key] = 1
-				} else {
-					ms.diameterNoAvailablePeer[e.Key] = curr + 1
-				}
+				safeIncrement[PeerDiameterMetricKey](ms.diameterNoAvailablePeer, e.Key)
+
 			case RouterHandlerError:
-				if curr, ok := ms.diameterHandlerError[e.Key]; !ok {
-					ms.diameterHandlerError[e.Key] = 1
-				} else {
-					ms.diameterHandlerError[e.Key] = curr + 1
-				}
+				safeIncrement[PeerDiameterMetricKey](ms.diameterHandlerError, e.Key)
 
 			// HttpClient Events
 			case HttpClientExchangeEvent:
-				if curr, ok := ms.httpClientExchanges[e.Key]; !ok {
-					ms.httpClientExchanges[e.Key] = 1
-				} else {
-					ms.httpClientExchanges[e.Key] = curr + 1
-				}
+				safeIncrement[HttpClientMetricKey](ms.httpClientExchanges, e.Key)
 
 			// HttpHandler Events
 			case HttpHandlerExchangeEvent:
-				if curr, ok := ms.httpHandlerExchanges[e.Key]; !ok {
-					ms.httpHandlerExchanges[e.Key] = 1
-				} else {
-					ms.httpHandlerExchanges[e.Key] = curr + 1
-				}
+				safeIncrement[HttpHandlerMetricKey](ms.httpHandlerExchanges, e.Key)
 
-			// HttpHandler Events
+			// HttpRouter Events
 			case HttpRouterExchangeEvent:
-				if curr, ok := ms.httpRouterExchanges[e.Key]; !ok {
-					ms.httpRouterExchanges[e.Key] = 1
-				} else {
-					ms.httpRouterExchanges[e.Key] = curr + 1
-				}
+				safeIncrement[HttpRouterMetricKey](ms.httpRouterExchanges, e.Key)
 
 			// SessionQuery Events
 			case SessionQueryEvent:
-				if curr, ok := ms.sessionQueries[e.Key]; !ok {
-					ms.sessionQueries[e.Key] = 1
-				} else {
-					ms.sessionQueries[e.Key] = curr + 1
-				}
+				safeIncrement[SessionQueryMetricKey](ms.sessionQueries, e.Key)
 
 			// SessionUpdate Events
 			case SessionUpdateEvent:
-				if curr, ok := ms.sessionUpdates[e.Key]; !ok {
-					ms.sessionUpdates[e.Key] = 1
-				} else {
-					ms.sessionUpdates[e.Key] = curr + 1
-				}
+				safeIncrement[SessionUpdateMetricKey](ms.sessionUpdates, e.Key)
 
 			// PeersTable
 			case DiameterPeersTableUpdatedEvent:
@@ -1224,17 +1057,17 @@ func (ms *MetricsServer) getMetricsHandler() func(w http.ResponseWriter, req *ht
 		var err error
 		switch pathElements[1] {
 		case "diameterMetrics":
-			jAnswer, err = json.Marshal(ms.DiameterQuery(queryName, filter, agg))
+			jAnswer, err = json.Marshal(MetricQuery[PeerDiameterMetrics](ms, queryName, filter, agg))
 		case "radiusMetrics":
-			jAnswer, err = json.Marshal(ms.RadiusQuery(queryName, filter, agg))
+			jAnswer, err = json.Marshal(MetricQuery[RadiusMetrics](ms, queryName, filter, agg))
 		case "httpClientMetrics":
-			jAnswer, err = json.Marshal(ms.HttpClientQuery(queryName, filter, agg))
+			jAnswer, err = json.Marshal(MetricQuery[HttpClientMetrics](ms, queryName, filter, agg))
 		case "httpRouterMetrics":
-			jAnswer, err = json.Marshal(ms.HttpClientQuery(queryName, filter, agg))
+			jAnswer, err = json.Marshal(MetricQuery[HttpRouterMetrics](ms, queryName, filter, agg))
 		case "httpHandlerMetrics":
-			jAnswer, err = json.Marshal(ms.HttpClientQuery(queryName, filter, agg))
+			jAnswer, err = json.Marshal(MetricQuery[HttpHandlerMetrics](ms, queryName, filter, agg))
 		case "sessionQueryMetrics":
-			jAnswer, err = json.Marshal(ms.SessionQueryQuery(queryName, filter, agg))
+			jAnswer, err = json.Marshal(MetricQuery[SessionQueryMetrics](ms, queryName, filter, agg))
 		case "sessionUpdateMetrics":
 			jAnswer, err = json.Marshal(MetricQuery[SessionUpdateMetrics](ms, queryName, filter, agg))
 			//jAnswer, err = json.Marshal(ms.SessionUpdateQuery(queryName, filter, agg))
@@ -1318,5 +1151,14 @@ func (ms *MetricsServer) getPrometheusMetricsHandler() func(w http.ResponseWrite
 
 		// Write response
 		writer.Write([]byte(builder.String()))
+	}
+}
+
+// Helper
+func safeIncrement[T comparable](m map[T]uint64, k T) {
+	if curr, ok := m[k]; !ok {
+		m[k] = 1
+	} else {
+		m[k] = curr + 1
 	}
 }

@@ -438,7 +438,7 @@ func TestRadiusTimeout(t *testing.T) {
 	}
 	time.Sleep(50 * time.Millisecond)
 	// Two packets will be sent. Server not in quarantine
-	requestsSentMetrics := core.MS.RadiusQuery("RadiusClientRequests", nil, nil)
+	requestsSentMetrics := core.MetricQuery[core.RadiusMetrics](core.MS, "RadiusClientRequests", nil, nil)
 	if requestsSentMetrics[core.RadiusMetricKey{}] != 2 {
 		t.Fatalf("bad number of packets sent (could be due to network unavailable) %d", requestsSentMetrics[core.RadiusMetricKey{}])
 	}
@@ -446,7 +446,7 @@ func TestRadiusTimeout(t *testing.T) {
 	if !findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
 		t.Fatal("non-existing-server is not available")
 	}
-	timeoutMetrics := core.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
+	timeoutMetrics := core.MetricQuery[core.RadiusMetrics](core.MS, "RadiusClientTimeouts", nil, nil)
 	if timeoutMetrics[core.RadiusMetricKey{}] != 2 {
 		t.Fatal("bad number of timeouts (could be due to network unavailable)")
 	}
@@ -458,7 +458,7 @@ func TestRadiusTimeout(t *testing.T) {
 	}
 	time.Sleep(50 * time.Millisecond)
 	// Repeat. Four packets will be reported as sent. Sever in quarantine
-	requestsSentMetrics = core.MS.RadiusQuery("RadiusClientRequests", nil, nil)
+	requestsSentMetrics = core.MetricQuery[core.RadiusMetrics](core.MS, "RadiusClientRequests", nil, nil)
 	if requestsSentMetrics[core.RadiusMetricKey{}] != 4 {
 		t.Fatal("bad number of packets sent", err)
 	}
@@ -466,7 +466,7 @@ func TestRadiusTimeout(t *testing.T) {
 	if findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
 		t.Fatal("non-existing-server is available")
 	}
-	timeoutMetrics = core.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
+	timeoutMetrics = core.MetricQuery[core.RadiusMetrics](core.MS, "RadiusClientTimeouts", nil, nil)
 	if timeoutMetrics[core.RadiusMetricKey{}] != 4 {
 		t.Fatal("bad number of timeouts")
 	}
@@ -477,7 +477,7 @@ func TestRadiusTimeout(t *testing.T) {
 		t.Fatalf("request failed %s", err)
 	}
 	time.Sleep(50 * time.Millisecond)
-	requestsSentMetrics = core.MS.RadiusQuery("RadiusClientRequests", nil, nil)
+	requestsSentMetrics = core.MetricQuery[core.RadiusMetrics](core.MS, "RadiusClientRequests", nil, nil)
 	if requestsSentMetrics[core.RadiusMetricKey{}] != 5 {
 		t.Fatal("bad number of packets sent", err)
 	}
@@ -485,17 +485,17 @@ func TestRadiusTimeout(t *testing.T) {
 	if findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
 		t.Fatal("non-existing-server is available")
 	}
-	timeoutMetrics = core.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
+	timeoutMetrics = core.MetricQuery[core.RadiusMetrics](core.MS, "RadiusClientTimeouts", nil, nil)
 	if timeoutMetrics[core.RadiusMetricKey{}] != 4 {
 		t.Fatal("bad number of timeouts")
 	}
-	serverRequestsMetrics := core.MS.RadiusQuery("RadiusServerRequests", nil, []string{"Endpoint"})
+	serverRequestsMetrics := core.MetricQuery[core.RadiusMetrics](core.MS, "RadiusServerRequests", nil, []string{"Endpoint"})
 	if serverRequestsMetrics[core.RadiusMetricKey{Endpoint: "127.0.0.1"}] != 1 {
 		t.Fatalf("bad number of server requests %v", serverRequestsMetrics)
 	} else {
 		t.Log(serverRequestsMetrics)
 	}
-	serverResponsesMetrics := core.MS.RadiusQuery("RadiusServerResponses", nil, []string{"Endpoint"})
+	serverResponsesMetrics := core.MetricQuery[core.RadiusMetrics](core.MS, "RadiusServerResponses", nil, []string{"Endpoint"})
 	if serverResponsesMetrics[core.RadiusMetricKey{Endpoint: "127.0.0.1"}] != 1 {
 		t.Fatalf("bad number of server responses %v", serverResponsesMetrics)
 	}
@@ -505,7 +505,7 @@ func TestRadiusTimeout(t *testing.T) {
 	if err == nil {
 		t.Fatal("should get a timeout sending to non existing specific server")
 	}
-	timeoutMetrics = core.MS.RadiusQuery("RadiusClientTimeouts", nil, nil)
+	timeoutMetrics = core.MetricQuery[core.RadiusMetrics](core.MS, "RadiusClientTimeouts", nil, nil)
 	if timeoutMetrics[core.RadiusMetricKey{}] != 6 {
 		t.Fatal("bad number of timeouts")
 	}

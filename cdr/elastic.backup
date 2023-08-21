@@ -1,0 +1,2 @@
+{"index": {"_id": "session-1|127.0.0.1|", "_index": "cdr-1986-11", "version": 533360048, "version_type": "external"}}
+{"IgorOctets": "0102030405060708090a0b", "IgorString": "stringvalue,anotherStringvalue", "SessionTime": 3598, "InputBytes": 4294968296, "IgorInt": "Zero,One,One", "IgorInt64": 999999999999}
