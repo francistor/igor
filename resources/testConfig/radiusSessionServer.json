@@ -1,0 +1,22 @@
+{
+    "indexNames":   ["Framed-IP-Address"],
+    "idAttributes": ["Acct-Session-Id", "NAS-IP-Address"],
+    "expirationTimeSeconds": 10,
+    "limboTimeSeconds": 1,
+    "radiusBindAddress": "0.0.0.0",
+    "radiusBindPort": 91813,
+    "httpBindAddress": "0.0.0.0",
+    "httpBindPort": 98080,
+    "receiveFrom": 	{
+        "127.0.0.1":{
+            "name": "sessionclient",
+            "secret": "secret"
+        }
+    },
+    "sendTo": 	{
+        "127.0.0.1":{
+            "name": "sessionserver",
+            "secret": "secret"
+        }
+    }
+}

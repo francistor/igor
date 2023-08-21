@@ -18,7 +18,7 @@ type RadiusMetricKey struct {
 
 type RadiusMetrics map[RadiusMetricKey]uint64
 
-// Custom marshalling of PeerDiameterMetrics
+// Custom marshalling of RadiusMetrics
 func (rm RadiusMetrics) MarshalJSON() ([]byte, error) {
 
 	// JSON object will have a property for the key and another one for the value
@@ -28,7 +28,7 @@ func (rm RadiusMetrics) MarshalJSON() ([]byte, error) {
 	}
 
 	// The array of T to produce as JSON
-	metrics := make([]T, 0)
+	metrics := make([]T, len(rm))
 
 	for m, v := range rm {
 		metrics = append(metrics, T{Key: m, Value: v})

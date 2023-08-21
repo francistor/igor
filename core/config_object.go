@@ -34,8 +34,8 @@ func (co *ConfigObject[T]) Update(cm *ConfigurationManager) error {
 	if err := cm.BuildJSONConfigObject(co.objectName, &theObject); err != nil {
 		return err
 	} else {
-		if initializable, ok := any(theObject).(Initializable); ok {
-
+		// Passing &theObject so that both pointer and value initializers are executed
+		if initializable, ok := any(&theObject).(Initializable); ok {
 			if err := initializable.initialize(); err != nil {
 				return err
 			}

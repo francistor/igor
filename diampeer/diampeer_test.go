@@ -89,7 +89,7 @@ func TestDiameterPeerOK(t *testing.T) {
 	// Check metrics. Getting the metrics aggregating by application and command.
 	// Notice that there is only one metrics server and thus both diameter peers report
 	// to the same. The metrics values are the sum for both
-	metrics := core.MS.DiameterQuery("DiameterRequestsReceived", nil, []string{"AP", "CM"})
+	metrics := core.MetricQuery[core.PeerDiameterMetrics](core.MS, "DiameterRequestsReceived", nil, []string{"AP", "CM"})
 	// Should have received two TestApplication / TestRequest messages
 	if metric, ok := metrics[core.PeerDiameterMetricKey{AP: "TestApplication", CM: "TestRequest"}]; !ok {
 		t.Fatal("bad metrics for TestApplication and TestRequest")
@@ -108,7 +108,7 @@ func TestDiameterPeerOK(t *testing.T) {
 	}
 
 	// Aggregate timeouts per Peer. Getting the metrics aggregated by Peer
-	metrics = core.MS.DiameterQuery("DiameterRequestsTimeout", nil, []string{"Peer"})
+	metrics = core.MetricQuery[core.PeerDiameterMetrics](core.MS, "DiameterRequestsTimeout", nil, []string{"Peer"})
 	if metric, ok := metrics[core.PeerDiameterMetricKey{Peer: "server.igorserver"}]; !ok {
 		t.Fatal("bad timeout metrics")
 	} else {

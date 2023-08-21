@@ -103,13 +103,13 @@ func TestHttpMetrics(t *testing.T) {
 	IncrementHttpClientExchange("https://localhost", "200")
 	IncrementHttpClientExchange("https://localhost", "200")
 
-	IncrementHttpHandlerExchange("500", "/DiameterRequest")
-	IncrementHttpHandlerExchange("300", "/DiameterRequest")
-	IncrementHttpHandlerExchange("300", "/RadiusRequest")
+	IncrementHttpHandlerExchange("/DiameterRequest", "500")
+	IncrementHttpHandlerExchange("/DiameterRequest", "300")
+	IncrementHttpHandlerExchange("/RadiusRequest", "300")
 
-	IncrementHttpRouterExchange("200", "/routeRadiusRequest")
-	IncrementHttpRouterExchange("200", "/routeDiameterRequest")
-	IncrementHttpRouterExchange("300", "/routeDiameterRequest")
+	IncrementHttpRouterExchange("/routeRadiusRequest", "200")
+	IncrementHttpRouterExchange("/routeDiameterRequest", "200")
+	IncrementHttpRouterExchange("/routeDiameterRequest", "300")
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -149,6 +149,53 @@ func TestHttpMetrics(t *testing.T) {
 		t.Fatalf("HttpRouterExchanges not found")
 	} else if v != 2 {
 		t.Fatalf("HttpRouterExchanges is not 2")
+	}
+}
+
+func TestSessionServerMetrics(t *testing.T) {
+
+	MS.ResetMetrics()
+	time.Sleep(100 * time.Millisecond)
+
+	IncrementSessionQueries("/sessionserver/v1/sessions", "Framed-IP-Address", "200")
+	IncrementSessionQueries("/sessionserver/v1/sessions", "Framed-IP-Address", "200")
+	IncrementSessionQueries("/sessionserver/v1/sessions", "Bad-Attribute", "400")
+
+	IncrementSessionUpdateQueries("1.1.1.1")
+	IncrementSessionUpdateQueries("1.1.1.1")
+	IncrementSessionUpdateQueries("2.2.2.2")
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Check SessionQuery Metrics
+	sq := MS.SessionQueryQuery("SessionQueries", nil, []string{"Path", "IndexName"})
+	if v, ok := sq[SessionQueryMetricKey{Path: "/sessionserver/v1/sessions", IndexName: "Framed-IP-Address"}]; !ok {
+		t.Fatalf("SessionQueries not found")
+	} else if v != 2 {
+		t.Fatalf("SessionQueries is not 2")
+	}
+
+	sq1 := MS.SessionQueryQuery("SessionQueries", nil, []string{})
+	if v, ok := sq1[SessionQueryMetricKey{}]; !ok {
+		t.Fatalf("SessionQueries not found")
+	} else if v != 3 {
+		t.Fatalf("SessionQueries is not 3")
+	}
+
+	// Check Session Update Metrics
+	su := MS.SessionUpdateQuery("SessionUpdates", nil, []string{"Endpoint"})
+	if v, ok := su[SessionUpdateMetricKey{Endpoint: "1.1.1.1"}]; !ok {
+		t.Fatalf("SessionUpdates not found")
+	} else if v != 2 {
+		t.Fatalf("SessionUpdates is not 2")
+	}
+
+	// Check Session Update Metrics
+	su1 := MetricQuery[SessionUpdateMetrics](MS, "SessionUpdates", nil, []string{"Endpoint"})
+	if v, ok := su1[SessionUpdateMetricKey{Endpoint: "1.1.1.1"}]; !ok {
+		t.Fatalf("SessionUpdates not found (generic)")
+	} else if v != 2 {
+		t.Fatalf("SessionUpdates is not 2 (generic)")
 	}
 }
 
@@ -217,7 +264,7 @@ func TestRadiusMetrics(t *testing.T) {
 	}
 }
 
-func TestHttpMetricsEndpoint(t *testing.T) {
+func TestPrometheusEndpoint(t *testing.T) {
 
 	MS.ResetMetrics()
 	time.Sleep(100 * time.Millisecond)
@@ -241,13 +288,13 @@ func TestHttpMetricsEndpoint(t *testing.T) {
 	IncrementHttpClientExchange("https://localhost", "200")
 	IncrementHttpClientExchange("https://localhost", "200")
 
-	IncrementHttpHandlerExchange("500", "/DiameterRequest")
-	IncrementHttpHandlerExchange("300", "/DiameterRequest")
-	IncrementHttpHandlerExchange("300", "/RadiusRequest")
+	IncrementHttpHandlerExchange("/DiameterRequest", "500")
+	IncrementHttpHandlerExchange("/DiameterRequest", "300")
+	IncrementHttpHandlerExchange("/RadiusRequest", "300")
 
-	IncrementHttpRouterExchange("200", "/routeRadiusRequest")
-	IncrementHttpRouterExchange("200", "/routeDiameterRequest")
-	IncrementHttpRouterExchange("300", "/routeDiameterRequest")
+	IncrementHttpRouterExchange("/routeRadiusRequest", "200")
+	IncrementHttpRouterExchange("/routeDiameterRequest", "300")
+	IncrementHttpRouterExchange("/routeDiameterRequest", "300")
 
 	IncrementRadiusServerRequest("127.0.0.1:1812", "1")
 	IncrementRadiusServerResponse("127.0.0.1:1812", "2")
@@ -257,6 +304,14 @@ func TestHttpMetricsEndpoint(t *testing.T) {
 	IncrementRadiusClientTimeout("127.0.0.1:1812", "1")
 	IncrementRadiusClientResponseStalled("127.0.0.1:1812", "1")
 	IncrementRadiusClientResponseDrop("127.0.0.1:1812", "1")
+
+	IncrementSessionQueries("/sessionserver/v1/sessions", "Framed-IP-Address", "200")
+	IncrementSessionQueries("/sessionserver/v1/sessions", "Framed-IP-Address", "200")
+	IncrementSessionQueries("/sessionserver/v1/sessions", "Bad-Attribute", "400")
+
+	IncrementSessionUpdateQueries("1.1.1.1")
+	IncrementSessionUpdateQueries("1.1.1.1")
+	IncrementSessionUpdateQueries("2.2.2.2")
 
 	metrics, err := httpGet("http://localhost:9090/metrics")
 	if err != nil {
@@ -271,6 +326,12 @@ func TestHttpMetricsEndpoint(t *testing.T) {
 	}
 	if !strings.Contains(metrics, `radius_client_requests{endpoint="127.0.0.1:1812",code="1"} 1`) {
 		t.Fatal("radius_client_requests not found or incorrect")
+	}
+	if !strings.Contains(metrics, `session_queries{path="/sessionserver/v1/sessions",indexname="Framed-IP-Address",errorcode="200"} 2`) {
+		t.Fatal("session_server_queries not found or incorrect")
+	}
+	if !strings.Contains(metrics, `session_updates{endpoint="1.1.1.1"} 2`) {
+		t.Fatal("session_server_updates not found or incorrect")
 	}
 
 	// TODO: add others

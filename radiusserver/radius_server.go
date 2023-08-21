@@ -11,16 +11,18 @@ import (
 
 // Valid statuses
 const (
-	StatusTerminated = 1
+	StatusOperational = 0
+	StatusTerminated  = 1
 )
 
 // Implements a radius server socket
 // Validates incoming messages, sends them to the router for processing and replies back
 // with the responses
+// TODO: Being able to update the radius clients
 type RadiusServer struct {
 
-	// Configuration instance object
-	ci *core.PolicyConfigurationManager
+	// Radius Clients
+	radiusClients core.RadiusClients
 
 	// Handler function for incoming packets
 	// handler RadiusPacketHandler
@@ -34,7 +36,7 @@ type RadiusServer struct {
 }
 
 // Creates a Radius Server
-func NewRadiusServer(ci *core.PolicyConfigurationManager, bindAddress string, bindPort int, handler core.RadiusPacketHandler) *RadiusServer {
+func NewRadiusServer(radiusClients core.RadiusClients, bindAddress string, bindPort int, handler core.RadiusPacketHandler) *RadiusServer {
 
 	// Create the server socket
 	socket, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", bindAddress, bindPort))
@@ -45,9 +47,9 @@ func NewRadiusServer(ci *core.PolicyConfigurationManager, bindAddress string, bi
 	}
 
 	radiusServer := RadiusServer{
-		ci:      ci,
-		handler: handler,
-		socket:  socket,
+		radiusClients: radiusClients,
+		handler:       handler,
+		socket:        socket,
 	}
 
 	// Start receiving packets
@@ -77,7 +79,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 			// Check here if the error is due to the socket being closed
 			if atomic.LoadInt32(&rs.status) == StatusTerminated {
 				// The socket was closed gracefully
-				core.GetLogger().Infof("finished radius server socket %s", socket.LocalAddr().String())
+				core.GetLogger().Infof("closed radius server socket %s", socket.LocalAddr().String())
 				return
 			} else {
 				// Some other error
@@ -87,8 +89,9 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 
 		clientIP := clientAddr.(*net.UDPAddr).IP
 		clientIPAddr := clientIP.String()
-		radiusClient, err := rs.ci.RadiusClients().FindRadiusClient(clientIP)
+		radiusClient, err := rs.radiusClients.FindRadiusClient(clientIP)
 		if err != nil {
+			core.IncrementRadiusServerDrop(clientIPAddr, "0")
 			core.GetLogger().Warnf("message from unknown client %s", clientIPAddr)
 			continue
 		}
@@ -126,6 +129,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 				return
 			}
 
+			// Build the response
 			respBuf, err := response.ToBytes(secret, radiusPacket.Identifier)
 			if err != nil {
 				core.GetLogger().Errorf("error serializing packet for %s with code %d: %s", addr.String(), code, err)

@@ -241,11 +241,11 @@ func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	cm := core.MS.HttpClientQuery("HttpClientExchanges", nil, []string{})
+	cm := core.MetricQuery[core.HttpClientMetrics](core.MS, "HttpClientExchanges", nil, []string{})
 	if cm[core.HttpClientMetricKey{}] != 1 {
 		t.Fatalf("Client Exchanges was not 1")
 	}
-	hm := core.MS.HttpHandlerQuery("HttpHandlerExchanges", nil, []string{})
+	hm := core.MetricQuery[core.HttpHandlerMetrics](core.MS, "HttpHandlerExchanges", nil, []string{})
 	if hm[core.HttpHandlerMetricKey{}] != 1 {
 		t.Fatalf("Handler Exchanges was not 1")
 	}

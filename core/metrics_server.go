@@ -31,6 +31,12 @@ var HTTPHANDLER_AGG_KEYS = []string{"Path", "ErrorCode"}
 // All HttpRouterMetric Keys
 var HTTPROUTER_AGG_KEYS = []string{"Path", "ErrorCode"}
 
+// All SessionQueryMetric Keys
+var SESSIONQUERY_AGG_KEYS = []string{"Path", "IndexName", "ErrorCode"}
+
+// All SessionUpdateMetric Keys
+var SESSIONUPDATE_AGG_KEYS = []string{"Endpoint"}
+
 type ResetMetricsEvent struct{}
 
 // The single instance of the metrics server.
@@ -112,6 +118,10 @@ type MetricsServer struct {
 
 	// HttpRouter
 	httpRouterExchanges HttpRouterMetrics
+
+	// SessionServer
+	sessionQueries SessionQueryMetrics
+	sessionUpdates SessionUpdateMetrics
 
 	// One PeerTable per configuration instance
 	diameterPeersTables map[string]DiameterPeersTable
@@ -563,6 +573,148 @@ func GetHttpRouterMetrics(httpRouterMetrics HttpRouterMetrics, filter map[string
 	return GetAggHttpRouterMetrics(GetFilteredHttpRouterMetrics(httpRouterMetrics, filter), aggLabels)
 }
 
+// //////////////////////////////////////////////////////////
+// Session Server Query Metrics
+// //////////////////////////////////////////////////////////
+func GetAggSessionQueryMetrics(sessionQueryMetrics SessionQueryMetrics, aggLabels []string) SessionQueryMetrics {
+	outMetrics := make(SessionQueryMetrics)
+
+	// Iterate through the items in the metrics map, group & add by the value of the labels
+	for metricKey, v := range sessionQueryMetrics {
+		// metricKey will contain the values of the labels that we are aggregating by, the others are zeroed (not initialized)
+		mk := SessionQueryMetricKey{}
+		for _, key := range aggLabels {
+			switch key {
+			case "Path":
+				mk.Path = metricKey.Path
+			case "IndexName":
+				mk.IndexName = metricKey.IndexName
+			case "ErrorCode":
+				mk.ErrorCode = metricKey.ErrorCode
+			}
+		}
+		if m, found := outMetrics[mk]; found {
+			outMetrics[mk] = m + v
+		} else {
+			outMetrics[mk] = v
+		}
+	}
+
+	return outMetrics
+}
+
+func GetFilteredSessionQueryMetrics(sessionQueryMetrics SessionQueryMetrics, filter map[string]string) SessionQueryMetrics {
+
+	// If no filter specified, do nothing
+	if filter == nil {
+		return sessionQueryMetrics
+	}
+
+	// We'll put the output here
+	outMetrics := make(SessionQueryMetrics)
+
+	for metricKey := range sessionQueryMetrics {
+
+		// Check all the items in the filter. If mismatch, get out of the loop
+		match := true
+	outer:
+		for key := range filter {
+			switch key {
+			case "ErrorCode":
+				if metricKey.ErrorCode != filter["ErrorCode"] {
+					match = false
+					break outer
+				}
+			case "Path":
+				if metricKey.Path != filter["Path"] {
+					match = false
+					break outer
+				}
+			case "IndexName":
+				if metricKey.Path != filter["IndexName"] {
+					match = false
+					break outer
+				}
+			}
+		}
+
+		// Filter match
+		if match {
+			outMetrics[metricKey] = sessionQueryMetrics[metricKey]
+		}
+	}
+
+	return outMetrics
+}
+
+func GetSessionQueryMetrics(sessionQueryMetrics SessionQueryMetrics, filter map[string]string, aggLabels []string) SessionQueryMetrics {
+	return GetAggSessionQueryMetrics(GetFilteredSessionQueryMetrics(sessionQueryMetrics, filter), aggLabels)
+}
+
+// //////////////////////////////////////////////////////////
+// Session Server Update Metrics
+// //////////////////////////////////////////////////////////
+func GetAggSessionUpdateMetrics(sessionUpdateMetrics SessionUpdateMetrics, aggLabels []string) SessionUpdateMetrics {
+	outMetrics := make(SessionUpdateMetrics)
+
+	// Iterate through the items in the metrics map, group & add by the value of the labels
+	for metricKey, v := range sessionUpdateMetrics {
+		// metricKey will contain the values of the labels that we are aggregating by, the others are zeroed (not initialized)
+		mk := SessionUpdateMetricKey{}
+		for _, key := range aggLabels {
+			switch key {
+			case "Endpoint":
+				mk.Endpoint = metricKey.Endpoint
+			}
+			if m, found := outMetrics[mk]; found {
+				outMetrics[mk] = m + v
+			} else {
+				outMetrics[mk] = v
+			}
+		}
+	}
+
+	return outMetrics
+}
+
+func GetFilteredSessionUpdateMetrics(sessionUpdateMetrics SessionUpdateMetrics, filter map[string]string) SessionUpdateMetrics {
+
+	// If no filter specified, do nothing
+	if filter == nil {
+		return sessionUpdateMetrics
+	}
+
+	// We'll put the output here
+	outMetrics := make(SessionUpdateMetrics)
+
+	for metricKey := range sessionUpdateMetrics {
+
+		// Check all the items in the filter. If mismatch, get out of the loop
+		match := true
+	outer:
+		for key := range filter {
+			switch key {
+			case "Endpoint":
+				if metricKey.Endpoint != filter["Endpoint"] {
+					match = false
+					break outer
+				}
+			}
+		}
+
+		// Filter match
+		if match {
+			outMetrics[metricKey] = sessionUpdateMetrics[metricKey]
+		}
+	}
+
+	return outMetrics
+}
+
+func GetSessionUpdateMetrics(sessionUpdateMetrics SessionUpdateMetrics, filter map[string]string, aggLabels []string) SessionUpdateMetrics {
+	return GetAggSessionUpdateMetrics(GetFilteredSessionUpdateMetrics(sessionUpdateMetrics, filter), aggLabels)
+}
+
 //////////////////////////////////////////////////////////////////////////////////
 
 // Empties all the counters
@@ -594,6 +746,9 @@ func (ms *MetricsServer) resetMetrics() {
 	ms.httpHandlerExchanges = make(HttpHandlerMetrics)
 
 	ms.httpRouterExchanges = make(HttpRouterMetrics)
+
+	ms.sessionQueries = make(SessionQueryMetrics)
+	ms.sessionUpdates = make(SessionUpdateMetrics)
 }
 
 // Wrapper to reset Diameter Metrics
@@ -601,6 +756,7 @@ func (ms *MetricsServer) ResetMetrics() {
 	ms.metricEventChan <- ResetMetricsEvent{}
 }
 
+/*
 // Wrapper to get Diameter Metrics
 func (ms *MetricsServer) DiameterQuery(name string, filter map[string]string, aggLabels []string) PeerDiameterMetrics {
 	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
@@ -661,6 +817,39 @@ func (ms *MetricsServer) HttpRouterQuery(name string, filter map[string]string, 
 	}
 }
 
+// Wrapper to get SessionQuery metrics
+func (ms *MetricsServer) SessionQueryQuery(name string, filter map[string]string, aggLabels []string) SessionQueryMetrics {
+	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
+	ms.queryChan <- query
+	v, ok := (<-query.RChan).(SessionQueryMetrics)
+	if ok {
+		return v
+	} else {
+		return SessionQueryMetrics{}
+	}
+}
+
+// Wrapper to get SessionQuery metrics
+func (ms *MetricsServer) SessionUpdateQuery(name string, filter map[string]string, aggLabels []string) SessionUpdateMetrics {
+	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
+	ms.queryChan <- query
+	v, ok := (<-query.RChan).(SessionUpdateMetrics)
+	if ok {
+		return v
+	} else {
+		return SessionUpdateMetrics{}
+	}
+}
+
+*/
+
+// Generic wrapper for getting metrics
+func MetricQuery[T any](ms *MetricsServer, name string, filter map[string]string, aggLabels []string) T {
+	query := Query{Name: name, Filter: filter, AggLabels: aggLabels, RChan: make(chan interface{})}
+	ms.queryChan <- query
+	return (<-query.RChan).(T)
+}
+
 // Wrapper to get PeersTable
 func (ms *MetricsServer) PeersTableQuery() map[string]DiameterPeersTable {
 	query := Query{Name: "DiameterPeersTables", RChan: make(chan interface{})}
@@ -682,7 +871,7 @@ func (ms *MetricsServer) httpLoop(bindAddress string, port int) {
 	mux.HandleFunc("/metrics", ms.getPrometheusMetricsHandler())
 	mux.HandleFunc("/diameterPeers", ms.getDiameterPeersHandler())
 	mux.HandleFunc("/radiusServers", ms.getRadiusServersHandler())
-	// Same for all below
+	// Same handler for all below
 	mux.HandleFunc("/diameterMetrics/", ms.getMetricsHandler())
 	mux.HandleFunc("/radiusMetrics/", ms.getMetricsHandler())
 	mux.HandleFunc("/httpClientMetrics/", ms.getMetricsHandler())
@@ -771,6 +960,12 @@ func (ms *MetricsServer) metricServerLoop() {
 
 			case "HttpRouterExchanges":
 				query.RChan <- GetHttpRouterMetrics(ms.httpRouterExchanges, query.Filter, query.AggLabels)
+
+			case "SessionQueries":
+				query.RChan <- GetSessionQueryMetrics(ms.sessionQueries, query.Filter, query.AggLabels)
+
+			case "SessionUpdates":
+				query.RChan <- GetSessionUpdateMetrics(ms.sessionUpdates, query.Filter, query.AggLabels)
 
 			case "DiameterPeersTables":
 				query.RChan <- ms.diameterPeersTables
@@ -936,6 +1131,22 @@ func (ms *MetricsServer) metricServerLoop() {
 					ms.httpRouterExchanges[e.Key] = curr + 1
 				}
 
+			// SessionQuery Events
+			case SessionQueryEvent:
+				if curr, ok := ms.sessionQueries[e.Key]; !ok {
+					ms.sessionQueries[e.Key] = 1
+				} else {
+					ms.sessionQueries[e.Key] = curr + 1
+				}
+
+			// SessionUpdate Events
+			case SessionUpdateEvent:
+				if curr, ok := ms.sessionUpdates[e.Key]; !ok {
+					ms.sessionUpdates[e.Key] = 1
+				} else {
+					ms.sessionUpdates[e.Key] = curr + 1
+				}
+
 			// PeersTable
 			case DiameterPeersTableUpdatedEvent:
 				ms.diameterPeersTables[e.InstanceName] = e.Table
@@ -1022,6 +1233,11 @@ func (ms *MetricsServer) getMetricsHandler() func(w http.ResponseWriter, req *ht
 			jAnswer, err = json.Marshal(ms.HttpClientQuery(queryName, filter, agg))
 		case "httpHandlerMetrics":
 			jAnswer, err = json.Marshal(ms.HttpClientQuery(queryName, filter, agg))
+		case "sessionQueryMetrics":
+			jAnswer, err = json.Marshal(ms.SessionQueryQuery(queryName, filter, agg))
+		case "sessionUpdateMetrics":
+			jAnswer, err = json.Marshal(MetricQuery[SessionUpdateMetrics](ms, queryName, filter, agg))
+			//jAnswer, err = json.Marshal(ms.SessionUpdateQuery(queryName, filter, agg))
 		}
 
 		if err != nil {
@@ -1044,56 +1260,63 @@ func (ms *MetricsServer) getPrometheusMetricsHandler() func(w http.ResponseWrite
 
 		// Cannot access directly the ms variables, but go through the event loop
 		// Diameter Server
-		builder.WriteString(ms.DiameterQuery("DiameterRequestsReceived", nil, DIAM_AGG_KEYS).genPrometheusMetric("diameter_requests_received", "number of diameter requests received"))
+		builder.WriteString(ms.diameterRequestsReceived.genPrometheusMetric("diameter_requests_received", "number of diameter requests received"))
 		builder.WriteString("\n")
-		builder.WriteString(ms.DiameterQuery("DiameterAnswersSent", nil, DIAM_AGG_KEYS).genPrometheusMetric("diameter_answers_sent", "number of diameter answers sent"))
+		builder.WriteString(ms.diameterAnswersSent.genPrometheusMetric("diameter_answers_sent", "number of diameter answers sent"))
 		builder.WriteString("\n")
 		// Diameter client
-		builder.WriteString(ms.DiameterQuery("DiameterRequestsSent", nil, DIAM_AGG_KEYS).genPrometheusMetric("diameter_requests_sent", "number of diameter requests sent"))
+		builder.WriteString(ms.diameterRequestsSent.genPrometheusMetric("diameter_requests_sent", "number of diameter requests sent"))
 		builder.WriteString("\n")
-		builder.WriteString(ms.DiameterQuery("DiameterAnswersReceived", nil, DIAM_AGG_KEYS).genPrometheusMetric("diameter_answers_received", "number of diameter answers received"))
+		builder.WriteString(ms.diameterAnswersReceived.genPrometheusMetric("diameter_answers_received", "number of diameter answers received"))
 		builder.WriteString("\n")
-		builder.WriteString(ms.DiameterQuery("DiameterRequestsTimeout", nil, DIAM_AGG_KEYS).genPrometheusMetric("diameter_requests_timeout", "number of diameter requests timed out"))
+		builder.WriteString(ms.diameterRequestsTimeout.genPrometheusMetric("diameter_requests_timeout", "number of diameter requests timed out"))
 		builder.WriteString("\n")
-		builder.WriteString(ms.DiameterQuery("DiameterAnswersStalled", nil, DIAM_AGG_KEYS).genPrometheusMetric("diameter_answers_stalled", "number of diameter answers without corresponding request, possibly due to previous timeout"))
+		builder.WriteString(ms.diameterAnswersStalled.genPrometheusMetric("diameter_answers_stalled", "number of diameter answers without corresponding request, possibly due to previous timeout"))
 		builder.WriteString("\n")
 		// Radius server
-		builder.WriteString(ms.RadiusQuery("RadiusServerRequests", nil, RADIUS_AGG_KEYS).genPrometheusMetric("radius_server_requests", "number of radius server requests received"))
+		builder.WriteString(ms.radiusServerRequests.genPrometheusMetric("radius_server_requests", "number of radius server requests received"))
 		builder.WriteString("\n")
-		builder.WriteString(ms.RadiusQuery("RadiusServerResponses", nil, RADIUS_AGG_KEYS).genPrometheusMetric("radius_server_responses", "number of radius server responses sent"))
+		builder.WriteString(ms.radiusServerResponses.genPrometheusMetric("radius_server_responses", "number of radius server responses sent"))
 		builder.WriteString("\n")
-		builder.WriteString(ms.RadiusQuery("RadiusServerDrops", nil, RADIUS_AGG_KEYS).genPrometheusMetric("radius_server_drops", "number of radius server requests not answered"))
+		builder.WriteString(ms.radiusServerDrops.genPrometheusMetric("radius_server_drops", "number of radius server requests not answered"))
 		builder.WriteString("\n")
 		// Radius client
-		builder.WriteString(ms.RadiusQuery("RadiusClientRequests", nil, RADIUS_AGG_KEYS).genPrometheusMetric("radius_client_requests", "number of radius client requests sent"))
+		builder.WriteString(ms.radiusClientRequests.genPrometheusMetric("radius_client_requests", "number of radius client requests sent"))
 		builder.WriteString("\n")
-		builder.WriteString(ms.RadiusQuery("RadiusClientResponses", nil, RADIUS_AGG_KEYS).genPrometheusMetric("radius_client_responses", "number of radius client responses received"))
+		builder.WriteString(ms.radiusClientResponses.genPrometheusMetric("radius_client_responses", "number of radius client responses received"))
 		builder.WriteString("\n")
-		builder.WriteString(ms.RadiusQuery("RadiusClientTimeouts", nil, RADIUS_AGG_KEYS).genPrometheusMetric("radius_client_timeouts", "number of radius client timeouts"))
+		builder.WriteString(ms.radiusClientTimeouts.genPrometheusMetric("radius_client_timeouts", "number of radius client timeouts"))
 		builder.WriteString("\n")
-		builder.WriteString(ms.RadiusQuery("RadiusClientResponsesStalled", nil, RADIUS_AGG_KEYS).genPrometheusMetric("radius_client_responses_stalled", "number of radius client responses without corresponding request, possibly due to previous timeout"))
+		builder.WriteString(ms.radiusClientResponsesStalled.genPrometheusMetric("radius_client_responses_stalled", "number of radius client responses without corresponding request, possibly due to previous timeout"))
 		builder.WriteString("\n")
-		builder.WriteString(ms.RadiusQuery("RadiusClientResponsesDrops", nil, RADIUS_AGG_KEYS).genPrometheusMetric("radius_client_responses_drops", "number of radius client responses dropped"))
+		builder.WriteString(ms.radiusClientResponsesDrops.genPrometheusMetric("radius_client_responses_drops", "number of radius client responses dropped"))
 		builder.WriteString("\n")
 		// Router
-		builder.WriteString(ms.DiameterQuery("DiameterRouteNotFound", nil, DIAM_AGG_KEYS).genPrometheusMetric("diameter_route_not_found", "diameter messages dropped due to route not found"))
+		builder.WriteString(ms.diameterRouteNotFound.genPrometheusMetric("diameter_route_not_found", "diameter messages dropped due to route not found"))
 		builder.WriteString("\n")
-		builder.WriteString(ms.DiameterQuery("DiameterNoAvailablePeer", nil, DIAM_AGG_KEYS).genPrometheusMetric("diameter_no_available_peer", "diameter messages dropped due to no peer available"))
+		builder.WriteString(ms.diameterNoAvailablePeer.genPrometheusMetric("diameter_no_available_peer", "diameter messages dropped due to no peer available"))
 		builder.WriteString("\n")
-		builder.WriteString(ms.DiameterQuery("DiameterHandlerError", nil, DIAM_AGG_KEYS).genPrometheusMetric("diameter_handler_error", "diameter handler errors"))
+		builder.WriteString(ms.diameterHandlerError.genPrometheusMetric("diameter_handler_error", "diameter handler errors"))
 		builder.WriteString("\n")
 		// HttpClient
-		builder.WriteString(ms.HttpClientQuery("HttpClientExchanges", nil, HTTPCLIENT_AGG_KEYS).genPrometheusMetric("http_client_exchanges", "requests sent to http handler"))
+		builder.WriteString(ms.httpClientExchanges.genPrometheusMetric("http_client_exchanges", "requests sent to http handler"))
 		builder.WriteString("\n")
 		// HttpHandler
-		builder.WriteString(ms.HttpHandlerQuery("HttpHandlerExchanges", nil, HTTPHANDLER_AGG_KEYS).genPrometheusMetric("http_handler_exchanges", "requests received in http handler"))
+		builder.WriteString(ms.httpHandlerExchanges.genPrometheusMetric("http_handler_exchanges", "requests received in http handler"))
 		builder.WriteString("\n")
 		// HttpRouter
-		builder.WriteString(ms.HttpRouterQuery("HttpRouterExchanges", nil, HTTPROUTER_AGG_KEYS).genPrometheusMetric("http_router_exchanges", "requests received in http router"))
+		builder.WriteString(ms.httpRouterExchanges.genPrometheusMetric("http_router_exchanges", "requests received in http router"))
+		builder.WriteString("\n")
+
+		// SessionServer
+		//builder.WriteString(ms.SessionQueryQuery("SessionQueries", nil, SESSIONQUERY_AGG_KEYS).genPrometheusMetric("session_queries", "queries performed to the session server"))
+		builder.WriteString(ms.sessionQueries.genPrometheusMetric("session_queries", "queries performed to the session server"))
+		builder.WriteString("\n")
+		//builder.WriteString(ms.SessionUpdateQuery("SessionUpdates", nil, SESSIONUPDATE_AGG_KEYS).genPrometheusMetric("session_updates", "session updates performed to the session server"))
+		builder.WriteString(ms.sessionUpdates.genPrometheusMetric("session_updates", "session updates performed to the session server"))
 		builder.WriteString("\n")
 
 		// Write response
 		writer.Write([]byte(builder.String()))
 	}
-
 }

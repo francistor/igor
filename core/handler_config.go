@@ -1,13 +1,9 @@
 package core
 
-import (
-	"fmt"
-)
-
 // Manages the configuration items for the http handlers
 type HttpHandlerConfigurationManager struct {
-	CM                       ConfigurationManager
-	currentHttpHandlerConfig HttpHandlerConfig
+	CM                ConfigurationManager
+	httpHandlerConfig *ConfigObject[HttpHandlerConfig]
 }
 
 // Slice of configuration managers
@@ -26,7 +22,10 @@ func InitHttpHandlerConfigInstance(bootstrapFile string, instanceName string, co
 	}
 
 	// Better to create asap
-	httpHandlerConfig := HttpHandlerConfigurationManager{CM: NewConfigurationManager(bootstrapFile, instanceName, configParams)}
+	httpHandlerConfig := HttpHandlerConfigurationManager{
+		CM:                NewConfigurationManager(bootstrapFile, instanceName, configParams),
+		httpHandlerConfig: NewConfigObject[HttpHandlerConfig]("httpHandler.json"),
+	}
 	httpHandlerConfigs = append(httpHandlerConfigs, &httpHandlerConfig)
 
 	// Initialize logger, dictionary and metrics if default
@@ -38,7 +37,9 @@ func InitHttpHandlerConfigInstance(bootstrapFile string, instanceName string, co
 	}
 
 	// Load handler configuraton
-	httpHandlerConfig.UpdateHttpHandlerConfig()
+	if err := httpHandlerConfig.UpdateHttpHandlerConfig(); err != nil {
+		panic(err)
+	}
 
 	return &httpHandlerConfig
 }
@@ -76,16 +77,10 @@ type HttpHandlerConfig struct {
 
 // Updates the global variable with the http handler configuration
 func (c *HttpHandlerConfigurationManager) UpdateHttpHandlerConfig() error {
-	hc := HttpHandlerConfig{}
-	err := c.CM.BuildJSONConfigObject("httpHandler.json", &hc)
-	if err != nil {
-		return fmt.Errorf("could not retrieve the Handler configuration: %w", err)
-	}
-	c.currentHttpHandlerConfig = hc
-	return nil
+	return c.httpHandlerConfig.Update(&c.CM)
 }
 
 // Retrieves the current http handler configuration
 func (c *HttpHandlerConfigurationManager) HttpHandlerConf() HttpHandlerConfig {
-	return c.currentHttpHandlerConfig
+	return c.httpHandlerConfig.Get()
 }

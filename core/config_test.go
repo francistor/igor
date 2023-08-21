@@ -4,6 +4,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestHttpRetrieval(t *testing.T) {
@@ -194,5 +195,19 @@ func TestHandlerLogger(t *testing.T) {
 	}
 	if !strings.Contains(logDump, "<info message>") {
 		t.Fatalf("missing handler logger message in info mode")
+	}
+}
+
+func TestRadiusSessionStoreConfig(t *testing.T) {
+	ssc := GetRadiusSessionServerConfig().RadiusSessionServerConf()
+
+	if ssc.HttpBindPort != 98080 {
+		t.Fatalf("bad http bind port for radius session store")
+	}
+	if ssc.ExpirationTime != time.Duration(10)*time.Second {
+		t.Fatalf("expiration time is not 10 seconds")
+	}
+	if ssc.ReceiveFrom["127.0.0.1"].OriginIP != "127.0.0.1/32" {
+		t.Fatalf("bad origin IP")
 	}
 }

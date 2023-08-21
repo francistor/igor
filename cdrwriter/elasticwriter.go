@@ -17,13 +17,11 @@ import (
 )
 
 const (
-	ELASTIC_PACKET_BUFFER_SIZE = 1000
-	CDR_COUNT_THRESHOLD        = 500
-	CDR_WRITE_TIME_MILLIS      = 500
-	BACKUP_CHECK_TIME_SECONDS  = 60
+	ELASTIC_PACKET_BUFFER_SIZE        = 1000
+	ELASTIC_CDR_COUNT_THRESHOLD       = 500
+	ELASTIC_CDR_WRITE_TIME_MILLIS     = 500
+	ELASTIC_BACKUP_CHECK_TIME_SECONDS = 60
 )
-
-type Tick struct{}
 
 // Writes CDR to Elastic using bulk injection
 // If unavailability of the database last longer that the configured time
@@ -111,7 +109,7 @@ func (w *ElasticCDRWriter) eventLoop() {
 
 	// Sends Ticks through the packet channel, to signal that a write must be
 	// done even if the number of packets has not reached the triggering value.
-	var ticker = time.NewTicker(CDR_WRITE_TIME_MILLIS * time.Millisecond)
+	var ticker = time.NewTicker(ELASTIC_CDR_WRITE_TIME_MILLIS * time.Millisecond)
 	go func() {
 		for {
 			<-ticker.C
@@ -127,7 +125,7 @@ func (w *ElasticCDRWriter) eventLoop() {
 			cdrCounter++
 		}
 
-		if cdrCounter > CDR_COUNT_THRESHOLD || time.Since(lastWritten).Milliseconds() > CDR_WRITE_TIME_MILLIS {
+		if cdrCounter > ELASTIC_CDR_COUNT_THRESHOLD || time.Since(lastWritten).Milliseconds() > ELASTIC_CDR_WRITE_TIME_MILLIS {
 			if sb.Len() == 0 {
 				continue
 			}
@@ -274,7 +272,7 @@ func (w *ElasticCDRWriter) processBackupFiles() {
 			}
 		}
 
-		time.Sleep(BACKUP_CHECK_TIME_SECONDS * time.Second)
+		time.Sleep(ELASTIC_BACKUP_CHECK_TIME_SECONDS * time.Second)
 	}
 }
 

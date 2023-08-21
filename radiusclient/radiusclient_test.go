@@ -40,14 +40,14 @@ func TestRadiusClientSocket(t *testing.T) {
 	serverConf := pci.RadiusServerConf()
 
 	// Instantiate a radius server
-	rs := radiusserver.NewRadiusServer(core.GetPolicyConfigInstance("testServer"), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
+	rs := radiusserver.NewRadiusServer(core.GetPolicyConfigInstance("testServer").RadiusClients(), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
 
 	// Wait fo the server to be created
 	time.Sleep(100 * time.Millisecond)
 
 	// Create the RadiusClientSocket
 	cchan := make(chan interface{})
-	rcs := NewRadiusClientSocket(pci, cchan, "127.0.0.1", 18120)
+	rcs := NewRadiusClientSocket(cchan, "127.0.0.1", 18120)
 
 	// Create a request radius packet
 	request := core.NewRadiusRequest(1)
@@ -124,11 +124,11 @@ func TestRadiusClientSocket(t *testing.T) {
 
 func TestRadiusClientSocketClose(t *testing.T) {
 	// Get the configuration
-	pci := core.GetPolicyConfigInstance("testServer")
+	core.GetPolicyConfigInstance("testServer")
 
 	// Create the RadiusClientSocket
 	cchan := make(chan interface{})
-	rcs := NewRadiusClientSocket(pci, cchan, "127.0.0.1", 18120)
+	rcs := NewRadiusClientSocket(cchan, "127.0.0.1", 18120)
 
 	rcs.closeSocket()
 
@@ -151,13 +151,13 @@ func TestRadiusClientOnly(t *testing.T) {
 	serverConf := pci.RadiusServerConf()
 
 	// Instantiate a radius server
-	rs := radiusserver.NewRadiusServer(core.GetPolicyConfigInstance("testServer"), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
+	rs := radiusserver.NewRadiusServer(core.GetPolicyConfigInstance("testServer").RadiusClients(), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
 
 	// Wait fo the server to be created
 	time.Sleep(100 * time.Millisecond)
 
 	// Create the radius client
-	rc := NewRadiusClient(pci)
+	rc := NewRadiusClient()
 
 	// Create a request radius packet
 	request := core.NewRadiusRequest(1)

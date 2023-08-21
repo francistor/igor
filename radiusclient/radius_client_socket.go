@@ -85,9 +85,6 @@ type RequestContext struct {
 // authenticator and timer, in order to match requests with answers.
 type RadiusClientSocket struct {
 
-	// Configuration instance
-	ci *core.PolicyConfigurationManager
-
 	// The port used
 	port int
 
@@ -123,7 +120,7 @@ type RadiusClientSocket struct {
 }
 
 // Creation function
-func NewRadiusClientSocket(ci *core.PolicyConfigurationManager, controlChannel chan interface{}, bindAddress string, originPort int) *RadiusClientSocket {
+func NewRadiusClientSocket(controlChannel chan interface{}, bindAddress string, originPort int) *RadiusClientSocket {
 
 	// Bind socket
 	socket, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", bindAddress, originPort))
@@ -132,7 +129,6 @@ func NewRadiusClientSocket(ci *core.PolicyConfigurationManager, controlChannel c
 	}
 
 	rcs := RadiusClientSocket{
-		ci:                  ci,
 		port:                originPort,
 		requestsMap:         make(map[string]map[byte]RequestContext),
 		lastRadiusIdMap:     make(map[string]byte),

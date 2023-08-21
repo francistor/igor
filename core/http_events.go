@@ -104,8 +104,8 @@ type HttpHandlerExchangeEvent struct {
 	Key HttpHandlerMetricKey
 }
 
-func IncrementHttpHandlerExchange(errorCode string, path string) {
-	MS.metricEventChan <- HttpHandlerExchangeEvent{Key: HttpHandlerMetricKey{ErrorCode: errorCode, Path: path}}
+func IncrementHttpHandlerExchange(path string, errorCode string) {
+	MS.metricEventChan <- HttpHandlerExchangeEvent{Key: HttpHandlerMetricKey{Path: path, ErrorCode: errorCode}}
 }
 
 //////////////////////////////////////////////////////////
@@ -155,7 +155,7 @@ type HttpRouterExchangeEvent struct {
 	Key HttpRouterMetricKey
 }
 
-func IncrementHttpRouterExchange(errorCode string, path string) {
+func IncrementHttpRouterExchange(path string, errorCode string) {
 	// Strip the querystring to the path
 	pos := strings.IndexRune(path, '?')
 	if pos >= 0 {

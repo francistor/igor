@@ -30,7 +30,7 @@ type HttpHandler struct {
 }
 
 // Creates a new DiameterHandler object
-func NewHttpHandler(instanceName string, diameterHandler core.DiameterMessageHandler, radiusHandler core.RadiusPacketHandler) HttpHandler {
+func NewHttpHandler(instanceName string, diameterHandler core.DiameterMessageHandler, radiusHandler core.RadiusPacketHandler) *HttpHandler {
 
 	// If using the default mux (not done here. Just in case...)
 	// https://stackoverflow.com/questions/40786526/resetting-http-handlers-in-golang-for-unit-testing
@@ -56,10 +56,10 @@ func NewHttpHandler(instanceName string, diameterHandler core.DiameterMessageHan
 
 	go h.run()
 
-	return h
+	return &h
 }
 
-// Execute the DiameterHandler. This function blocks. Should be executed
+// Execute the Radius and Diameter handlers. This function blocks. Should be executed
 // in a goroutine.
 func (dh *HttpHandler) run() {
 
@@ -85,23 +85,16 @@ func (dh *HttpHandler) Close() {
 func getDiameterRequestHandler(handlerFunc core.DiameterMessageHandler) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		logger := core.GetLogger()
 
 		// Get the Diameter Request
 		jRequest, err := io.ReadAll(req.Body)
 		if err != nil {
-			logger.Errorf("error reading request %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpHandlerExchange(req.RequestURI, constants.NETWORK_ERROR)
+			treatError(w, err, "error reading request", http.StatusInternalServerError, req.RequestURI, constants.NETWORK_ERROR)
 			return
 		}
 		var request core.DiameterMessage
 		if err = json.Unmarshal(jRequest, &request); err != nil {
-			logger.Errorf("error unmarshalling request %s", err)
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpHandlerExchange(req.RequestURI, constants.UNSERIALIZATION_ERROR)
+			treatError(w, err, "error unmarshaling request", http.StatusBadRequest, req.RequestURI, constants.UNSERIALIZATION_ERROR)
 			return
 		}
 		request.Tidy()
@@ -109,18 +102,12 @@ func getDiameterRequestHandler(handlerFunc core.DiameterMessageHandler) func(w h
 		// Generate the Diameter Answer, invoking the passed function
 		answer, err := handlerFunc(&request)
 		if err != nil {
-			logger.Errorf("error handling request %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpHandlerExchange(req.RequestURI, constants.HANDLER_FUNCTION_ERROR)
+			treatError(w, err, "error handling request", http.StatusInternalServerError, req.RequestURI, constants.HANDLER_FUNCTION_ERROR)
 			return
 		}
 		jAnswer, err := json.Marshal(answer)
 		if err != nil {
-			logger.Errorf("error marshaling response %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpHandlerExchange(req.RequestURI, constants.SERIALIZATION_ERROR)
+			treatError(w, err, "error marshaling response", http.StatusInternalServerError, req.RequestURI, constants.SERIALIZATION_ERROR)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -133,45 +120,40 @@ func getDiameterRequestHandler(handlerFunc core.DiameterMessageHandler) func(w h
 func getRadiusRequestHandler(handlerFunc core.RadiusPacketHandler) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		logger := core.GetLogger()
 
 		// Get the Radius Request
 		jRequest, err := io.ReadAll(req.Body)
 		if err != nil {
-			logger.Errorf("error reading request %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpHandlerExchange(req.RequestURI, constants.NETWORK_ERROR)
+			treatError(w, err, "error reading request", http.StatusInternalServerError, req.RequestURI, constants.NETWORK_ERROR)
 			return
 		}
 		var request core.RadiusPacket
 		if err = json.Unmarshal(jRequest, &request); err != nil {
-			logger.Errorf("error unmarshalling request %s", err)
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpHandlerExchange(req.RequestURI, constants.UNSERIALIZATION_ERROR)
+			treatError(w, err, "error unmarshaling request", http.StatusBadRequest, req.RequestURI, constants.UNSERIALIZATION_ERROR)
 			return
 		}
 
 		// Generate the Radius Answer, invoking the passed function
 		answer, err := handlerFunc(&request)
 		if err != nil {
-			logger.Errorf("error handling request %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpHandlerExchange(req.RequestURI, constants.HANDLER_FUNCTION_ERROR)
+			treatError(w, err, "error marshaling response", http.StatusInternalServerError, req.RequestURI, constants.HANDLER_FUNCTION_ERROR)
 			return
 		}
 		jAnswer, err := json.Marshal(answer)
 		if err != nil {
-			logger.Errorf("error marshaling response %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpHandlerExchange(req.RequestURI, constants.SERIALIZATION_ERROR)
+			treatError(w, err, "error marshaling response", http.StatusInternalServerError, req.RequestURI, constants.SERIALIZATION_ERROR)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
 		core.IncrementHttpHandlerExchange(req.RequestURI, constants.SUCCESS)
 	}
+}
+
+// Helper function to avoid code duplication
+func treatError(w http.ResponseWriter, err error, message string, statusCode int, reqURI string, appErrorCode string) {
+	core.GetLogger().Errorf(message+": %s", err)
+	w.WriteHeader(statusCode)
+	w.Write([]byte(err.Error()))
+	core.IncrementHttpHandlerExchange(reqURI, appErrorCode)
 }

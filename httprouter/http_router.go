@@ -11,18 +11,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/francistor/igor/constants"
 	"github.com/francistor/igor/core"
 	"github.com/francistor/igor/router"
-)
-
-const (
-	SERIALIZATION_ERROR    = "550"
-	NETWORK_ERROR          = "551"
-	HTTP_RESPONSE_ERROR    = "552"
-	HANDLER_FUNCTION_ERROR = "553"
-	UNSERIALIZATION_ERROR  = "554"
-
-	SUCCESS = "200"
 )
 
 type HttpRouter struct {
@@ -96,16 +87,12 @@ func (dh *HttpRouter) Close() {
 func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		logger := core.GetLogger()
 
 		// Get the Routable Diameter Request
 		var jRequest []byte
 		jRequestRaw, err := io.ReadAll(req.Body)
 		if err != nil {
-			logger.Error("error reading request: %s", err)
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpRouterExchange(NETWORK_ERROR, req.RequestURI)
+			treatError(w, err, "error reading request", http.StatusBadRequest, req.RequestURI, constants.NETWORK_ERROR)
 			return
 		}
 
@@ -114,10 +101,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 			// Apply template with query parameters if defined
 			tmpl, err := template.New("request_template").Parse(string(jRequestRaw))
 			if err != nil {
-				logger.Errorf("error un-templating request: %s", err)
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte(err.Error()))
-				core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+				treatError(w, err, "error un-templating request", http.StatusBadRequest, req.RequestURI, constants.UNSERIALIZATION_ERROR)
 				return
 			}
 
@@ -130,10 +114,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 			// Apply the template
 			var tmplRes strings.Builder
 			if err := tmpl.Execute(&tmplRes, parametersSet); err != nil {
-				logger.Errorf("error un-templating request: %s", err)
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte(err.Error()))
-				core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+				treatError(w, err, "error un-templating request", http.StatusBadRequest, req.RequestURI, constants.UNSERIALIZATION_ERROR)
 				return
 			}
 
@@ -145,10 +126,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 
 		var request router.RoutableDiameterRequest
 		if err = request.FromJson(jRequest); err != nil {
-			logger.Errorf("error unmarshalling request: %s", err)
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+			treatError(w, err, "error unmarshaling request", http.StatusBadRequest, req.RequestURI, constants.UNSERIALIZATION_ERROR)
 			return
 		}
 		request.Message.Tidy()
@@ -156,40 +134,30 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 		// Generate the Diameter Answer, passing it to the router
 		answer, err := diameterRouter.RouteDiameterRequest(request.Message, request.Timeout)
 		if err != nil {
-			logger.Errorf("error handling request: %s", err)
-			w.WriteHeader(http.StatusGatewayTimeout)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpRouterExchange(HANDLER_FUNCTION_ERROR, req.RequestURI)
+			treatError(w, err, "error handling request", http.StatusGatewayTimeout, req.RequestURI, constants.HANDLER_FUNCTION_ERROR)
 			return
 		}
 		jAnswer, err := json.Marshal(answer)
 		if err != nil {
-			logger.Errorf("error marshaling response: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
+			treatError(w, err, "error marshaling response", http.StatusInternalServerError, req.RequestURI, constants.SERIALIZATION_ERROR)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		core.IncrementHttpRouterExchange(SUCCESS, req.RequestURI)
+		core.IncrementHttpRouterExchange(req.RequestURI, constants.SUCCESS)
 	}
 }
 
 func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.ResponseWriter, req *http.Request) {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		logger := core.GetLogger()
 
 		// Get the Radius Request
 		var jRequest []byte
 		jRequestRaw, err := io.ReadAll(req.Body)
 		if err != nil {
-			logger.Errorf("error reading request: %s", err)
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpRouterExchange(NETWORK_ERROR, req.RequestURI)
+			treatError(w, err, "error reading request", http.StatusBadRequest, req.RequestURI, constants.NETWORK_ERROR)
 			return
 		}
 
@@ -198,10 +166,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 			// Apply template with query parameters if defined
 			tmpl, err := template.New("request_template").Parse(string(jRequestRaw))
 			if err != nil {
-				logger.Errorf("error un-templating request: %s", err)
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte(err.Error()))
-				core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+				treatError(w, err, "error un-templating request", http.StatusBadRequest, req.RequestURI, constants.UNSERIALIZATION_ERROR)
 				return
 			}
 
@@ -214,10 +179,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 			// Apply the template
 			var tmplRes strings.Builder
 			if err := tmpl.Execute(&tmplRes, parametersSet); err != nil {
-				logger.Errorf("error un-templating request: %s", err)
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte(err.Error()))
-				core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+				treatError(w, err, "error un-templating request", http.StatusBadRequest, req.RequestURI, constants.UNSERIALIZATION_ERROR)
 				return
 			}
 
@@ -229,33 +191,32 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 
 		var request router.RoutableRadiusRequest
 		if err = request.FromJson(jRequest); err != nil {
-			logger.Errorf("error unmarshalling request: %s", err)
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpRouterExchange(UNSERIALIZATION_ERROR, req.RequestURI)
+			treatError(w, err, "error unmarshaling request", http.StatusBadRequest, req.RequestURI, constants.UNSERIALIZATION_ERROR)
 			return
 		}
 
 		// Generate the Radius Answer, passing it to the router
 		answer, err := radiusRouter.RouteRadiusRequest(request.Packet, request.Destination, request.PerRequestTimeout, request.Tries, request.ServerTries, request.Secret)
 		if err != nil {
-			logger.Errorf("error handling request: %s", err)
-			w.WriteHeader(http.StatusGatewayTimeout)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpRouterExchange(HANDLER_FUNCTION_ERROR, req.RequestURI)
+			treatError(w, err, "error handling request", http.StatusGatewayTimeout, req.RequestURI, constants.HANDLER_FUNCTION_ERROR)
 			return
 		}
 		jAnswer, err := json.Marshal(answer)
 		if err != nil {
-			logger.Errorf("error marshaling response: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-			core.IncrementHttpRouterExchange(SERIALIZATION_ERROR, req.RequestURI)
+			treatError(w, err, "error marshaling message", http.StatusInternalServerError, req.RequestURI, constants.SERIALIZATION_ERROR)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		core.IncrementHttpRouterExchange(SUCCESS, req.RequestURI)
+		core.IncrementHttpRouterExchange(req.RequestURI, constants.SUCCESS)
 	}
+}
+
+// Helper function to avoid code duplication
+func treatError(w http.ResponseWriter, err error, message string, statusCode int, reqURI string, appErrorCode string) {
+	core.GetLogger().Errorf(message+": %s", err)
+	w.WriteHeader(statusCode)
+	w.Write([]byte(err.Error()))
+	core.IncrementHttpRouterExchange(reqURI, appErrorCode)
 }

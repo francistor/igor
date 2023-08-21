@@ -183,14 +183,14 @@ func TestHttpRouterHandler(t *testing.T) {
 		t.Fatalf("diameter response does not contain expected diameter attribute")
 	}
 
-	rrm := core.MS.HttpRouterQuery("HttpRouterExchanges", nil, []string{"Path"})
+	rrm := core.MetricQuery[core.HttpRouterMetrics](core.MS, "HttpRouterExchanges", nil, []string{"Path"})
 	if v, ok := rrm[core.HttpRouterMetricKey{Path: "/routeRadiusRequest"}]; !ok {
 		t.Fatalf("HttpRouterExchanges not found")
 	} else if v != 1 {
 		t.Fatalf("HttpRouterExchanges for radius is not 1")
 	}
 
-	drm := core.MS.HttpRouterQuery("HttpRouterExchanges", nil, []string{"Path"})
+	drm := core.MetricQuery[core.HttpRouterMetrics](core.MS, "HttpRouterExchanges", nil, []string{"Path"})
 	if v, ok := drm[core.HttpRouterMetricKey{Path: "/routeDiameterRequest"}]; !ok {
 		t.Fatalf("HttpRouterExchanges not found")
 	} else if v != 1 {

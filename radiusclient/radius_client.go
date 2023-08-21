@@ -58,9 +58,6 @@ type ClientRadiusRequestMsg struct {
 // The RadiusClientSockets are created on demand. It is the RadiusRouter which is in control of the origin port used
 type RadiusClient struct {
 
-	// Configuration instance
-	ci *core.PolicyConfigurationManager
-
 	// Receives events from the RadiusClientSockets and from the external world
 	controlChannel chan interface{}
 
@@ -82,10 +79,9 @@ type RadiusClient struct {
 }
 
 // Creates a new instance of the Radius Client
-func NewRadiusClient(ci *core.PolicyConfigurationManager) *RadiusClient {
+func NewRadiusClient() *RadiusClient {
 
 	rc := RadiusClient{
-		ci:              ci,
 		controlChannel:  make(chan interface{}, CONTROL_QUEUE_SIZE),
 		requestsChannel: make(chan interface{}, REQUESTS_QUEUE_SIZE),
 		doneChannel:     make(chan interface{}, 1),
@@ -184,7 +180,7 @@ func (r *RadiusClient) eventLoop() {
 				var rcs *RadiusClientSocket
 				var found bool
 				if rcs, found = r.clientSockets[v.originPort]; !found {
-					rcs = NewRadiusClientSocket(r.ci, r.controlChannel, core.GetPolicyConfig().RadiusServerConf().BindAddress, v.originPort)
+					rcs = NewRadiusClientSocket(r.controlChannel, core.GetPolicyConfig().RadiusServerConf().BindAddress, v.originPort)
 					r.clientSockets[v.originPort] = rcs
 				}
 
