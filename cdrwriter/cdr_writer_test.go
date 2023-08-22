@@ -1,14 +1,16 @@
 package cdrwriter
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/francistor/igor/core"
+	"google.golang.org/api/option"
 )
 
 // Initialization
@@ -16,13 +18,18 @@ var bootstrapFile = "resources/searchRules.json"
 var instanceName = "testConfig"
 var cdrDirectoryName = "../cdr"
 
+var googleProjectName = "operating-spot-389516"
+var bqdatasetName = "IgorTest1"
+var bqtableName = "TestTable1"
+var googleCredentialsFile = "../google-keyfile.json"
+
 var jElasticConfig = `
 {
 	"attributeMap": {
 		"IgorInt": "Igor-IntegerAttribute",
 		"IgorInt64": "Igor-Integer64Attribute",
 		"IgorOctets": "Igor-OctetsAttribute",
-		"IgorString": "Igor-StringAttribute",
+		"IgorString": "Class:Igor-StringAttribute",
 		"SessionTime": "Acct-Session-Time!Acct-Delay-Time",
 		"InputBytes": "Acct-Input-Octets<Acct-Input-Gigawords",
 		"Status": "Acct-Status-Type"
@@ -34,7 +41,19 @@ var jElasticConfig = `
 	"idFields": ["Acct-Session-Id", "NAS-IP-Address"],
 	"versionField1": "Igor-TimeAttribute",
 	"versionAlgorithm": "timeandtype"
+}`
 
+var jBigQueryConfig = `{
+	"attributeMap":{
+		"IgorInt": "Igor-IntegerAttribute",
+		"IgorInt64": "Igor-Integer64Attribute",
+		"IgorOctets": "Igor-OctetsAttribute",
+		"IgorString": "Class:Igor-StringAttribute",
+		"SessionTime": "Acct-Session-Time!Acct-Delay-Time",
+		"InputBytes": "Acct-Input-Octets<Acct-Input-Gigawords",
+		"Status": "Acct-Status-Type",
+		"EventTimestamp": "Igor-TimeAttribute"
+	}
 }`
 
 // Initializer of the test suite.
@@ -45,7 +64,7 @@ func TestMain(m *testing.M) {
 	exitCode := m.Run()
 
 	// Clean cdr files
-	os.RemoveAll(cdrDirectoryName)
+	//os.RemoveAll(cdrDirectoryName)
 
 	os.Exit(exitCode)
 }
@@ -222,7 +241,7 @@ func TestFileWriter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error reading cdr file %s", err)
 	}
-	fmt.Println(string(cdrbytes))
+
 	if !strings.Contains(string(cdrbytes), "0102030405060708090a0b") {
 		t.Fatal("bad cdr contents")
 	}
@@ -273,12 +292,91 @@ func TestElasticWriter(t *testing.T) {
 	}
 	ef := NewElasticFormat(conf)
 
-	ecdrw := NewElasticCDRWriter("http://elasticdatabase:9200/_doc/_bulk?filter_path=took,errors", "", "", ef, 1 /* Timeout */, 2 /* GlitchSeconds */, "../cdr/elastic.backup")
+	ecdrw := NewElasticCDRWriter("http://elasticdatabase:9200/_doc/_bulk?filter_path=took,errors", "", "", ef, 1 /* Timeout */, 2 /* GlitchSeconds */, "../cdr/elastic/elastic.backup")
 
 	rp := buildSimpleRadiusPacket(t)
 	ecdrw.WriteRadiusCDR(&rp)
 	time.Sleep(1 * time.Second)
-	//ecdrw.Close()
+	ecdrw.Close()
+}
+
+func TestBigQueryWriter(t *testing.T) {
+
+	// Get the current number of lines in the table
+	currentLines := getBQLinesInTable(t)
+
+	var conf BigQueryFormatConf
+	if err := json.Unmarshal([]byte(jBigQueryConfig), &conf); err != nil {
+		t.Fatalf("bad BigQuery format: %s", err)
+	}
+	bqf := NewBigQueryFormat(conf)
+
+	bqw := NewBigQueryCDRWriter(googleProjectName, bqdatasetName, bqtableName, googleCredentialsFile, bqf /* Timeout seconds */, 10 /* Glitch seconds */, 60, "../cdr/bigquery/bigquery.backup")
+
+	rp := buildSimpleRadiusPacket(t)
+
+	// The same packet will be written twice
+	bqw.WriteRadiusCDR(&rp)
+	bqw.WriteRadiusCDR(&rp)
+
+	time.Sleep(1 * time.Second)
+	bqw.Close()
+
+	// Get the new number of lines in the table
+	newLines := getBQLinesInTable(t)
+	if currentLines == newLines {
+		t.Fatal("no new lines were detected as inserted")
+	}
+}
+
+func TestBigQueryGenBackup(t *testing.T) {
+	var conf BigQueryFormatConf
+	if err := json.Unmarshal([]byte(jBigQueryConfig), &conf); err != nil {
+		t.Fatalf("bad BigQuery format: %s", err)
+	}
+	bqf := NewBigQueryFormat(conf)
+
+	// Reduced timeout and glitch time
+	bqw := NewBigQueryCDRWriter(googleProjectName, bqdatasetName, bqtableName, googleCredentialsFile, bqf /* Timeout seconds */, 1 /* Glitch seconds */, 1, "../cdr/bigquery/bigquery.backup")
+	bqw._forceBigQueryError = true
+
+	rp := buildSimpleRadiusPacket(t)
+
+	// The same packet will be written twice
+	bqw.WriteRadiusCDR(&rp)
+	bqw.WriteRadiusCDR(&rp)
+
+	time.Sleep(2 * time.Second)
+	bqw.Close()
+
+	// Check that file was created
+	if _, err := os.Stat("../cdr/bigquery/bigquery.backup"); err != nil {
+		t.Fatal("backup file not created")
+	}
+}
+
+func TestBigQueryIngestBackup(t *testing.T) {
+
+	// Get the current number of lines in the table
+	currentLines := getBQLinesInTable(t)
+
+	var conf BigQueryFormatConf
+	if err := json.Unmarshal([]byte(jBigQueryConfig), &conf); err != nil {
+		t.Fatalf("bad BigQuery format: %s", err)
+	}
+	bqf := NewBigQueryFormat(conf)
+
+	// Reduced timeout and glitch time
+	bqw := NewBigQueryCDRWriter(googleProjectName, bqdatasetName, bqtableName, googleCredentialsFile, bqf /* Timeout seconds */, 1 /* Glitch seconds */, 1, "../cdr/bigquery/bigquery.backup")
+
+	time.Sleep(2 * time.Second)
+	bqw.Close()
+
+	// Get the new number of lines in the table
+	newLines := getBQLinesInTable(t)
+	if currentLines == newLines {
+		t.Fatal("no new lines were detected as inserted")
+	}
 }
 
 // Helper function
@@ -317,4 +415,26 @@ func buildSimpleRadiusPacket(t *testing.T) core.RadiusPacket {
 	}
 
 	return rp
+}
+
+func getBQLinesInTable(t *testing.T) int64 {
+	// Create the bigquery client. It will not report any errors until really used
+	ctx := context.Background()
+	client, err := bigquery.NewClient(ctx, googleProjectName, option.WithCredentialsFile(googleCredentialsFile))
+	if err != nil {
+		t.Fatal("could not create client for Google cloud")
+	}
+	q := client.Query("SELECT count(*) FROM " + googleProjectName + "." + bqdatasetName + "." + bqtableName)
+
+	it, err := q.Read(ctx)
+	if err != nil {
+		t.Fatal("error reading number of lines in table")
+	}
+	var values []bigquery.Value
+	err = it.Next(&values)
+	if err != nil {
+		t.Fatal("error reading number of lines in table")
+	}
+
+	return values[0].(int64)
 }

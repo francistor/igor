@@ -12,7 +12,7 @@ func TestSunnyDay(t *testing.T) {
 
 	// Instantiate sesion store. Expiration times are zero
 	store := RadiusSessionStore{}
-	store.init([]string{"Acct-Session-Id", "NAS-IP-Address"}, []string{"Framed-IP-Address"}, time.Duration(0*time.Second), time.Duration(0*time.Second))
+	store.init([]string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "Framed-IP-Address", IsUnique: true}}, time.Duration(0*time.Second), time.Duration(0*time.Second))
 
 	// Create the packets
 	accessPacket1 := core.NewRadiusRequest(core.ACCESS_REQUEST).
@@ -189,7 +189,7 @@ func TestSunnyDay(t *testing.T) {
 func TestMissingPackets(t *testing.T) {
 
 	store := RadiusSessionStore{}
-	store.init([]string{"Acct-Session-Id", "NAS-IP-Address"}, []string{"Framed-IP-Address"}, time.Duration(1*time.Second), time.Duration(0*time.Second))
+	store.init([]string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "Framed-IP-Address", IsUnique: true}}, time.Duration(1*time.Second), time.Duration(0*time.Second))
 
 	// Create the packets
 	accessPacket1 := core.NewRadiusRequest(core.ACCESS_REQUEST).
@@ -366,48 +366,119 @@ func TestMultipleIndexValues(t *testing.T) {
 
 	// Instantiate sesion store.
 	store := RadiusSessionStore{}
-	store.init([]string{"Acct-Session-Id", "NAS-IP-Address"}, []string{"Framed-IP-Address"}, time.Duration(0*time.Second), time.Duration(0*time.Second))
+	store.init([]string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "NAS-IP-Address", IsUnique: false}}, time.Duration(0*time.Second), time.Duration(0*time.Second))
 
 	startPacket1 := core.NewRadiusRequest(core.ACCOUNTING_REQUEST).
 		Add("Acct-Session-Id", "session-1").
 		Add("NAS-IP-Address", "1.1.1.1").
-		Add("Framed-IP-Address", "9.9.9.9").
+		Add("Framed-IP-Address", "200.1.1.1").
 		Add("Acct-Status-Type", "Start")
 	startPacket2 := core.NewRadiusRequest(core.ACCOUNTING_REQUEST).
 		Add("Acct-Session-Id", "session-2").
 		Add("NAS-IP-Address", "1.1.1.1").
-		Add("Framed-IP-Address", "9.9.9.9").
+		Add("Framed-IP-Address", "200.1.1.2").
 		Add("Acct-Status-Type", "Start")
 
 	store.PushPacket(startPacket1)
 	store.PushPacket(startPacket2)
 
-	sessions := store.FindByIndex("Framed-IP-Address", "9.9.9.9", true)
+	sessions := store.FindByIndex("NAS-IP-Address", "1.1.1.1", true)
 	if len(sessions) != 2 {
-		t.Fatal("number of sessions with the same IP adress was not 2")
+		t.Fatal("number of sessions with the same NAS-IP adress was not 2")
 	}
-	if sessions[1].GetStringAVP("Framed-IP-Address") != "9.9.9.9" {
-		t.Fatal("IP address found is not 9.9.9.9")
+	if sessions[1].GetStringAVP("NAS-IP-Address") != "1.1.1.1" {
+		t.Fatal("NAS-IP address found is not 1.1.1.1")
 	}
 
 	// Stop one session
 	stopPacket1 := core.NewRadiusRequest(core.ACCOUNTING_REQUEST).
 		Add("Acct-Session-Id", "session-1").
 		Add("NAS-IP-Address", "1.1.1.1").
-		Add("Framed-IP-Address", "9.9.9.9").
+		Add("Framed-IP-Address", "200.1.1.1").
 		Add("Acct-Status-Type", "Stop")
 
 	store.PushPacket(stopPacket1)
 
 	// With stop filtered
-	sessions = store.FindByIndex("Framed-IP-Address", "9.9.9.9", true)
+	sessions = store.FindByIndex("NAS-IP-Address", "1.1.1.1", true)
 	if len(sessions) != 1 {
-		t.Fatal("number of sessions with the same IP adress was not 1")
+		t.Fatal("number of sessions with the same NAS-IP adress was not 1")
 	}
 
 	// Without stop filtered
-	sessions = store.FindByIndex("Framed-IP-Address", "9.9.9.9", false)
+	sessions = store.FindByIndex("NAS-IP-Address", "1.1.1.1", false)
 	if len(sessions) != 2 {
-		t.Fatal("number of sessions with the same IP adress was not 2")
+		t.Fatal("number of sessions with the same NAS-IP adress was not 2")
+	}
+}
+
+func TestUniqueIndex(t *testing.T) {
+
+	// Instantiate sesion store.
+	store := RadiusSessionStore{}
+	store.init([]string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "User-Name", IsUnique: true}}, time.Duration(0*time.Second), time.Duration(0*time.Second))
+
+	accessPacket1 := core.NewRadiusRequest(core.ACCESS_REQUEST).
+		Add("Acct-Session-Id", "session-1").
+		Add("NAS-IP-Address", "1.1.1.1").
+		Add("User-Name", "user1")
+	startPacket1 := core.NewRadiusRequest(core.ACCOUNTING_REQUEST).
+		Add("Acct-Session-Id", "session-1").
+		Add("NAS-IP-Address", "1.1.1.1").
+		Add("Framed-IP-Address", "200.1.1.1").
+		Add("User-Name", "user1").
+		Add("Acct-Status-Type", "Start")
+
+	accessPacket2 := core.NewRadiusRequest(core.ACCESS_REQUEST).
+		Add("Acct-Session-Id", "session-2").
+		Add("NAS-IP-Address", "1.1.1.1").
+		Add("Framed-IP-Address", "200.1.1.2").
+		Add("User-Name", "user1")
+
+	var offendingIndex string
+	_, offendingIndex = store.PushPacket(accessPacket1)
+	if offendingIndex != "" {
+		t.Fatal("access 1 not performed")
+	}
+	_, offendingIndex = store.PushPacket(startPacket1)
+	if offendingIndex != "" {
+		t.Fatal("start 1 not performed")
+	}
+	_, offendingIndex = store.PushPacket(accessPacket2)
+	if offendingIndex != "User-Name" {
+		t.Fatal("access 2 was performed")
+	}
+
+	sessions := store.FindByIndex("User-Name", "user1", true)
+	if len(sessions) != 1 {
+		t.Fatal("number of sessions with the same user-Name was not 1")
+	}
+	if sessions[0].GetStringAVP("Acct-Session-Id") != "session-1" {
+		t.Fatal("the session found was not session-1")
+	}
+
+	// Stop offending session
+	stopPacket1 := core.NewRadiusRequest(core.ACCOUNTING_REQUEST).
+		Add("Acct-Session-Id", "session-1").
+		Add("NAS-IP-Address", "1.1.1.1").
+		Add("Framed-IP-Address", "200.1.1.1").
+		Add("User-Name", "user1").
+		Add("Acct-Status-Type", "Stop")
+
+	store.PushPacket(stopPacket1)
+
+	_, offendingIndex = store.PushPacket(accessPacket2)
+	if offendingIndex != "" {
+		t.Fatal("access 2 could not yet be performed")
+	}
+
+	// With stop filtered
+	sessions = store.FindByIndex("User-Name", "user1", true)
+	if len(sessions) != 1 {
+		t.Fatal("number of sessions with the same Use-Name was not 1")
+	}
+
+	if sessions[0].GetStringAVP("Acct-Session-Id") != "session-2" {
+		t.Fatal("the session found was not session-2")
 	}
 }

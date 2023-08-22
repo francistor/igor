@@ -210,4 +210,7 @@ func TestRadiusSessionStoreConfig(t *testing.T) {
 	if ssc.ReceiveFrom["127.0.0.1"].OriginIP != "127.0.0.1/32" {
 		t.Fatalf("bad origin IP")
 	}
+	if ssc.SendTo[0].IPAddress != "127.0.0.1" {
+		t.Fatalf("bad destination IP")
+	}
 }

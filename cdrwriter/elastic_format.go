@@ -235,7 +235,9 @@ func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 		if strings.Contains(v, ":") {
 			// Write the first not null
 			for _, attrName := range strings.Split(v, ":") {
-				ew.writeStringAVP(&sb, rp.GetAllAVP(attrName), k, &first)
+				if ew.writeStringAVP(&sb, rp.GetAllAVP(attrName), k, &first) {
+					break
+				}
 			}
 		} else if strings.Contains(v, "+") {
 			// Add the values
@@ -277,11 +279,11 @@ func (ew *ElasticFormat) GetRadiusCDRString(rp *core.RadiusPacket) string {
 }
 
 // Helper to write "esAttributeName": <attributeValue> from an AVP
-func (ew *ElasticFormat) writeStringAVP(sb *strings.Builder, avps []core.RadiusAVP, attributeName string, first *bool) {
+func (ew *ElasticFormat) writeStringAVP(sb *strings.Builder, avps []core.RadiusAVP, attributeName string, first *bool) bool {
 
 	// Ignore empty set
 	if len(avps) == 0 {
-		return
+		return false
 	}
 
 	// If not the first attribute, use a comma
@@ -330,6 +332,8 @@ func (ew *ElasticFormat) writeStringAVP(sb *strings.Builder, avps []core.RadiusA
 	} else {
 		sb.WriteString(values[0])
 	}
+
+	return true
 }
 
 // Helper to write "esAttributeName": integerAttributeValue

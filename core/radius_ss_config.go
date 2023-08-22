@@ -68,10 +68,15 @@ func GetRadiusSessionServerConfig() *RadiusSessionServerConfigurationManager {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+type SessionIndexConf struct {
+	IndexName string
+	IsUnique  bool
+}
+
 // Holds a radius session server configuration
 type RadiusSessionServerConfig struct {
 	// The names of the attributes with indexes
-	IndexNames []string
+	IndexConf []SessionIndexConf
 
 	// The names of the attributes that conform the id
 	IdAttributes []string
@@ -92,19 +97,13 @@ type RadiusSessionServerConfig struct {
 
 	// To be cooked
 	ReceiveFrom RadiusClients
-	SendTo      RadiusClients
+	SendTo      []RadiusServer
 }
 
 // Initializer
 func (rssc *RadiusSessionServerConfig) initialize() error {
 
-	var err error
-	err = rssc.ReceiveFrom.initialize()
-	if err != nil {
-		return err
-	}
-	err = rssc.SendTo.initialize()
-	if err != nil {
+	if err := rssc.ReceiveFrom.initialize(); err != nil {
 		return err
 	}
 

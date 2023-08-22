@@ -1,8 +1,11 @@
 package core
 
 import (
+	"crypto/tls"
 	"fmt"
+	"io"
 	"math/rand"
+	"net/http"
 	"os"
 	"strconv"
 	"sync/atomic"
@@ -181,4 +184,33 @@ func toFloat64(value interface{}) (float64, error) {
 	default:
 		return 0, fmt.Errorf("cannot convert %T to float64", value)
 	}
+}
+
+// Helper function for tests
+func httpGet(location string) (string, error) {
+
+	// Create client with timeout
+	httpClient := http.Client{
+		Timeout: HTTP_TIMEOUT_SECONDS * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
+
+		},
+	}
+
+	// Location is a http URL
+	resp, err := httpClient.Get(location)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("got status code %d while retrieving %s", resp.StatusCode, location)
+	}
+	if body, err := io.ReadAll(resp.Body); err != nil {
+		return "", err
+	} else {
+		return string(body), nil
+	}
+
 }

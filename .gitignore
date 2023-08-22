@@ -5,6 +5,7 @@
 *.so
 *.dylib
 state-id
+google*.json
 igor
 
 # Test binary, built with `go test -c`

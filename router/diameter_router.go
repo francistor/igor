@@ -131,7 +131,6 @@ func (router *DiameterRouter) Close() {
 	// Terminate the event loop
 	router.routerControlChannel <- RouterCloseCommand{}
 
-	// router.routerDoneChannel is closed in the event loop
 	close(router.routerControlChannel)
 	close(router.diameterRequestsChan)
 	close(router.peerControlChannel)
@@ -355,12 +354,16 @@ func (router *DiameterRouter) eventLoop() {
 			// Diameter Request message to be routed
 		case rdr := <-router.diameterRequestsChan:
 
-			route, err := router.ci.DiameterRoutingRules().FindDiameterRoutingRule(
+			var route core.DiameterRoutingRule
+			var err error
+
+			if router.status == StatusTerminated {
+				rdr.RChan <- fmt.Errorf("diameter router is terminated")
+				close(rdr.RChan)
+			} else if route, err = router.ci.DiameterRoutingRules().FindDiameterRoutingRule(
 				rdr.Message.GetStringAVP("Destination-Realm"),
 				rdr.Message.ApplicationName,
-				false)
-
-			if err != nil {
+				false); err != nil {
 				core.IncrementRouterRouteNotFound("", rdr.Message)
 				rdr.RChan <- fmt.Errorf("request not sent: no route found")
 				close(rdr.RChan)

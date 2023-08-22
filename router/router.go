@@ -16,8 +16,8 @@ import (
 
 // Statuses of the Router
 const (
-	StatusOperational = int32(0)
-	StatusTerminated  = int32(1)
+	StatusOperational = 0
+	StatusTerminated  = 1
 )
 
 // Size of the channel for getting messages to route

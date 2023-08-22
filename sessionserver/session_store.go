@@ -33,7 +33,7 @@ type RadiusSessionStore struct {
 	limboTime time.Duration
 
 	// The names of the additional indexes, besides the id
-	indexNames []string
+	indexConf []core.SessionIndexConf
 
 	// The fields that compose the id
 	idAttributes []string
@@ -41,10 +41,10 @@ type RadiusSessionStore struct {
 
 // Creates a new Radius Session Store.
 // For testing only. Normally will be embedded in a RadiusSessionServer.
-func (s *RadiusSessionStore) init(idAttributes []string, indexNames []string, expirationTime time.Duration, limboTime time.Duration) {
+func (s *RadiusSessionStore) init(idAttributes []string, indexConf []core.SessionIndexConf, expirationTime time.Duration, limboTime time.Duration) {
 
 	s.idAttributes = idAttributes
-	s.indexNames = indexNames
+	s.indexConf = indexConf
 	s.expirationTime = expirationTime
 	s.limboTime = limboTime
 
@@ -52,15 +52,15 @@ func (s *RadiusSessionStore) init(idAttributes []string, indexNames []string, ex
 	s.sessions = make(map[string]*RadiusSessionEntry)
 	// Additional indexes
 	s.indexes = make(map[string]map[string]map[string]struct{})
-	for _, indexName := range s.indexNames {
-		s.indexes[indexName] = make(map[string]map[string]struct{})
+	for _, indexConf := range s.indexConf {
+		s.indexes[indexConf.IndexName] = make(map[string]map[string]struct{})
 	}
 }
 
 // Checks if the packet passed as argument should replace the existing one for the same id
 // Returns true if the new session is relevant, and optionally the session that must be
 // replaced
-func (s *RadiusSessionStore) CheckInsert(id string, packetType int, packet *core.RadiusPacket) (bool, *RadiusSessionEntry) {
+func (s *RadiusSessionStore) checkInsert(id string, packetType int, packet *core.RadiusPacket) (bool, *RadiusSessionEntry) {
 
 	// Look for existing session
 	existingEntry, found := s.sessions[id]
@@ -88,9 +88,10 @@ func (s *RadiusSessionStore) CheckInsert(id string, packetType int, packet *core
 	return false, nil
 }
 
-// Adds a new entry to the store
+// Adds a new entry to the store.
+// Returns the offending session-id and index if a restriction was found
 // Warning: This method modifies the original packet!!!
-func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) {
+func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) (string, string) {
 
 	// Build the id
 	var id string
@@ -99,12 +100,6 @@ func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) {
 		id += "/"
 	}
 	id = strings.TrimSuffix(id, "/")
-
-	packet.Add("SessionStore-Id", id)
-
-	// Add meta attributes
-	lastUpdated := time.Now()
-	packet.Add("SessionStore-LastUpdated", lastUpdated.UnixMilli())
 
 	var packetType int
 	if packet.Code == core.ACCESS_REQUEST {
@@ -121,17 +116,46 @@ func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) {
 			packetType = PACKET_TYPE_ACCOUNTING_STOP
 		default:
 			core.GetLogger().Error("received accounting packet without Acct-Status-Type")
-			return
+			return "", ""
 		}
 	}
 
 	// If packet is not newer, do nothing
-	doInsert, oldSession := s.CheckInsert(id, packetType, packet)
+	doInsert, oldSession := s.checkInsert(id, packetType, packet)
 	if !doInsert {
 		core.GetLogger().Error("Ignoring packet")
-		return
+		return "", ""
 	}
 
+	// Check unique indexes
+	if packetType == PACKET_TYPE_ACCESS_REQUEST {
+		for _, indexConf := range s.indexConf {
+			if indexConf.IsUnique {
+				indexName := indexConf.IndexName
+				// Get attribute value for the index
+				indexAVP, err := packet.GetAVP(indexName)
+				if err != nil {
+					continue
+				}
+				indexValue := indexAVP.GetString()
+				if sessionIds, found := s.indexes[indexName][indexValue]; found {
+					// Should only be one entry, but iterate through all
+					for id := range sessionIds {
+						if entry, exists := s.sessions[id]; exists {
+							if entry.packetType != PACKET_TYPE_ACCOUNTING_STOP {
+								return id, indexName
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Add meta attributes
+	lastUpdated := time.Now()
+	packet.Add("SessionStore-Id", id)
+	packet.Add("SessionStore-LastUpdated", lastUpdated.UnixMilli())
 	packet.Add("SessionStore-PacketType", packetType)
 
 	var expirationTime time.Time
@@ -161,16 +185,17 @@ func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) {
 		}
 	}
 
-	// Add to sessions. Deleton is done always by the deleter process
+	// Add to sessions. Deletion is done always by the deleter process
 	s.sessions[id] = &entry
 
-	// Add entry for each index, if not already there. Some attributes may not be present in START
-	if oldSession == nil || oldSession.packetType == PACKET_TYPE_ACCOUNTING_START {
-		for _, indexName := range s.indexNames {
+	// Add entry for each index, if not already there. Some attributes may not be present in ACCESS
+	if oldSession == nil || oldSession.packetType == PACKET_TYPE_ACCESS_REQUEST {
+		for _, indexConf := range s.indexConf {
+			indexName := indexConf.IndexName
 			// Get attribute value for the index
 			indexAVP, err := packet.GetAVP(indexName)
 			if err != nil {
-				fmt.Println(err)
+				// Attribute for index not found
 				continue
 			}
 			// The value is dummy. The only point of interest if the key in the map
@@ -184,10 +209,12 @@ func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) {
 
 		}
 	}
+
+	return "", ""
 }
 
 // Removes the session from all the maps
-func (s *RadiusSessionStore) DeleteEntry(e *RadiusSessionEntry) {
+func (s *RadiusSessionStore) deleteEntry(e *RadiusSessionEntry) {
 
 	// Unlink
 	switch e.packetType {
@@ -200,7 +227,8 @@ func (s *RadiusSessionStore) DeleteEntry(e *RadiusSessionEntry) {
 	}
 
 	// Delete from indexes
-	for _, indexName := range s.indexNames {
+	for _, indexConf := range s.indexConf {
+		indexName := indexConf.IndexName
 		indexAVP, _ := e.packet.GetAVP(indexName)
 		indexValue := indexAVP.GetString()
 		delete(s.indexes[indexName][indexValue], e.id)
@@ -215,7 +243,6 @@ func (s *RadiusSessionStore) DeleteEntry(e *RadiusSessionEntry) {
 
 // Get all the sessions with the specified index name and value
 func (s *RadiusSessionStore) FindByIndex(indexName string, indexValue string, activeOnly bool) []core.RadiusPacket {
-	fmt.Println(s.indexes["Framed-IP-Address"])
 	var ids []string
 	for id := range s.indexes[indexName][indexValue] {
 		ids = append(ids, id)

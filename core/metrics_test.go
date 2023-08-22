@@ -1,10 +1,6 @@
 package core
 
 import (
-	"crypto/tls"
-	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -347,33 +343,4 @@ func TestPrometheusEndpoint(t *testing.T) {
 	}
 
 	// TODO: add others
-}
-
-// Helper function
-func httpGet(location string) (string, error) {
-
-	// Create client with timeout
-	httpClient := http.Client{
-		Timeout: HTTP_TIMEOUT_SECONDS * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
-
-		},
-	}
-
-	// Location is a http URL
-	resp, err := httpClient.Get(location)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("got status code %d while retrieving %s", resp.StatusCode, location)
-	}
-	if body, err := io.ReadAll(resp.Body); err != nil {
-		return "", err
-	} else {
-		return string(body), nil
-	}
-
 }

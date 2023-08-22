@@ -11,6 +11,44 @@ import (
 	"github.com/francistor/igor/radiusserver"
 )
 
+type SessionQueryRequest struct {
+	RChan      chan interface{}
+	IndexName  string
+	IndexValue string
+	ActiveOnly bool
+}
+
+type SessionQueryResponse struct {
+	Items [][]core.RadiusAVP
+}
+
+type IndexConstraintError struct {
+	offendingIndex string
+}
+
+func (e IndexConstraintError) Error() string {
+	return e.offendingIndex
+}
+
+type SessionUpdateRequest struct {
+	RChan  chan error
+	Packet *core.RadiusPacket
+}
+
+// Signal to initiate the termination process
+type SessionServerSetDownCommand struct {
+}
+
+// Signal to terminate the event loop
+type SessionServerCloseCommand struct {
+}
+
+// Statuses of the SessionServer
+const (
+	StatusOperational = 0
+	StatusTerminated  = 1
+)
+
 // Implements a session store that
 // - Is updated via Radius requests
 // - Can be queried by http
@@ -20,6 +58,9 @@ import (
 type RadiusSessionServer struct {
 	RadiusSessionStore
 
+	// Status. Can be one of the constants above
+	status int
+
 	// Holds the radius server
 	radiusServer *radiusserver.RadiusServer
 
@@ -28,6 +69,15 @@ type RadiusSessionServer struct {
 
 	// For signaling finalization of the http server
 	httpDoneChannel chan interface{}
+
+	// For sending session updates
+	updateChannel chan *SessionUpdateRequest
+
+	// For sending queries
+	queryChannel chan *SessionQueryRequest
+
+	// Event loop control channel
+	controlChannel chan interface{}
 }
 
 // Creates a new instance of the RadiusSessionServer
@@ -37,7 +87,12 @@ func NewRadiusSessionServer(instanceName string) *RadiusSessionServer {
 
 	// Build the unerlying store
 	rss := RadiusSessionServer{}
-	rss.init(ssConf.IdAttributes, ssConf.IndexNames, ssConf.ExpirationTime, ssConf.LimboTime)
+	rss.init(ssConf.IdAttributes, ssConf.IndexConf, ssConf.ExpirationTime, ssConf.LimboTime)
+
+	// Create channels
+	rss.updateChannel = make(chan *SessionUpdateRequest, 1)
+	rss.queryChannel = make(chan *SessionQueryRequest, 1)
+	rss.controlChannel = make(chan interface{}, 1)
 
 	// If using the default mux (not done here. Just in case...)
 	// https://stackoverflow.com/questions/40786526/resetting-http-handlers-in-golang-for-unit-testing
@@ -57,8 +112,24 @@ func NewRadiusSessionServer(instanceName string) *RadiusSessionServer {
 
 // Graceful shutdown
 func (rss *RadiusSessionServer) Close() {
+
+	// Close the http server
 	rss.httpServer.Shutdown(context.Background())
 	<-rss.httpDoneChannel
+
+	// Set down
+	rss.controlChannel <- SessionServerSetDownCommand{}
+
+	// Wait here if necessary
+	// TODO: Need to wait for anything?
+
+	// Terminate the event loop
+	rss.controlChannel <- SessionServerCloseCommand{}
+
+	// Close channels
+	close(rss.controlChannel)
+	close(rss.queryChannel)
+	close(rss.updateChannel)
 }
 
 // Execute the http server. This function blocks. Should be executed
@@ -67,6 +138,9 @@ func (rss *RadiusSessionServer) run() {
 
 	// Make sure the certificates exists in the current directory
 	certFile, keyFile := core.EnsureCertificates()
+
+	// Start event loop
+	go rss.eventLoop()
 
 	err := rss.httpServer.ListenAndServeTLS(certFile, keyFile)
 
@@ -77,17 +151,105 @@ func (rss *RadiusSessionServer) run() {
 	close(rss.httpDoneChannel)
 }
 
-// Pushes entries to the store
+// Event loop
+func (rss *RadiusSessionServer) eventLoop() {
+	for {
+		select {
+		case cr := <-rss.controlChannel:
+
+			switch cr.(type) {
+
+			case SessionServerSetDownCommand:
+				rss.status = StatusTerminated
+
+			case SessionServerCloseCommand:
+				return
+			}
+
+		case ur := <-rss.updateChannel:
+			if rss.status == StatusTerminated {
+				ur.RChan <- errors.New("session server terminated")
+			} else if _, offendingIndex := rss.PushPacket(ur.Packet); offendingIndex == "" {
+				ur.RChan <- nil
+			} else {
+				ur.RChan <- IndexConstraintError{offendingIndex}
+			}
+
+			close(ur.RChan)
+
+		case qr := <-rss.queryChannel:
+			if rss.status == StatusTerminated {
+				qr.RChan <- errors.New("session server terminated")
+			} else {
+				qr.RChan <- rss.FindByIndex(qr.IndexName, qr.IndexValue, true)
+			}
+
+			close(qr.RChan)
+		}
+
+	}
+}
+
+// Pushes entries received via radius to the store
 func (rss *RadiusSessionServer) handlePacket(request *core.RadiusPacket) (*core.RadiusPacket, error) {
 
-	// Always return a success
-	return core.NewRadiusResponse(request, true), nil
+	var constraintError IndexConstraintError
+
+	e := rss.ProcessPacket(request)
+
+	if e == nil {
+		return core.NewRadiusResponse(request, true), nil
+	} else if errors.As(e, &constraintError) {
+		return core.NewRadiusResponse(request, false).Add("Reply-Message", "Duplicated entry for index "+constraintError.offendingIndex), nil
+	} else {
+		return nil, e
+	}
+}
+
+// Processes the received request
+func (rss *RadiusSessionServer) ProcessPacket(request *core.RadiusPacket) error {
+
+	sur := SessionUpdateRequest{
+		RChan:  make(chan error),
+		Packet: request,
+	}
+
+	// Send request
+	rss.updateChannel <- &sur
+
+	// Wait for response
+	return <-sur.RChan
+}
+
+// Executes query
+func (rss *RadiusSessionServer) ProcessQuery(indexName string, indexValue string, activeOnly bool) ([]*core.RadiusPacket, error) {
+
+	sqr := SessionQueryRequest{
+		IndexName:  indexName,
+		IndexValue: indexValue,
+		ActiveOnly: activeOnly,
+	}
+
+	// Send request
+	rss.queryChannel <- &sqr
+
+	// Wait for response
+	resp := <-sqr.RChan
+	switch v := resp.(type) {
+	case error:
+		return nil, v
+	case []*core.RadiusPacket:
+		return v, nil
+	default:
+		panic("Process query got an answer that is not error or *[]RadiusPacket")
+	}
 }
 
 // Returns the function to handle http queries.
 // This way we can parametrize the function if needed.
 func getQueryHandler() func(w http.ResponseWriter, req *http.Request) {
 
+	// This is the handler function
 	return func(w http.ResponseWriter, req *http.Request) {
 
 		// Get the query index and value
@@ -107,7 +269,7 @@ func getQueryHandler() func(w http.ResponseWriter, req *http.Request) {
 		}
 
 		// Invoke here to get the answer
-		resp := SessionsResponse{}
+		resp := SessionQueryResponse{}
 		jAnswer, err := json.Marshal(resp)
 		if err != nil {
 			treatError(w, err, "error marshaling response", http.StatusInternalServerError, req.URL.Path, indexName, constants.UNSERIALIZATION_ERROR)

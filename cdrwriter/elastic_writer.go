@@ -29,7 +29,7 @@ const (
 type ElasticCDRWriter struct {
 
 	// This channel will receive the CDR to write
-	packetChan chan interface{}
+	packetChan chan *core.RadiusPacket
 
 	// To signal that we have finished processing CDR
 	doneChan chan struct{}
@@ -52,6 +52,9 @@ type ElasticCDRWriter struct {
 
 	// Name of the file where the CDR will be written in case of database unavailability
 	backupFileName string
+
+	// For sending periodics singals to empty batch
+	ticker *time.Ticker
 }
 
 // Builds a writer
@@ -65,7 +68,7 @@ func NewElasticCDRWriter(url string, username string, password string, formatter
 	}
 
 	w := ElasticCDRWriter{
-		packetChan:     make(chan interface{}, ELASTIC_PACKET_BUFFER_SIZE),
+		packetChan:     make(chan *core.RadiusPacket, ELASTIC_PACKET_BUFFER_SIZE),
 		doneChan:       make(chan struct{}),
 		url:            url,
 		username:       username,
@@ -98,6 +101,17 @@ func NewElasticCDRWriter(url string, username string, password string, formatter
 	return &w
 }
 
+// Call when sure that no more write operations will be invoked
+func (w *ElasticCDRWriter) Close() {
+
+	w.ticker.Stop()
+
+	close(w.packetChan)
+
+	// Consume all the pending CDR in the buffer
+	<-w.doneChan
+}
+
 // Event processing loop
 func (w *ElasticCDRWriter) eventLoop() {
 
@@ -109,20 +123,25 @@ func (w *ElasticCDRWriter) eventLoop() {
 
 	// Sends Ticks through the packet channel, to signal that a write must be
 	// done even if the number of packets has not reached the triggering value.
-	var ticker = time.NewTicker(ELASTIC_CDR_WRITE_TIME_MILLIS * time.Millisecond)
-	go func() {
-		for {
-			<-ticker.C
-			w.packetChan <- Tick{}
-		}
-	}()
+	w.ticker = time.NewTicker(ELASTIC_CDR_WRITE_TIME_MILLIS * time.Millisecond)
 
-	for m := range w.packetChan {
+loop:
+	for {
 
-		packet, isPacket := m.(*core.RadiusPacket)
-		if isPacket {
-			sb.WriteString(w.formatter.GetRadiusCDRString(packet))
-			cdrCounter++
+		var m *core.RadiusPacket
+
+		select {
+		case <-w.ticker.C:
+			// Nothing to do
+
+		case v := <-w.packetChan:
+			if m == nil {
+				break loop
+			} else {
+				m = v
+				cdrCounter++
+				sb.WriteString(w.formatter.GetRadiusCDRString(m))
+			}
 		}
 
 		if cdrCounter > ELASTIC_CDR_COUNT_THRESHOLD || time.Since(lastWritten).Milliseconds() > ELASTIC_CDR_WRITE_TIME_MILLIS {
@@ -181,7 +200,6 @@ func (w *ElasticCDRWriter) eventLoop() {
 		core.GetLogger().Errorf("elastic writer error: %s", err)
 	}
 
-	ticker.Stop()
 	close(w.doneChan)
 }
 
@@ -245,14 +263,6 @@ func (w *ElasticCDRWriter) WriteRadiusCDR(rp *core.RadiusPacket) {
 // Writes the Diameter CDR
 func (w *ElasticCDRWriter) WriteDiameterCDR(dm *core.DiameterMessage) {
 	panic("Writing diameter to elastic is not supported yet")
-}
-
-// Call when sure that no more write operations will be invoked
-func (w *ElasticCDRWriter) Close() {
-	close(w.packetChan)
-
-	// Consume all the pending CDR in the buffer
-	<-w.doneChan
 }
 
 // Processes the backup files (the ones with names terminating in ".w")
