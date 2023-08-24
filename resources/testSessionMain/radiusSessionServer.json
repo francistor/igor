@@ -1,4 +1,15 @@
 {
+    "attributes":[
+        "Event-Timestamp",
+        "Acct-Session-Id",
+        "NAS-IP-Address",
+        "NAS-Port",
+        "Acct-Session-Time",
+        "Acct-Status-Type",
+        "Framed-IP-Address",
+        "Delegated-IPv6-Prefix",
+        "User-Name"
+    ],
     "indexConf":   [
         {
             "indexName": "User-Name",
@@ -12,9 +23,9 @@
     "expirationTimeSeconds": 10,
     "limboTimeSeconds": 1,
     "radiusBindAddress": "0.0.0.0",
-    "radiusBindPort": 91813,
+    "radiusBindPort": 1818,
     "httpBindAddress": "0.0.0.0",
-    "httpBindPort": 98080,
+    "httpBindPort": 18080,
     "receiveFrom": 	{
         "127.0.0.1":{
             "name": "sessionclient",

@@ -1,4 +1,15 @@
 {
+    "attributes": [
+        "Event-Timestamp", 
+        "Acct-Session-Id", 
+        "NAS-IP-Address", 
+        "NAS-Port", 
+        "Acct-Session-Time", 
+        "Acct-Status-Type", 
+        "Framed-IP-Address", 
+        "Delegated-IPv6-Prefix",
+        "User-Name"
+    ],
     "indexConf":   [
         {
             "indexName": "User-Name",

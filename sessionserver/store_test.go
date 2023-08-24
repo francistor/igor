@@ -8,11 +8,23 @@ import (
 	"github.com/francistor/igor/core"
 )
 
+var attributes = []string{
+	"Event-Timestamp",
+	"Acct-Session-Id",
+	"NAS-IP-Address",
+	"NAS-Port",
+	"Acct-Session-Time",
+	"Acct-Status-Type",
+	"Framed-IP-Address",
+	"Delegated-IPv6-Prefix",
+	"User-Name",
+}
+
 func TestSunnyDay(t *testing.T) {
 
 	// Instantiate sesion store. Expiration times are zero
 	store := RadiusSessionStore{}
-	store.init([]string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "Framed-IP-Address", IsUnique: true}}, time.Duration(0*time.Second), time.Duration(0*time.Second))
+	store.init(attributes, []string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "Framed-IP-Address", IsUnique: true}}, time.Duration(0*time.Second), time.Duration(0*time.Second))
 
 	// Create the packets
 	accessPacket1 := core.NewRadiusRequest(core.ACCESS_REQUEST).
@@ -189,7 +201,7 @@ func TestSunnyDay(t *testing.T) {
 func TestMissingPackets(t *testing.T) {
 
 	store := RadiusSessionStore{}
-	store.init([]string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "Framed-IP-Address", IsUnique: true}}, time.Duration(1*time.Second), time.Duration(0*time.Second))
+	store.init(attributes, []string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "Framed-IP-Address", IsUnique: true}}, time.Duration(1*time.Second), time.Duration(0*time.Second))
 
 	// Create the packets
 	accessPacket1 := core.NewRadiusRequest(core.ACCESS_REQUEST).
@@ -366,7 +378,7 @@ func TestMultipleIndexValues(t *testing.T) {
 
 	// Instantiate sesion store.
 	store := RadiusSessionStore{}
-	store.init([]string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "NAS-IP-Address", IsUnique: false}}, time.Duration(0*time.Second), time.Duration(0*time.Second))
+	store.init(attributes, []string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "NAS-IP-Address", IsUnique: false}}, time.Duration(0*time.Second), time.Duration(0*time.Second))
 
 	startPacket1 := core.NewRadiusRequest(core.ACCOUNTING_REQUEST).
 		Add("Acct-Session-Id", "session-1").
@@ -416,7 +428,7 @@ func TestUniqueIndex(t *testing.T) {
 
 	// Instantiate sesion store.
 	store := RadiusSessionStore{}
-	store.init([]string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "User-Name", IsUnique: true}}, time.Duration(0*time.Second), time.Duration(0*time.Second))
+	store.init(attributes, []string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "User-Name", IsUnique: true}}, time.Duration(0*time.Second), time.Duration(0*time.Second))
 
 	accessPacket1 := core.NewRadiusRequest(core.ACCESS_REQUEST).
 		Add("Acct-Session-Id", "session-1").

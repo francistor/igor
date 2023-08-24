@@ -11,19 +11,29 @@ const (
 	PACKET_TYPE_ACCOUNTING_STOP    = 4
 )
 
-// Type for the sessions stored, which consist of a bunch of radius attributes
-// and a pointer to the next entry.
+// Type for the sessions stored, which consist of a full radius packet received,
+// and pointers to other sessions to setup a linked list ordered by expiration
+// date. This is done in order to implement a session deletion stragegy that
+// is as efficient as possible.
 // Entries are ordered by expiration date. Newest added or updated entries
 // are added to the end of the list
+// An additional "expires" parameter is added to track for the expiration time
+// An additional "packetType" parameter is added for easily having access to
+// the session lifecycle (access - start - interim - stop)
+// Sessions are added a few vendor (Session-Store) specific attributes for meta-data
+// * Expires	(as Int64 milleseconds since the epoch)
+// * LastUdated (as Int64 milleseconds since the epoch)
+// * Id
 type RadiusSessionEntry struct {
-	id         string
+	id         string // Unique identifier of the session, composed of a combination of radius attributes
 	packetType int
-	packet     *core.RadiusPacket
-	next       *RadiusSessionEntry
-	previous   *RadiusSessionEntry
+	packet     *core.RadiusPacket  // The radius packet
+	next       *RadiusSessionEntry // Next session in the list. nil if the last
+	previous   *RadiusSessionEntry // Previous session in the list. nil if the firts.
 	expires    int64
 }
 
+// Linked list of Radius Sessions.
 type RadiusSessionEntryList struct {
 	head *RadiusSessionEntry
 	tail *RadiusSessionEntry

@@ -64,7 +64,7 @@ func TestMain(m *testing.M) {
 	exitCode := m.Run()
 
 	// Clean cdr files
-	//os.RemoveAll(cdrDirectoryName)
+	os.RemoveAll(cdrDirectoryName)
 
 	os.Exit(exitCode)
 }

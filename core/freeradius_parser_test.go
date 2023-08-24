@@ -31,7 +31,7 @@ func TestFreeradiusParser(t *testing.T) {
 	if !ok {
 		t.Fatal("Attribute SessionStore-Id not found")
 	}
-	if otherAVP.Code != 4 {
+	if otherAVP.Code != 3 {
 		t.Fatal("SessionStore-Id has not code 3")
 	}
 }

@@ -75,6 +75,10 @@ type SessionIndexConf struct {
 
 // Holds a radius session server configuration
 type RadiusSessionServerConfig struct {
+
+	// The attributes to store in the session
+	Attributes []string
+
 	// The names of the attributes with indexes
 	IndexConf []SessionIndexConf
 

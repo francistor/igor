@@ -91,13 +91,6 @@ func GetStateId(clean bool, next bool) int {
 // Writes the specified state-id in the state-id file
 func writeStateId(stateId int) int {
 
-	// Get the contents of the file
-	/*
-		configBase := os.Getenv("IGOR_BASE")
-		if configBase == "" {
-			panic("environment variable IGOR_BASE undefined")
-		}
-	*/
 	stateIdFileName := igorConfigBase + "../state-id"
 
 	if os.WriteFile(stateIdFileName, []byte(fmt.Sprintf("%d", stateId)), 0660) != nil {
@@ -187,7 +180,7 @@ func toFloat64(value interface{}) (float64, error) {
 }
 
 // Helper function for tests
-func httpGet(location string) (string, error) {
+func HttpGet(location string) (string, error) {
 
 	// Create client with timeout
 	httpClient := http.Client{

@@ -60,26 +60,30 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string,
 	// Initialize logger and dictionary, if default
 	if isDefault {
 		initLogger(&policyConfig.CM)
+		initRadiusDict(&policyConfig.CM)
+		initDiameterDict(&policyConfig.CM)
 		initMetricsServer(&policyConfig.CM)
 	}
 
 	// Load diameter configuraton
 	var cerr error
+	var diameterServerEnabled bool
+	var radiusServerEnabled bool
 	if cerr = policyConfig.UpdateDiameterServerConfig(); cerr != nil {
 		panic(cerr)
 	}
 	if policyConfig.diameterServerConfig.Get().BindAddress != "" {
-		if isDefault {
-			initDiameterDict(&policyConfig.CM)
-		}
-		if cerr = policyConfig.UpdateDiameterPeers(); cerr != nil {
-			panic(cerr)
-		}
-		if cerr = policyConfig.UpdateDiameterRoutingRules(); cerr != nil {
-			panic(cerr)
-		}
+		diameterServerEnabled = true
 	} else {
-		GetLogger().Info("diameter server not configured")
+		GetLogger().Info("diameter server will not start")
+	}
+	// Try to load for the benefit of the DiameterRouter, but do not panic if configuration
+	// not found
+	if cerr = policyConfig.UpdateDiameterPeers(); cerr != nil && diameterServerEnabled {
+		panic(cerr)
+	}
+	if cerr = policyConfig.UpdateDiameterRoutingRules(); cerr != nil && diameterServerEnabled {
+		panic(cerr)
 	}
 
 	// Load radius configuration
@@ -87,20 +91,21 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string,
 		panic(cerr)
 	}
 	if policyConfig.radiusServerConfig.Get().BindAddress != "" {
-		if isDefault {
-			initRadiusDict(&policyConfig.CM)
-		}
-		if cerr = policyConfig.UpdateRadiusClients(); cerr != nil {
-			panic(cerr)
-		}
-		if cerr = policyConfig.UpdateRadiusServers(); cerr != nil {
-			panic(cerr)
-		}
-		if cerr = policyConfig.UpdateRadiusHttpHandlers(); cerr != nil {
-			panic(cerr)
-		}
+		radiusServerEnabled = true
 	} else {
-		GetLogger().Info("radius server not configured")
+		GetLogger().Info("radius server will not start")
+	}
+
+	// Try to load for the benefit of the RadiusRouterRouter, but do not panic if configuration
+	// not found
+	if cerr = policyConfig.UpdateRadiusClients(); cerr != nil && radiusServerEnabled {
+		panic(cerr)
+	}
+	if cerr = policyConfig.UpdateRadiusServers(); cerr != nil && radiusServerEnabled {
+		panic(cerr)
+	}
+	if cerr = policyConfig.UpdateRadiusHttpHandlers(); cerr != nil && radiusServerEnabled {
+		panic(cerr)
 	}
 
 	// Load http router configuration

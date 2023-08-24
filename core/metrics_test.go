@@ -309,7 +309,7 @@ func TestPrometheusEndpoint(t *testing.T) {
 	IncrementSessionUpdateQueries("1.1.1.1")
 	IncrementSessionUpdateQueries("2.2.2.2")
 
-	metrics, err := httpGet("http://localhost:9090/metrics")
+	metrics, err := HttpGet("http://localhost:9090/metrics")
 	if err != nil {
 		t.Fatalf("could not get metrics: %s", err)
 	}
@@ -332,12 +332,12 @@ func TestPrometheusEndpoint(t *testing.T) {
 
 	// TODO: add others
 
-	metricsJSON, _ := httpGet("http://localhost:9090/diameterMetrics/diameterRequestsReceived?agg=Peer&oh=server.igorserver")
+	metricsJSON, _ := HttpGet("http://localhost:9090/diameterMetrics/diameterRequestsReceived?agg=Peer&oh=server.igorserver")
 	if !strings.Contains(metricsJSON, `"Peer":"testPeer"`) || !strings.Contains(metricsJSON, `"Value":1`) {
 		t.Fatal("bad diameterMetric " + metricsJSON)
 	}
 
-	metricsJSON, _ = httpGet("http://localhost:9090/radiusMetrics/radiusServerRequests?agg=Code&endpoint=127.0.0.1:1812")
+	metricsJSON, _ = HttpGet("http://localhost:9090/radiusMetrics/radiusServerRequests?agg=Code&endpoint=127.0.0.1:1812")
 	if !strings.Contains(metricsJSON, `"Code":"1"`) || !strings.Contains(metricsJSON, `"Value":1`) {
 		t.Fatal("bad radiusMetric " + metricsJSON)
 	}

@@ -654,18 +654,6 @@
                 },
                 {
                     "code": 3,
-                    "name": "PacketType",
-                    "type": "Integer",
-                    "enumValues": 
-                    {
-                        "AccessRequest": 1,
-                        "AccountingStart": 2,
-                        "AccountingInterim": 3,
-                        "AccountingStop": 4
-                    }
-                },
-                {
-                    "code": 4,
                     "name": "Id",
                     "type": "String"
                 }

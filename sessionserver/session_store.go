@@ -9,8 +9,25 @@ import (
 )
 
 // In memory radius session store.
-// Not thread safe. Must be used inside an Actor
+// Not thread safe. Must be used inside an Actor.
+// The desing and usage principles are
+// * The id must be globally unique and unique over time
+// * Multiple RadiusSessionStore instances will be normally running in parallel, each one
+// possibly having incomplete information. It is up to the clients to query multiple
+// RadiusSesionStore instances and merge the entries received in order to get the most
+// recent information.
+// For instance, to get the session with an existing IP address, still the id should be
+// a radius session-id, which is unique. IP addresses are not. If the query returns a
+// session which has been updated later, but whose implied start session is more recent,
+// it should take this one.
+//
+// It may also be used to enforce uniquenes of certain session attributes. The method
+// for inserting a session will inform of that condition if a unique index is specified
+// and a duplicate is found.
 type RadiusSessionStore struct {
+
+	// List of attribute names to store
+	attributes []string
 
 	// Main map, storing by Id
 	sessions map[string]*RadiusSessionEntry
@@ -18,7 +35,7 @@ type RadiusSessionStore struct {
 	// Secondary indexes -> map of index names to-> map of index values to-> set of id(s) (implemented as map)
 	indexes map[string]map[string]map[string]struct{}
 
-	// List of sessions per type
+	// List of sessions per type and ordered by expiration time
 	acceptedSessions RadiusSessionEntryList
 	startedSessions  RadiusSessionEntryList
 	stoppedSessions  RadiusSessionEntryList
@@ -41,8 +58,9 @@ type RadiusSessionStore struct {
 
 // Creates a new Radius Session Store.
 // For testing only. Normally will be embedded in a RadiusSessionServer.
-func (s *RadiusSessionStore) init(idAttributes []string, indexConf []core.SessionIndexConf, expirationTime time.Duration, limboTime time.Duration) {
+func (s *RadiusSessionStore) init(attributes []string, idAttributes []string, indexConf []core.SessionIndexConf, expirationTime time.Duration, limboTime time.Duration) {
 
+	s.attributes = append(attributes, "SessionStore-Expires", "SessionStore-LastUpdated", "SessionStore-Id")
 	s.idAttributes = idAttributes
 	s.indexConf = indexConf
 	s.expirationTime = expirationTime
@@ -57,9 +75,9 @@ func (s *RadiusSessionStore) init(idAttributes []string, indexConf []core.Sessio
 	}
 }
 
-// Checks if the packet passed as argument should replace the existing one for the same id
+// Checks if the packet passed as argument should replace the existing one for the same id.
 // Returns true if the new session is relevant, and optionally the session that must be
-// replaced
+// replaced.
 func (s *RadiusSessionStore) checkInsert(id string, packetType int, packet *core.RadiusPacket) (bool, *RadiusSessionEntry) {
 
 	// Look for existing session
@@ -89,8 +107,7 @@ func (s *RadiusSessionStore) checkInsert(id string, packetType int, packet *core
 }
 
 // Adds a new entry to the store.
-// Returns the offending session-id and index if a restriction was found
-// Warning: This method modifies the original packet!!!
+// Returns the offending session-id and index if a restriction was found.
 func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) (string, string) {
 
 	// Build the id
@@ -141,7 +158,8 @@ func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) (string, stri
 				if sessionIds, found := s.indexes[indexName][indexValue]; found {
 					// Should only be one entry, but iterate through all
 					for id := range sessionIds {
-						if entry, exists := s.sessions[id]; exists {
+						if entry, found := s.sessions[id]; found {
+							// If type indicates that the session is not terminated, it is ok to go on
 							if entry.packetType != PACKET_TYPE_ACCOUNTING_STOP {
 								return id, indexName
 							}
@@ -152,34 +170,44 @@ func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) (string, stri
 		}
 	}
 
+	// Copy of the packet that will be stored
+	packetCopy := packet.Copy(s.attributes, nil)
+
 	// Add meta attributes
 	lastUpdated := time.Now()
-	packet.Add("SessionStore-Id", id)
-	packet.Add("SessionStore-LastUpdated", lastUpdated.UnixMilli())
-	packet.Add("SessionStore-PacketType", packetType)
-
 	var expirationTime time.Time
 	if packetType == PACKET_TYPE_ACCESS_REQUEST || packetType == PACKET_TYPE_ACCOUNTING_STOP {
 		expirationTime = lastUpdated.Add(s.limboTime)
 	} else {
 		expirationTime = lastUpdated.Add(s.expirationTime)
 	}
-	packet.Add("SessionStore-Expires", expirationTime.Unix())
+	packetCopy.Add("SessionStore-Expires", expirationTime.UnixMilli())
+	packetCopy.Add("SessionStore-LastUpdated", lastUpdated.UnixMilli())
+	packetCopy.Add("SessionStore-Id", id)
 
-	entry := RadiusSessionEntry{id, packetType, packet, nil, nil, expirationTime.Unix()}
+	// Object to be storeed
+	entry := RadiusSessionEntry{id, packetType, packetCopy, nil, nil, expirationTime.UnixMilli()}
+
+	// There is a linked list for each type of session
+	// Add the new session
 	switch packetType {
 	case PACKET_TYPE_ACCESS_REQUEST:
 		s.acceptedSessions.add(&entry)
+
 	case PACKET_TYPE_ACCOUNTING_START, PACKET_TYPE_ACCOUNTING_INTERIM:
 		s.startedSessions.add(&entry)
+
 	case PACKET_TYPE_ACCOUNTING_STOP:
 		s.stoppedSessions.add(&entry)
 	}
 
+	// Remove the old session
 	if oldSession != nil {
 		switch oldSession.packetType {
+
 		case PACKET_TYPE_ACCESS_REQUEST:
 			s.acceptedSessions.remove(oldSession)
+
 		case PACKET_TYPE_ACCOUNTING_START, PACKET_TYPE_ACCOUNTING_INTERIM:
 			s.startedSessions.remove(oldSession)
 		}
@@ -188,7 +216,7 @@ func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) (string, stri
 	// Add to sessions. Deletion is done always by the deleter process
 	s.sessions[id] = &entry
 
-	// Add entry for each index, if not already there. Some attributes may not be present in ACCESS
+	// Add entry for each index, if not already there. Some attributes may not be present in an access request
 	if oldSession == nil || oldSession.packetType == PACKET_TYPE_ACCESS_REQUEST {
 		for _, indexConf := range s.indexConf {
 			indexName := indexConf.IndexName
@@ -218,10 +246,13 @@ func (s *RadiusSessionStore) deleteEntry(e *RadiusSessionEntry) {
 
 	// Unlink
 	switch e.packetType {
+
 	case PACKET_TYPE_ACCESS_REQUEST:
 		s.acceptedSessions.remove(e)
+
 	case PACKET_TYPE_ACCOUNTING_START, PACKET_TYPE_ACCOUNTING_INTERIM:
 		s.startedSessions.remove(e)
+
 	case PACKET_TYPE_ACCOUNTING_STOP:
 		s.stoppedSessions.remove(e)
 	}
@@ -243,8 +274,15 @@ func (s *RadiusSessionStore) deleteEntry(e *RadiusSessionEntry) {
 
 // Get all the sessions with the specified index name and value
 func (s *RadiusSessionStore) FindByIndex(indexName string, indexValue string, activeOnly bool) []core.RadiusPacket {
+
+	index, found := s.indexes[indexName]
+	if !found {
+		core.GetLogger().Warnf("query for non existing index: %s", indexName)
+		return nil
+	}
+
 	var ids []string
-	for id := range s.indexes[indexName][indexValue] {
+	for id := range index[indexValue] {
 		ids = append(ids, id)
 	}
 
@@ -263,7 +301,7 @@ func (s *RadiusSessionStore) FindByIndex(indexName string, indexValue string, ac
 // Remove the expired entries from the specified list
 func (s *RadiusSessionStore) ExpireEntries(list *RadiusSessionEntryList, olderThan time.Time) {
 
-	cutoffTime := olderThan.Unix()
+	cutoffTime := olderThan.UnixMilli()
 
 	entry := list.head
 	for entry != nil {
