@@ -286,7 +286,7 @@ func (s *RadiusSessionStore) FindByIndex(indexName string, indexValue string, ac
 		ids = append(ids, id)
 	}
 
-	var packets []core.RadiusPacket
+	var packets = make([]core.RadiusPacket, 0)
 	for _, id := range ids {
 		if activeOnly && s.sessions[id].packetType == PACKET_TYPE_ACCOUNTING_STOP {
 			// Filter stopped sessions if so specified

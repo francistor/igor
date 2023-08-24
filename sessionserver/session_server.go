@@ -228,7 +228,7 @@ func (ss *RadiusSessionServer) eventLoop() {
 				qr.RChan <- errors.New("session server terminated")
 			} else {
 				// Build the response
-				resp := SessionQueryResponse{}
+				resp := SessionQueryResponse{Items: make([][]core.RadiusAVP, 0)} // Initialize to return an empty array instead of a null
 				for _, session := range ss.FindByIndex(qr.IndexName, qr.IndexValue, qr.ActiveOnly) {
 					resp.Items = append(resp.Items, session.AVPs)
 				}

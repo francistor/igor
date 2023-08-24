@@ -1,7 +1,6 @@
 package sessionserver
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -103,8 +102,6 @@ func TestServerSunnyDay(t *testing.T) {
 
 	// Send query for both sessions
 	queryResp, err = core.HttpGet("https://localhost:18080/sessionserver/v1/sessions?index_name=User-Name&index_value=user1&active_only=true")
-	fmt.Println("-----------------------")
-	fmt.Println(queryResp)
 	if err != nil {
 		t.Fatalf("query returned error %s", err)
 	}
