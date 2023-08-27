@@ -60,7 +60,7 @@ type RadiusSessionStore struct {
 // For testing only. Normally will be embedded in a RadiusSessionServer.
 func (s *RadiusSessionStore) init(attributes []string, idAttributes []string, indexConf []core.SessionIndexConf, expirationTime time.Duration, limboTime time.Duration) {
 
-	s.attributes = append(attributes, "SessionStore-Expires", "SessionStore-LastUpdated", "SessionStore-Id")
+	s.attributes = attributes
 	s.idAttributes = idAttributes
 	s.indexConf = indexConf
 	s.expirationTime = expirationTime
@@ -185,7 +185,7 @@ func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) (string, stri
 	packetCopy.Add("SessionStore-LastUpdated", lastUpdated.UnixMilli())
 	packetCopy.Add("SessionStore-Id", id)
 
-	// Object to be storeed
+	// Object to be stored
 	entry := RadiusSessionEntry{id, packetType, packetCopy, nil, nil, expirationTime.UnixMilli()}
 
 	// There is a linked list for each type of session
@@ -260,16 +260,38 @@ func (s *RadiusSessionStore) deleteEntry(e *RadiusSessionEntry) {
 	// Delete from indexes
 	for _, indexConf := range s.indexConf {
 		indexName := indexConf.IndexName
-		indexAVP, _ := e.packet.GetAVP(indexName)
-		indexValue := indexAVP.GetString()
-		delete(s.indexes[indexName][indexValue], e.id)
-		if len(s.indexes[indexName][indexValue]) == 0 {
-			delete(s.indexes[indexName], indexValue)
+		if indexAVP, err := e.packet.GetAVP(indexName); err == nil {
+			indexValue := indexAVP.GetString()
+			delete(s.indexes[indexName][indexValue], e.id)
+			if len(s.indexes[indexName][indexValue]) == 0 {
+				delete(s.indexes[indexName], indexValue)
+			}
 		}
 	}
 
 	// Delete from sessions
 	delete(s.sessions, e.id)
+}
+
+// Remove the expired entries from the specified list
+func (s *RadiusSessionStore) expireEntries(list *RadiusSessionEntryList, olderThan time.Time) {
+
+	cutoffTime := olderThan.UnixMilli()
+
+	entry := list.head
+	for entry != nil {
+		if entry.expires <= cutoffTime {
+			s.deleteEntry(entry)
+		}
+		entry = entry.next
+	}
+}
+
+// The method arguments should normally be set to now(), except for testing
+func (s *RadiusSessionStore) expireAllEntries(currentExpireDate time.Time, currentLimboDate time.Time) {
+	s.expireEntries(&s.acceptedSessions, currentLimboDate)
+	s.expireEntries(&s.startedSessions, currentExpireDate)
+	s.expireEntries(&s.stoppedSessions, currentLimboDate)
 }
 
 // Get all the sessions with the specified index name and value
@@ -296,26 +318,6 @@ func (s *RadiusSessionStore) FindByIndex(indexName string, indexValue string, ac
 	}
 
 	return packets
-}
-
-// Remove the expired entries from the specified list
-func (s *RadiusSessionStore) ExpireEntries(list *RadiusSessionEntryList, olderThan time.Time) {
-
-	cutoffTime := olderThan.UnixMilli()
-
-	entry := list.head
-	for entry != nil {
-		if entry.expires <= cutoffTime {
-			list.remove(entry)
-		}
-		entry = entry.next
-	}
-}
-
-func (s *RadiusSessionStore) ExpireAllEntries(olderThan time.Time) {
-	s.ExpireEntries(&s.acceptedSessions, olderThan)
-	s.ExpireEntries(&s.startedSessions, olderThan)
-	s.ExpireEntries(&s.stoppedSessions, olderThan)
 }
 
 // Used for testing

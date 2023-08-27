@@ -8,7 +8,12 @@ import (
 	"github.com/francistor/igor/core"
 )
 
+// SessionStore attributes added here.This is needed only for testing. SessionStore does that automatically
 var attributes = []string{
+	"SessionStore-Expires",
+	"SessionStore-LastUpdated",
+	"SessionStore-Id",
+	"SessionStore-SeenBy",
 	"Event-Timestamp",
 	"Acct-Session-Id",
 	"NAS-IP-Address",
@@ -20,7 +25,7 @@ var attributes = []string{
 	"User-Name",
 }
 
-func TestSunnyDay(t *testing.T) {
+func TestStoreSunnyDay(t *testing.T) {
 
 	// Instantiate sesion store. Expiration times are zero
 	store := RadiusSessionStore{}
@@ -183,7 +188,7 @@ func TestSunnyDay(t *testing.T) {
 	}
 
 	// Expire
-	store.ExpireAllEntries(time.Now())
+	store.expireAllEntries(time.Now(), time.Now())
 	acceptedEntries = store.GetEntries(PACKET_TYPE_ACCESS_REQUEST, true)
 	if len(acceptedEntries) > 0 {
 		t.Fatal("all sessions should have started and stopped")
@@ -198,7 +203,7 @@ func TestSunnyDay(t *testing.T) {
 	}
 }
 
-func TestMissingPackets(t *testing.T) {
+func TestStoreMissingPackets(t *testing.T) {
 
 	store := RadiusSessionStore{}
 	store.init(attributes, []string{"Acct-Session-Id", "NAS-IP-Address"}, []core.SessionIndexConf{{IndexName: "Framed-IP-Address", IsUnique: true}}, time.Duration(1*time.Second), time.Duration(0*time.Second))
@@ -284,7 +289,7 @@ func TestMissingPackets(t *testing.T) {
 	}
 
 	// Expire the started session. The accepted session has disappeared
-	store.ExpireAllEntries(time.Now())
+	store.expireAllEntries(time.Now(), time.Now())
 	acceptedEntries = store.GetEntries(PACKET_TYPE_ACCESS_REQUEST, true)
 	if len(acceptedEntries) != 0 {
 		t.Fatal("incorrect number of accepted sessions")
@@ -344,7 +349,7 @@ func TestMissingPackets(t *testing.T) {
 	}
 
 	// Expire
-	store.ExpireAllEntries(time.Now())
+	store.expireAllEntries(time.Now(), time.Now())
 	acceptedEntries = store.GetEntries(PACKET_TYPE_ACCESS_REQUEST, true)
 	if len(acceptedEntries) > 0 {
 		t.Fatal("all sessions should have started and stopped")
@@ -359,7 +364,7 @@ func TestMissingPackets(t *testing.T) {
 	}
 
 	// Force expiration of all
-	store.ExpireAllEntries(time.Now().Add(time.Duration(1 * time.Second)))
+	store.expireAllEntries(time.Now().Add(time.Duration(1*time.Second)), time.Now().Add(time.Duration(1*time.Second)))
 	acceptedEntries = store.GetEntries(PACKET_TYPE_ACCESS_REQUEST, true)
 	if len(acceptedEntries) > 0 {
 		t.Fatal("all sessions should have started and stopped")
@@ -374,7 +379,7 @@ func TestMissingPackets(t *testing.T) {
 	}
 }
 
-func TestMultipleIndexValues(t *testing.T) {
+func TestStoreMultipleIndexValues(t *testing.T) {
 
 	// Instantiate sesion store.
 	store := RadiusSessionStore{}
@@ -424,7 +429,7 @@ func TestMultipleIndexValues(t *testing.T) {
 	}
 }
 
-func TestUniqueIndex(t *testing.T) {
+func TestStoreUniqueIndex(t *testing.T) {
 
 	// Instantiate sesion store.
 	store := RadiusSessionStore{}

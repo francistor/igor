@@ -26,6 +26,11 @@
     "radiusBindPort": 91813,
     "httpBindAddress": "0.0.0.0",
     "httpBindPort": 98080,
+    "replicationParams": {
+        "originPorts": [9000, 9001],
+        "timeoutSecs": 2,
+        "serverTries": 2
+    },
     "receiveFrom": 	{
         "127.0.0.1":{
             "name": "sessionclient",
@@ -36,9 +41,7 @@
         {
             "ipAddress": "127.0.0.1",
             "secret": "secret",
-            "authPort": 11812,
-            "acctPort": 11813,
-            "originPorts": [9000, 9001]
+            "acctPort": 11813
         }
     ]	
 }

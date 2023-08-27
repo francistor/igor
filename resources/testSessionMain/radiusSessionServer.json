@@ -1,4 +1,5 @@
 {
+    "name": "sessionmaster",
     "attributes":[
         "Event-Timestamp",
         "Acct-Session-Id",
@@ -20,25 +21,29 @@
             "isUnique": false           
         }],
     "idAttributes": ["Acct-Session-Id", "NAS-IP-Address"],
-    "expirationTimeSeconds": 10,
+    "expirationTimeSeconds": 3,
     "limboTimeSeconds": 1,
     "radiusBindAddress": "0.0.0.0",
-    "radiusBindPort": 1818,
+    "radiusBindPort": 1813,
     "httpBindAddress": "0.0.0.0",
-    "httpBindPort": 18080,
+    "httpBindPort": 18813,
+    "replicationParams": {
+        "originPorts": [19000, 19001],
+        "timeoutSecs": 2,
+        "serverTries": 2
+    },
     "receiveFrom": 	{
         "127.0.0.1":{
-            "name": "sessionclient",
+            "name": "sessionreplica1",
             "secret": "secret"
         }
     },
     "sendTo": [
         {
+            "name": "sessionreplica1",
             "ipAddress": "127.0.0.1",
             "secret": "secret",
-            "authPort": 11812,
-            "acctPort": 11813,
-            "originPorts": [9000, 9001]
+            "acctPort": 1814
         }
     ]	
 }

@@ -1,0 +1,49 @@
+{
+    "name": "sessionreplica1",
+    "attributes":[
+        "Event-Timestamp",
+        "Acct-Session-Id",
+        "NAS-IP-Address",
+        "NAS-Port",
+        "Acct-Session-Time",
+        "Acct-Status-Type",
+        "Framed-IP-Address",
+        "Delegated-IPv6-Prefix",
+        "User-Name"
+    ],
+    "indexConf":   [
+        {
+            "indexName": "User-Name",
+            "isUnique": true
+        },
+        {
+            "indexName": "Framed-IP-Address",
+            "isUnique": false           
+        }],
+    "idAttributes": ["Acct-Session-Id", "NAS-IP-Address"],
+    "expirationTimeSeconds": 2,
+    "limboTimeSeconds": 1,
+    "radiusBindAddress": "0.0.0.0",
+    "radiusBindPort": 1814,
+    "httpBindAddress": "0.0.0.0",
+    "httpBindPort": 18814,
+    "replicationParams": {
+        "originPorts": [19010, 19011],
+        "timeoutSecs": 2,
+        "serverTries": 2
+    },
+    "receiveFrom": 	{
+        "127.0.0.1":{
+            "name": "sessionmaster",
+            "secret": "secret"
+        }
+    },
+    "sendTo": [
+        {
+            "name": "sessionmaster",
+            "ipAddress": "127.0.0.1",
+            "secret": "secret",
+            "acctPort": 1813
+        }
+    ]	
+}

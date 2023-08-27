@@ -10,13 +10,16 @@ import (
 func TestMain(m *testing.M) {
 	// Initialize the Config Objects
 	bootFile := "resources/searchRules.json"
-	instanceName := "testSessionMain"
+	instanceNameMain := "testSessionMain"
+	instanceNameReplica1 := "testSessionReplica1"
 
 	// For sending radius packets to myself
-	core.InitPolicyConfigInstance(bootFile, instanceName, nil, true)
+	core.InitPolicyConfigInstance(bootFile, instanceNameMain, nil, true)
 
-	// Intialization of Session Server
-	core.InitRadiusSessionServerConfigInstance(bootFile, instanceName, nil, false)
+	// Intialization of Session Servers
+	core.InitRadiusSessionServerConfigInstance(bootFile, instanceNameMain, nil, false)
+	// Intialization of Session Servers
+	core.InitRadiusSessionServerConfigInstance(bootFile, instanceNameReplica1, nil, false)
 
 	// Execute the tests
 	os.Exit(m.Run())

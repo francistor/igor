@@ -656,6 +656,11 @@
                     "code": 3,
                     "name": "Id",
                     "type": "String"
+                },
+                {
+                    "code": 4,
+                    "name": "SeenBy",
+                    "type": "String"
                 }
             ]
         }

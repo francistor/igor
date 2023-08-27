@@ -121,7 +121,7 @@ func (w *ElasticCDRWriter) eventLoop() {
 	var lastError time.Time
 	var hasBackup bool
 
-	// Sends Ticks through the packet channel, to signal that a write must be
+	// Sends Ticks to signal that a write must be
 	// done even if the number of packets has not reached the triggering value.
 	w.ticker = time.NewTicker(ELASTIC_CDR_WRITE_TIME_MILLIS * time.Millisecond)
 

@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/francistor/igor/constants"
 	"github.com/francistor/igor/core"
+	"github.com/francistor/igor/radiusclient"
 	"github.com/francistor/igor/radiusserver"
 )
 
@@ -23,6 +26,10 @@ type SessionServerSetDownCommand struct {
 
 // Signal to terminate the event loop
 type SessionServerCloseCommand struct {
+}
+
+// Signal to expire sesions
+type SessionPurgeCommand struct {
 }
 
 // Message to update the SessionsStore with a new or updated session
@@ -75,6 +82,9 @@ type RadiusSessionServer struct {
 	// Holds the radius server for incoming session storage requests
 	radiusServer *radiusserver.RadiusServer
 
+	// Holds the radius client for replication to other session servers
+	radiusClient *radiusclient.RadiusClient
+
 	// Holds the httpserver for incoming queries
 	httpServer *http.Server
 
@@ -95,6 +105,12 @@ type RadiusSessionServer struct {
 
 	// Full configuration
 	config core.RadiusSessionServerConfig
+
+	// Make sure goroutines are executed before closing
+	wg sync.WaitGroup
+
+	// For session expiration
+	ticker *time.Ticker
 }
 
 // Creates a new instance of the RadiusSessionServer
@@ -102,6 +118,7 @@ func NewRadiusSessionServer(instanceName string) *RadiusSessionServer {
 
 	// Get the configuration
 	ssConf := core.GetRadiusSessionServerConfigInstance(instanceName).RadiusSessionServerConf()
+	ssConf.Attributes = append(ssConf.Attributes, "SessionStore-Expires", "SessionStore-LastUpdated", "SessionStore-Id", "SessionStore-SeenBy")
 
 	// If using the default mux (not done here. Just in case...)
 	// https://stackoverflow.com/questions/40786526/resetting-http-handlers-in-golang-for-unit-testing
@@ -135,30 +152,6 @@ func NewRadiusSessionServer(instanceName string) *RadiusSessionServer {
 	return &rss
 }
 
-// Graceful shutdown
-func (ss *RadiusSessionServer) Close() {
-
-	// Close the http server
-	ss.httpServer.Shutdown(context.Background())
-	<-ss.httpDoneChannel
-
-	// Set down
-	ss.controlChannel <- SessionServerSetDownCommand{}
-
-	// Wait here if necessary
-	// TODO: Need to wait for anything?
-
-	// Terminate the event loop
-	ss.controlChannel <- SessionServerCloseCommand{}
-
-	<-ss.eventLoopDoneChannel
-
-	// Close channels
-	close(ss.controlChannel)
-	close(ss.queryChannel)
-	close(ss.updateChannel)
-}
-
 // Execute the event loop, radius and http servers
 func (rss *RadiusSessionServer) run() {
 
@@ -167,8 +160,11 @@ func (rss *RadiusSessionServer) run() {
 
 	// Instantiate the radius server. It starts operating right after instantiation.
 	rss.radiusServer = radiusserver.NewRadiusServer(rss.config.ReceiveFrom, rss.config.RadiusBindAddress, rss.config.RadiusBindPort, func(request *core.RadiusPacket) (*core.RadiusPacket, error) {
-		return rss.handlePacket(request)
+		return rss.HandlePacket(request)
 	})
+
+	// Instantiate the radius client.
+	rss.radiusClient = radiusclient.NewRadiusClient()
 
 	// Make sure the certificates exists in the current directory
 	certFile, keyFile := core.EnsureCertificates()
@@ -184,10 +180,60 @@ func (rss *RadiusSessionServer) run() {
 	close(rss.httpDoneChannel)
 }
 
+// Graceful shutdown
+func (ss *RadiusSessionServer) Close() {
+
+	// Stop the ticker
+	if ss.ticker != nil {
+		ss.ticker.Stop()
+	}
+
+	// Close the http server
+	ss.httpServer.Shutdown(context.Background())
+	<-ss.httpDoneChannel
+
+	// Set down
+	ss.controlChannel <- SessionServerSetDownCommand{}
+
+	// Wait for goroutines to finish
+	ss.wg.Wait()
+
+	// Close radius server and client
+	ss.radiusServer.Close()
+	ss.radiusClient.SetDown()
+	ss.radiusClient.Close()
+
+	// Terminate the event loop
+	ss.controlChannel <- SessionServerCloseCommand{}
+
+	<-ss.eventLoopDoneChannel
+
+	// Close channels
+	close(ss.controlChannel)
+	close(ss.queryChannel)
+	close(ss.updateChannel)
+}
+
 // Event loop
 func (ss *RadiusSessionServer) eventLoop() {
+
+	// Sends Ticks through the packet channel, to signal that a write must be
+	// done even if the number of packets has not reached the triggering value.
+	purgeIntervalMillis := ss.config.PurgeIntervalMillis
+	if purgeIntervalMillis == 0 {
+		ss.ticker = time.NewTicker(1000 * time.Millisecond)
+	} else {
+		ss.ticker = time.NewTicker(time.Duration(purgeIntervalMillis) * time.Millisecond)
+	}
+
 	for {
 		select {
+
+		case <-ss.ticker.C:
+
+			now := time.Now()
+			ss.expireAllEntries(now, now)
+
 		case cr := <-ss.controlChannel:
 
 			switch cr.(type) {
@@ -202,9 +248,10 @@ func (ss *RadiusSessionServer) eventLoop() {
 				// Terminate the event loop
 				ss.eventLoopDoneChannel <- struct{}{}
 				return
+
 			}
 
-			// New session request
+		// New session request
 		case ur := <-ss.updateChannel:
 
 			// Do not accept if we are terminated
@@ -222,6 +269,64 @@ func (ss *RadiusSessionServer) eventLoop() {
 			// The response channel is closed by the responder
 			close(ur.RChan)
 
+			// Replication
+			if ss.status == StatusTerminated {
+				ur.RChan <- errors.New("session server terminated")
+			} else if ur.Packet.Code == core.ACCOUNTING_REQUEST {
+				// Iterate over the sendTo array
+
+			destinationLoop:
+				for _, destination := range ss.config.SendTo {
+					// Check if we need to send the packet, or that would be a loop
+					seenByAttrs := ur.Packet.GetAllAVP("SessionStore-SeenBy")
+					for _, avp := range seenByAttrs {
+						if avp.GetString() == destination.Name {
+							continue destinationLoop
+						}
+					}
+					if (len(seenByAttrs)) > 4 {
+						core.GetLogger().Errorf("Session Replica loop aborted. Check configuration")
+						continue
+					}
+
+					// Choose random port. Specification in serverTo entry has precedence over specification in replicationParams
+					var originPorts []int
+					if len(destination.OriginPorts) == 0 {
+						originPorts = append(originPorts, ss.config.ReplicationParams.OriginPorts...)
+					} else {
+						originPorts = append(originPorts, destination.OriginPorts...)
+					}
+					originPort := originPorts[rand.Intn(len(originPorts))]
+
+					ss.wg.Add(1)
+					go func(destination core.RadiusServer) {
+						defer ss.wg.Done()
+
+						// Generate copy
+						packetToSend := ur.Packet.Copy(ss.attributes, nil)
+
+						// Send the radius packet
+						// Will only use server tries (not tries, since we are not sending to a group)
+						// Replication metrics will be shown as radius client metrics
+						ch := make(chan interface{}, 1)
+						ss.radiusClient.RadiusExchange(fmt.Sprintf("%s:%d", destination.IPAddress, destination.AcctPort), originPort,
+							packetToSend, time.Duration(ss.config.ReplicationParams.TimeoutSecs)*time.Second, ss.config.ReplicationParams.ServerTries,
+							destination.Secret, ch)
+
+						// Block here until response or error
+						response := <-ch
+
+						// ch was closed in RadiusExchange
+						switch v := response.(type) {
+						case *core.RadiusPacket:
+							// Correctly replicated
+						case error:
+							core.GetLogger().Warnf("could not replicate session to %s: %s", destination.IPAddress, v.Error())
+						}
+					}(destination)
+				}
+			}
+
 		case qr := <-ss.queryChannel:
 			// Do not accept if we are terminated
 			if ss.status == StatusTerminated {
@@ -237,20 +342,23 @@ func (ss *RadiusSessionServer) eventLoop() {
 
 			// The response channel is closed by the responder
 			close(qr.RChan)
-		}
 
-	}
+		} // select
+
+	} // for
 }
 
 // Pushes entries received via radius to the store
 // The first returned value is the packet that must be sent as response in case of an access-accept
 // denied due to index constraint not met.
 // If error is true, some other kind of error occured and the packet should be dropped
-func (rss *RadiusSessionServer) handlePacket(request *core.RadiusPacket) (*core.RadiusPacket, error) {
+func (rss *RadiusSessionServer) HandlePacket(request *core.RadiusPacket) (*core.RadiusPacket, error) {
 
+	// Generate the request to the event loop.
+	// Add myself as processor of this packet (loop avoidance)
 	sur := SessionStoreRequest{
 		RChan:  make(chan error, 1),
-		Packet: request,
+		Packet: request.Add("SessionStore-SeenBy", rss.config.Name),
 	}
 
 	// Send request

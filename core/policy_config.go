@@ -255,6 +255,7 @@ func (c *PolicyConfigurationManager) RadiusClients() RadiusClients {
 
 // Holds the configuration for an upstream Radius Server
 type RadiusServer struct {
+	Name                  string
 	IPAddress             string
 	Secret                string
 	AuthPort              int

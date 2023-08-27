@@ -5,5 +5,6 @@ BEGIN-VENDOR	SessionStore
 ATTRIBUTE	Expires			        1	integer64
 ATTRIBUTE	LastUpdated			    2   integer64
 ATTRIBUTE	Id     		            3	string
+ATTRIBUTE   SeenBy                  4   string
 
 END-VENDOR	SessionStore
