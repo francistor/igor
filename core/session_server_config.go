@@ -38,7 +38,7 @@ func InitRadiusSessionServerConfigInstance(bootstrapFile string, instanceName st
 		initLogger(&radiusSessionServerConfig.CM)
 		initRadiusDict(&radiusSessionServerConfig.CM)
 		initDiameterDict(&radiusSessionServerConfig.CM)
-		initMetricsServer(&radiusSessionServerConfig.CM)
+		initInstrumentationServer(&radiusSessionServerConfig.CM)
 	}
 
 	// Load handler configuraton

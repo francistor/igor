@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/francistor/igor/core"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -154,8 +155,8 @@ type WatchdogMsg struct {
 // Stored in the DiameterPeer.requestMap
 type RequestContext struct {
 
-	// Metric key. Used because the message will not be available in a timeout
-	key core.PeerDiameterMetricKey
+	// Used because the message will not be available in a timeout
+	labels prometheus.Labels
 
 	// Channel on which the answer or an error will be reported back
 	rchan chan interface{}
@@ -520,7 +521,7 @@ func (dp *DiameterPeer) eventLoop() {
 						// If it was a Request, store in the outstanding request map
 						// RChan may be nil if it is a base application message
 						if v.message.IsRequest {
-							core.IncrementPeerDiameterRequestSent(dp.peerConfig.DiameterHost, v.message)
+							core.RecordPeerDiameterRequestSent(dp.peerConfig.DiameterHost, v.message)
 							if v.rchan != nil {
 								// Set timer
 								dp.wg.Add(1)
@@ -532,18 +533,18 @@ func (dp *DiameterPeer) eventLoop() {
 
 								// Add to requests map
 								dp.requestsMap[v.message.HopByHopId] = RequestContext{
-									rchan: v.rchan,
-									timer: timer,
-									key:   core.PeerDiameterMetricFromMessage(dp.peerConfig.DiameterHost, v.message),
+									rchan:  v.rchan,
+									timer:  timer,
+									labels: core.LabelsFromDiameterMessage(dp.peerConfig.DiameterHost, v.message),
 								}
 							}
 						} else {
-							core.IncrementPeerDiameterAnswerSent(dp.peerConfig.DiameterHost, v.message)
+							core.RecordPeerDiameterAnswerSent(dp.peerConfig.DiameterHost, v.message)
 						}
 					}
 
 				} else {
-					core.GetLogger().Errorf("message with application %s and command %s to %s was not sent because peer status is %d", v.message.ApplicationName, v.message.CommandName, dp.status)
+					core.GetLogger().Errorf("message with application %s and command %s to %s was not sent because peer status is %d", v.message.ApplicationName, v.message.CommandName, dp.peerConfig.DiameterHost, dp.status)
 					if v.rchan != nil {
 						v.rchan <- fmt.Errorf("message not sent to %s. Status is not Engaged", dp.peerConfig.DiameterHost)
 						close(v.rchan)
@@ -562,7 +563,7 @@ func (dp *DiameterPeer) eventLoop() {
 
 				if v.message.IsRequest {
 
-					core.IncrementPeerDiameterRequestReceived(dp.peerConfig.DiameterHost, v.message)
+					core.RecordPeerDiameterRequestReceived(dp.peerConfig.DiameterHost, v.message)
 
 					// Check if it is a Base application message (code for Base application is 0)
 					// In this case, handling is done here
@@ -620,7 +621,7 @@ func (dp *DiameterPeer) eventLoop() {
 					}
 				} else {
 					// Received an answer
-					core.IncrementPeerDiameterAnswerReceived(dp.peerConfig.DiameterHost, v.message)
+					core.RecordPeerDiameterAnswerReceived(dp.peerConfig.DiameterHost, v.message)
 
 					if v.message.ApplicationId == 0 {
 						// Base answer
@@ -666,7 +667,7 @@ func (dp *DiameterPeer) eventLoop() {
 						// Non base answer
 						if requestContext, ok := dp.requestsMap[v.message.HopByHopId]; !ok {
 							// Request not found in the requests map
-							core.IncrementPeerDiameterAnswerStalled(dp.peerConfig.DiameterHost, v.message)
+							core.RecordPeerDiameterAnswerStalled(dp.peerConfig.DiameterHost, v.message)
 							core.GetLogger().Errorf("stalled diameter answer: '%v'", v.message)
 						} else {
 							// Cancel timer
@@ -701,7 +702,7 @@ func (dp *DiameterPeer) eventLoop() {
 					// Delete the requestmap entry
 					delete(dp.requestsMap, v.hopByHopId)
 					// Update metric
-					core.IncrementPeerDiameterRequestTimeout(requestContext.key)
+					core.RecordPeerDiameterRequestTimeout(requestContext.labels)
 				}
 
 			case WatchdogMsg:

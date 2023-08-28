@@ -370,12 +370,15 @@ func (rss *RadiusSessionServer) HandlePacket(request *core.RadiusPacket) (*core.
 	var constraintError IndexConstraintError
 	if e == nil {
 		// Processed correctly
+		core.RecordSessionUpdate(strconv.Itoa(int(request.Code)), "0", "")
 		return core.NewRadiusResponse(request, true), nil
 	} else if errors.As(e, &constraintError) {
 		// Not inserted due to constraint
+		core.RecordSessionUpdate(strconv.Itoa(int(request.Code)), "1", constraintError.offendingIndex)
 		return core.NewRadiusResponse(request, false).Add("Reply-Message", "Duplicated entry for index "+constraintError.offendingIndex), nil
 	} else {
 		// Not inserted due to a generic error
+		core.RecordSessionUpdate(strconv.Itoa(int(request.Code)), "1", "")
 		return nil, e
 	}
 }
@@ -431,7 +434,7 @@ func (ss *RadiusSessionServer) getQueryHandler() func(w http.ResponseWriter, req
 		// If request is empty, answer with OK
 		if indexName == "" || indexValue == "" {
 			w.WriteHeader(http.StatusOK)
-			core.IncrementSessionQueries(req.URL.Path, "", constants.SUCCESS)
+			core.RecordSessionQuery(req.URL.Path, "", constants.SUCCESS)
 			return
 		}
 
@@ -451,7 +454,7 @@ func (ss *RadiusSessionServer) getQueryHandler() func(w http.ResponseWriter, req
 
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		core.IncrementSessionQueries(req.URL.Path, indexName, constants.SUCCESS)
+		core.RecordSessionQuery(req.URL.Path, indexName, constants.SUCCESS)
 	}
 }
 
@@ -460,5 +463,5 @@ func treatError(w http.ResponseWriter, err error, message string, statusCode int
 	core.GetLogger().Errorf(message+": %s", err)
 	w.WriteHeader(statusCode)
 	w.Write([]byte(err.Error()))
-	core.IncrementSessionQueries(reqURI, indexName, appErrorCode)
+	core.RecordSessionQuery(reqURI, indexName, appErrorCode)
 }

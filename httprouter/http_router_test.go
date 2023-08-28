@@ -183,18 +183,19 @@ func TestHttpRouterHandler(t *testing.T) {
 		t.Fatalf("diameter response does not contain expected diameter attribute")
 	}
 
-	rrm := core.MetricQuery[core.HttpRouterMetrics](core.MS, "HttpRouterExchanges", nil, []string{"Path"})
-	if v, ok := rrm[core.HttpRouterMetricKey{Path: "/routeRadiusRequest"}]; !ok {
-		t.Fatalf("HttpRouterExchanges not found")
-	} else if v != 1 {
-		t.Fatalf("HttpRouterExchanges for radius is not 1")
+	val, err := core.GetMetricWithLabels("http_router_exchanges", `{.*path="/routeDiameterRequest".*}`)
+	if err != nil {
+		t.Fatalf("error getting http_router_exchanges %s", err)
 	}
-
-	drm := core.MetricQuery[core.HttpRouterMetrics](core.MS, "HttpRouterExchanges", nil, []string{"Path"})
-	if v, ok := drm[core.HttpRouterMetricKey{Path: "/routeDiameterRequest"}]; !ok {
-		t.Fatalf("HttpRouterExchanges not found")
-	} else if v != 1 {
-		t.Fatalf("HttpRouterExchanges for diameteris not 1")
+	if val != 1 {
+		t.Fatalf("number of http_router_exchanges messages was not 1")
+	}
+	val, err = core.GetMetricWithLabels("http_router_exchanges", `{.*path="/routeRadiusRequest".*}`)
+	if err != nil {
+		t.Fatalf("error getting http_router_exchanges %s", err)
+	}
+	if val != 1 {
+		t.Fatalf("number of http_router_exchanges messages was not 1")
 	}
 
 	rrouter.Close()

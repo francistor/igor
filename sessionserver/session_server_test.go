@@ -86,11 +86,44 @@ func TestSessionServerSunnyDay(t *testing.T) {
 	if err != nil {
 		t.Fatalf("query returned error %s", err)
 	}
+
+	// Get metrics
 	if !strings.Contains(queryResp, "{\"SessionStore-Id\":\"session2/1.1.1.1\"}") {
 		t.Fatalf("bad response to session query in start state")
 	}
 	if !strings.Contains(queryResp, "{\"SessionStore-Id\":\"session1/1.1.1.1\"}") {
 		t.Fatalf("bad response to session query in start state")
+	}
+
+	val, err := core.GetMetricWithLabels("session_server_updates", `{.*code="1".*}`)
+	if err != nil {
+		t.Fatalf("error getting session_server_updates: %s", err)
+	}
+	if val != 1 {
+		t.Fatal("number of accept udates was not 1")
+	}
+
+	val, err = core.GetMetricWithLabels("session_server_updates", `{.*code="4".*}`)
+	if err != nil {
+		t.Fatalf("error getting session_server_updates: %s", err)
+	}
+	if val != 1 {
+		t.Fatal("number of start udates was not 1")
+	}
+
+	val, err = core.GetMetricWithLabels("session_server_queries", `{.*indexname="Framed-IP-Address".*}`)
+	if err != nil {
+		t.Fatalf("error getting session_server_queries: %s", err)
+	}
+	if val != 1 {
+		t.Fatal("number of session_server_queries for Framed-IP-Address was not 1")
+	}
+	val, err = core.GetMetricWithLabels("session_server_queries", `{.*indexname="User-Name".*}`)
+	if err != nil {
+		t.Fatalf("error getting session_server_queries: %s", err)
+	}
+	if val != 2 {
+		t.Fatal("number of session_server_queries for User-Name was not 2")
 	}
 
 	////////////////////////////////////////////////////////////////////

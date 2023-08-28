@@ -16,6 +16,8 @@ import (
 	"golang.org/x/net/http2"
 )
 
+// For instrumentation
+
 // The Diameter Peer table is a map of DiameterPeerWithStatus, which contains a pointer to a diameter
 // peer and some helping metadata about its status
 type DiameterPeerWithStatus struct {
@@ -364,7 +366,7 @@ func (router *DiameterRouter) eventLoop() {
 				rdr.Message.GetStringAVP("Destination-Realm"),
 				rdr.Message.ApplicationName,
 				false); err != nil {
-				core.IncrementRouterRouteNotFound("", rdr.Message)
+				core.RecordRouterRouteNotFound("", rdr.Message)
 				rdr.RChan <- fmt.Errorf("request not sent: no route found")
 				close(rdr.RChan)
 			} else {
@@ -393,7 +395,7 @@ func (router *DiameterRouter) eventLoop() {
 					}
 
 					if !engagedPeerFound {
-						core.IncrementRouterNoAvailablePeer("", rdr.Message)
+						core.RecordRouterNoAvailablePeer("", rdr.Message)
 						rdr.RChan <- fmt.Errorf("resquest not sent: no engaged peer")
 						close(rdr.RChan)
 					}
@@ -417,7 +419,7 @@ func (router *DiameterRouter) eventLoop() {
 
 						if answer, err := HttpDiameterRequest(router.http2Client, url, diameterRequest); err != nil {
 							logger.Errorf("http handler %s returned error: %s", url, err.Error())
-							core.IncrementRouterHandlerError("", diameterRequest)
+							core.RecordRouterHandlerError("", diameterRequest)
 							rchan <- err
 						} else {
 							// Add the Origin-Host and Origin-Realm, that are not set by the handler
@@ -440,7 +442,7 @@ func (router *DiameterRouter) eventLoop() {
 						answer, err := router.localHandler(diameterRequest)
 						if err != nil {
 							logger.Errorf("local handler returned error: %s", err.Error())
-							core.IncrementRouterHandlerError("", diameterRequest)
+							core.RecordRouterHandlerError("", diameterRequest)
 							rchan <- err
 						} else {
 							// Add the Origin-Host and Origin-Realm, that are not set by the handler

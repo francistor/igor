@@ -112,7 +112,7 @@ func getDiameterRequestHandler(handlerFunc core.DiameterMessageHandler) func(w h
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		core.IncrementHttpHandlerExchange(req.RequestURI, constants.SUCCESS)
+		core.RecordHttpHandlerExchange(req.RequestURI, constants.SUCCESS)
 	}
 }
 
@@ -146,7 +146,7 @@ func getRadiusRequestHandler(handlerFunc core.RadiusPacketHandler) func(w http.R
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		core.IncrementHttpHandlerExchange(req.RequestURI, constants.SUCCESS)
+		core.RecordHttpHandlerExchange(req.RequestURI, constants.SUCCESS)
 	}
 }
 
@@ -155,5 +155,5 @@ func treatError(w http.ResponseWriter, err error, message string, statusCode int
 	core.GetLogger().Errorf(message+": %s", err)
 	w.WriteHeader(statusCode)
 	w.Write([]byte(err.Error()))
-	core.IncrementHttpHandlerExchange(reqURI, appErrorCode)
+	core.RecordHttpHandlerExchange(reqURI, appErrorCode)
 }

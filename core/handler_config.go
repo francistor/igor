@@ -33,7 +33,7 @@ func InitHttpHandlerConfigInstance(bootstrapFile string, instanceName string, co
 		initLogger(&httpHandlerConfig.CM)
 		initRadiusDict(&httpHandlerConfig.CM)
 		initDiameterDict(&httpHandlerConfig.CM)
-		initMetricsServer(&httpHandlerConfig.CM)
+		initInstrumentationServer(&httpHandlerConfig.CM)
 	}
 
 	// Load handler configuraton

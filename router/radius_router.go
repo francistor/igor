@@ -257,7 +257,7 @@ func (router *RadiusRouter) eventLoop() {
 
 				// Send the table in the event loop, since the radiusServersTable will be
 				// constantly changed
-				core.IncrementRadiusServersTable(router.instanceName, router.parseRadiusServersTable())
+				core.PushRadiusServersTable(router.instanceName, router.parseRadiusServersTable())
 
 				// Sent after each radius request, to keep track of the status of the servers
 

@@ -145,7 +145,7 @@ func getDiameterRouteHandler(diameterRouter *router.DiameterRouter) func(w http.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		core.IncrementHttpRouterExchange(req.RequestURI, constants.SUCCESS)
+		core.RecordHttpRouterExchange(req.RequestURI, constants.SUCCESS)
 	}
 }
 
@@ -209,7 +209,7 @@ func getRadiusRouteHandler(radiusRouter *router.RadiusRouter) func(w http.Respon
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(jAnswer)
-		core.IncrementHttpRouterExchange(req.RequestURI, constants.SUCCESS)
+		core.RecordHttpRouterExchange(req.RequestURI, constants.SUCCESS)
 	}
 }
 
@@ -218,5 +218,5 @@ func treatError(w http.ResponseWriter, err error, message string, statusCode int
 	core.GetLogger().Errorf(message+": %s", err)
 	w.WriteHeader(statusCode)
 	w.Write([]byte(err.Error()))
-	core.IncrementHttpRouterExchange(reqURI, appErrorCode)
+	core.RecordHttpRouterExchange(reqURI, appErrorCode)
 }

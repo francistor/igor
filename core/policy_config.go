@@ -62,7 +62,7 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string,
 		initLogger(&policyConfig.CM)
 		initRadiusDict(&policyConfig.CM)
 		initDiameterDict(&policyConfig.CM)
-		initMetricsServer(&policyConfig.CM)
+		initInstrumentationServer(&policyConfig.CM)
 	}
 
 	// Load diameter configuraton

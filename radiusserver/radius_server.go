@@ -91,7 +91,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 		clientIPAddr := clientIP.String()
 		radiusClient, err := rs.radiusClients.FindRadiusClient(clientIP)
 		if err != nil {
-			core.IncrementRadiusServerDrop(clientIPAddr, "0")
+			core.RecordRadiusServerDrop(clientIPAddr, "0")
 			core.GetLogger().Warnf("message from unknown client %s", clientIPAddr)
 			continue
 		}
@@ -107,13 +107,13 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 		// Validate the packet
 		if radiusPacket.Code != core.ACCESS_REQUEST {
 			if !core.ValidateRequestAuthenticator(reqBuf[:packetSize], radiusClient.Secret) {
-				core.IncrementRadiusServerDrop(clientIPAddr, strconv.Itoa(int(radiusPacket.Code)))
+				core.RecordRadiusServerDrop(clientIPAddr, strconv.Itoa(int(radiusPacket.Code)))
 				core.GetLogger().Warnf("invalid request packet %s\n", radiusPacket)
 				continue
 			}
 		}
 
-		core.IncrementRadiusServerRequest(clientIPAddr, strconv.Itoa(int(radiusPacket.Code)))
+		core.RecordRadiusServerRequest(clientIPAddr, strconv.Itoa(int(radiusPacket.Code)))
 		core.GetLogger().Debugf("<- Server received RadiusPacket %s\n", radiusPacket)
 
 		// Wait for response
@@ -125,7 +125,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 
 			if err != nil {
 				core.GetLogger().Errorf("discarding packet for %s with code %d: %s", addr.String(), radiusPacket.Code, err)
-				core.IncrementRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))
+				core.RecordRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))
 				return
 			}
 
@@ -133,16 +133,16 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 			respBuf, err := response.ToBytes(secret, radiusPacket.Identifier)
 			if err != nil {
 				core.GetLogger().Errorf("error serializing packet for %s with code %d: %s", addr.String(), code, err)
-				core.IncrementRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))
+				core.RecordRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))
 				return
 			}
 			if _, err = socket.WriteTo(respBuf, addr); err != nil {
 				core.GetLogger().Errorf("error sending packet to %s with code %d: %s", addr.String(), code, err)
-				core.IncrementRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))
+				core.RecordRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))
 				return
 			}
 
-			core.IncrementRadiusServerResponse(clientIPAddr, strconv.Itoa(int(code)))
+			core.RecordRadiusServerResponse(clientIPAddr, strconv.Itoa(int(code)))
 			core.GetLogger().Debugf("-> Server sent RadiusPacket %s\n", response)
 
 		}(radiusPacket, radiusClient.Secret, clientAddr)
