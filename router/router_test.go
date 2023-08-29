@@ -139,7 +139,7 @@ func TestDiameterBasicSetup(t *testing.T) {
 	*/
 
 	// Get the current peer status
-	peerTables := core.MS.PeersTableQuery()
+	peerTables := core.IS.PeersTableQuery()
 
 	// The testClient Router will have an established connection
 	// to server.igor but not one to unreachableserver.igor
@@ -431,7 +431,7 @@ func TestRadiusHandleLocal(t *testing.T) {
 
 func TestRadiusTimeout(t *testing.T) {
 
-	core.MS.ResetMetrics()
+	core.IS.ResetMetrics()
 
 	// Start handler
 	httpHandler := httphandler.NewHttpHandler("testServer", httpDiameterHandler, httpRadiusHandler)
@@ -454,7 +454,7 @@ func TestRadiusTimeout(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	// Two packets will be sent. Server not in quarantine
-	serverTable := core.MS.RadiusServersTableQuery()
+	serverTable := core.IS.RadiusServersTableQuery()
 	if !findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
 		t.Fatal("non-existing-server is not available")
 	}
@@ -481,7 +481,7 @@ func TestRadiusTimeout(t *testing.T) {
 	}
 	time.Sleep(50 * time.Millisecond)
 	// Repeat. Four packets will be reported as sent. Sever in quarantine
-	serverTable = core.MS.RadiusServersTableQuery()
+	serverTable = core.IS.RadiusServersTableQuery()
 	if findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
 		t.Fatal("non-existing-server is available")
 	}
@@ -506,7 +506,7 @@ func TestRadiusTimeout(t *testing.T) {
 		t.Fatalf("request failed %s", err)
 	}
 	time.Sleep(50 * time.Millisecond)
-	serverTable = core.MS.RadiusServersTableQuery()
+	serverTable = core.IS.RadiusServersTableQuery()
 	if findRadiusServer("non-existing-server", serverTable["testServer"]).IsAvailable {
 		t.Fatal("non-existing-server is available")
 	}

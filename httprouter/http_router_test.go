@@ -65,7 +65,7 @@ func TestMain(m *testing.M) {
 
 	// Execute the tests and exit
 	exitCode := m.Run()
-	core.MS.Close()
+	core.IS.Close()
 	os.Exit(exitCode)
 }
 

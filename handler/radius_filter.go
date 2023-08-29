@@ -12,17 +12,17 @@ import (
 /////////////////////////////////////////////////////////////////////////////
 
 // Entry in AVPFilter file
-type AVPFilter struct {
+type RadiusAVPFilter struct {
 	Allow  []string    // List of attributes to allow
 	Remove []string    // List of attributes to remove. Makes sense either Allow or Remove, but not both
 	Force  [][2]string // List of attributes to set a specific value. Contents of the list are 2 element arrays (attribute, value)
 }
 
 // Contents of the AVPFilters file. Set of AVPFilters by key
-type AVPFilters map[string]*AVPFilter
+type RadiusAVPFilters map[string]*RadiusAVPFilter
 
 // Creates a copy of the radius packet with the attributes filtered as specified in the filter for the passed key
-func (fs AVPFilters) FilteredPacket(packet *core.RadiusPacket, key string) (*core.RadiusPacket, error) {
+func (fs RadiusAVPFilters) FilteredPacket(packet *core.RadiusPacket, key string) (*core.RadiusPacket, error) {
 	if filter, ok := fs[key]; !ok {
 		return &core.RadiusPacket{}, fmt.Errorf("%s filter not found", key)
 	} else {
@@ -31,7 +31,7 @@ func (fs AVPFilters) FilteredPacket(packet *core.RadiusPacket, key string) (*cor
 }
 
 // Copy the radius packet with the attributes modified as defined in the specified filter
-func (f *AVPFilter) FilteredPacket(packet *core.RadiusPacket) *core.RadiusPacket {
+func (f *RadiusAVPFilter) FilteredPacket(packet *core.RadiusPacket) *core.RadiusPacket {
 	var rp *core.RadiusPacket
 	if len(f.Allow) > 0 {
 		rp = packet.Copy(f.Allow, nil)
@@ -52,9 +52,9 @@ func (f *AVPFilter) FilteredPacket(packet *core.RadiusPacket) *core.RadiusPacket
 }
 
 // Returns an object representing the configured AVPFilters
-func NewAVPFilters(configObjectName string, ci *core.PolicyConfigurationManager) (AVPFilters, error) {
+func NewAVPFilters(configObjectName string, ci *core.PolicyConfigurationManager) (RadiusAVPFilters, error) {
 
-	filters := make(AVPFilters)
+	filters := make(RadiusAVPFilters)
 
 	// If we pass nil as last parameter, use the default
 	var myCi *core.PolicyConfigurationManager

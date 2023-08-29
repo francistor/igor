@@ -41,13 +41,14 @@ type RadiusPacketCheck struct {
 // The contents of all the checks defined in the corresponding configuration object
 type RadiusPacketChecks map[string]RadiusPacketCheck
 
-// Check whether the radius packet is conformant to the RadiusAVPCheck specification
+// Check whether the radius packet is conformant to the RadiusAVPCheck specification for
+// the specified key
 func (cs RadiusPacketChecks) CheckPacket(key string, packet *core.RadiusPacket) bool {
-	if check, ok := cs[key]; !ok {
-		return false
-	} else {
+	if check, ok := cs[key]; ok {
 		return check.CheckPacket(packet)
 	}
+
+	return false
 }
 
 // Check whether the radius packet is conformant to the RadiusAVPCheck specification

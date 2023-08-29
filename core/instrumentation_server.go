@@ -30,7 +30,7 @@ type DiameterPeersTableUpdatedEvent struct {
 }
 
 func PushDiameterPeersStatus(instanceName string, table DiameterPeersTable) {
-	MS.metricEventChan <- DiameterPeersTableUpdatedEvent{InstanceName: instanceName, Table: table}
+	IS.metricEventChan <- DiameterPeersTableUpdatedEvent{InstanceName: instanceName, Table: table}
 }
 
 // Instrumentation of Radius servers table
@@ -48,7 +48,7 @@ type RadiusServersTableUpdatedEvent struct {
 }
 
 func PushRadiusServersTable(instanceName string, table RadiusServersTable) {
-	MS.metricEventChan <- RadiusServersTableUpdatedEvent{InstanceName: instanceName, Table: table}
+	IS.metricEventChan <- RadiusServersTableUpdatedEvent{InstanceName: instanceName, Table: table}
 }
 
 // Buffer for the channel to receive the events
@@ -58,7 +58,7 @@ const INPUT_QUEUE_SIZE = 10
 const QUERY_QUEUE_SIZE = 10
 
 // The single instance of the metrics server.
-var MS *InstrumentationServer
+var IS *InstrumentationServer
 
 type InstrumentationServerConfiguration struct {
 	BindAddress string
@@ -142,7 +142,7 @@ func initInstrumentationServer(cm *ConfigurationManager) {
 
 	// Make the metrics server globally available
 	var config = metricsConfig.Get()
-	MS = NewMetricsServer(config.BindAddress, config.Port)
+	IS = NewMetricsServer(config.BindAddress, config.Port)
 }
 
 // Shuts down the http server and the event loop
