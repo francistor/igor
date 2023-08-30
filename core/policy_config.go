@@ -180,12 +180,13 @@ func (c *PolicyConfigurationManager) RadiusServerConf() RadiusServerConfig {
 // Holds the configuration of a Radius Client
 // Key in the RadiusClients map will be the IPAddress
 type RadiusClient struct {
-	Name             string
-	OriginIP         string
-	Secret           string
-	ClientClass      string
-	ClientProperties map[string]string
-	RadiusAttributes []RadiusAVP
+	Name                           string
+	OriginIP                       string
+	Secret                         string
+	ClientClass                    string
+	ClientProperties               map[string]string
+	RadiusAttributes               []RadiusAVP
+	NonOverridableRadiusAttributes []RadiusAVP
 
 	// Cooked attribute, in case the IP address is in reality a CIDR block
 	OriginNetworkCIDR net.IPNet
