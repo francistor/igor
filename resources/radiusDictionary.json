@@ -520,6 +520,16 @@
                     "code": 119,
                     "name": "LegacyClientId",
                     "type": "String"
+                },
+                {
+                    "code": 150,
+                    "name": "AccessId",
+                    "type": "String"
+                },
+                {
+                    "code": 151,
+                    "name": "AccessPort",
+                    "type": "Integer"
                 }
             ]
         },

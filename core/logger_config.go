@@ -69,10 +69,6 @@ func initLogger(cm *ConfigurationManager) {
 			"level": "info",
 			"development": true,
 			"encoding": "console",
-			"outputPaths": ["stdout"],
-			"errorOutputPaths": ["stderr"],
-			"disableCaller": false,
-			"disableStackTrace": false,
 			"encoderConfig": {
 				"messageKey": "message",
 				"levelKey": "level",
@@ -128,8 +124,15 @@ func NewHandlerLogger() *HandlerLogger {
 
 	handlerLogger := HandlerLogger{}
 
+	var encoder zapcore.Encoder
+	if handlerCfg.Encoding == "console" {
+		encoder = zapcore.NewConsoleEncoder(handlerCfg.EncoderConfig)
+	} else {
+		encoder = zapcore.NewJSONEncoder(handlerCfg.EncoderConfig)
+	}
+
 	core := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(handlerCfg.EncoderConfig),
+		encoder,
 		zapcore.AddSync(&handlerLogger.b),
 		handlerCfg.Level,
 	)

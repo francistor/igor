@@ -18,4 +18,7 @@ ATTRIBUTE	BRAS-NAS-IP-Address			114	string
 ATTRIBUTE	MAC-Address	                117	string
 ATTRIBUTE	LegacyClientId	            119	string
 
+ATTRIBUTE   AccessId                    150 string
+ATTRIBUTE   AccessPort                  151 integer
+
 END-VENDOR	PSA
