@@ -30,7 +30,7 @@ type DiameterPeersTableUpdatedEvent struct {
 }
 
 func PushDiameterPeersStatus(instanceName string, table DiameterPeersTable) {
-	IS.metricEventChan <- DiameterPeersTableUpdatedEvent{InstanceName: instanceName, Table: table}
+	IS.instrumentationEventChan <- DiameterPeersTableUpdatedEvent{InstanceName: instanceName, Table: table}
 }
 
 // Instrumentation of Radius servers table
@@ -48,7 +48,7 @@ type RadiusServersTableUpdatedEvent struct {
 }
 
 func PushRadiusServersTable(instanceName string, table RadiusServersTable) {
-	IS.metricEventChan <- RadiusServersTableUpdatedEvent{InstanceName: instanceName, Table: table}
+	IS.instrumentationEventChan <- RadiusServersTableUpdatedEvent{InstanceName: instanceName, Table: table}
 }
 
 // Buffer for the channel to receive the events
@@ -57,7 +57,7 @@ const INPUT_QUEUE_SIZE = 10
 // Buffer for the channel to receive the queries
 const QUERY_QUEUE_SIZE = 10
 
-// The single instance of the metrics server.
+// The single instance of the instrumentation server.
 var IS *InstrumentationServer
 
 type InstrumentationServerConfiguration struct {
@@ -65,7 +65,7 @@ type InstrumentationServerConfiguration struct {
 	Port        int
 }
 
-// Specification of a query to the metrics server. Metrics server will listen for this type
+// Specification of a query to the instrumentation server. Metrics server will listen for this type
 // of object in a channel
 type Query struct {
 
@@ -86,8 +86,8 @@ type InstrumentationServer struct {
 	// To signal closure
 	controlChan chan interface{}
 
-	// Events for metrics updating are received here
-	metricEventChan chan interface{}
+	// Events for instrumentation updating are received here
+	instrumentationEventChan chan interface{}
 
 	// Queries are received here
 	queryChan chan Query
@@ -105,11 +105,11 @@ type InstrumentationServer struct {
 
 func NewMetricsServer(bindAddress string, port int) *InstrumentationServer {
 	server := InstrumentationServer{
-		doneChan:           make(chan interface{}, 1),
-		controlChan:        make(chan interface{}, 1),
-		metricEventChan:    make(chan interface{}, INPUT_QUEUE_SIZE), // Receives the events to record
-		queryChan:          make(chan Query, QUERY_QUEUE_SIZE),       // Receives the queries
-		prometheusRegistry: prometheus.NewRegistry(),
+		doneChan:                 make(chan interface{}, 1),
+		controlChan:              make(chan interface{}, 1),
+		instrumentationEventChan: make(chan interface{}, INPUT_QUEUE_SIZE), // Receives the events to record
+		queryChan:                make(chan Query, QUERY_QUEUE_SIZE),       // Receives the queries
+		prometheusRegistry:       prometheus.NewRegistry(),
 	}
 
 	// Initialize Metrics
@@ -123,10 +123,10 @@ func NewMetricsServer(bindAddress string, port int) *InstrumentationServer {
 	pm.HttpRouterMetrics = newHttpRouterPrometheusMetrics(server.prometheusRegistry)
 	pm.SessionServerMetrics = newSessionServerPrometheusMetrics(server.prometheusRegistry)
 
-	// Start metrics server
+	// Start instrumentation server
 	go server.httpLoop(bindAddress, port)
 
-	// Start metrics processing loop
+	// Start instrumentation processing loop
 	go server.metricServerLoop()
 
 	return &server
@@ -135,13 +135,13 @@ func NewMetricsServer(bindAddress string, port int) *InstrumentationServer {
 // To be called in the main function
 func initInstrumentationServer(cm *ConfigurationManager) {
 
-	var metricsConfig = NewConfigObject[InstrumentationServerConfiguration]("metrics.json")
-	if err := metricsConfig.Update(cm); err != nil {
-		panic("could not apply metrics configuration: " + err.Error())
+	var instrumentationConfig = NewConfigObject[InstrumentationServerConfiguration]("instrumentation.json")
+	if err := instrumentationConfig.Update(cm); err != nil {
+		panic("could not apply instrumentation configuration: " + err.Error())
 	}
 
-	// Make the metrics server globally available
-	var config = metricsConfig.Get()
+	// Make the instrumentationConfig server globally available
+	var config = instrumentationConfig.Get()
 	IS = NewMetricsServer(config.BindAddress, config.Port)
 }
 
@@ -236,7 +236,7 @@ func (is *InstrumentationServer) metricServerLoop() {
 
 			close(query.RChan)
 
-		case event, ok := <-is.metricEventChan:
+		case event, ok := <-is.instrumentationEventChan:
 
 			if !ok {
 				break

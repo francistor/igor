@@ -13,7 +13,9 @@ import (
 
 type Properties map[string]string
 
-// Merges Properties. New with higher priority
+// Merges Properties. New with higher priority.
+// Used to get configuration properties from various sources with different
+// priorities.
 func (q Properties) OverrideWith(p Properties) Properties {
 	r := p
 
@@ -27,7 +29,7 @@ func (q Properties) OverrideWith(p Properties) Properties {
 	return r
 }
 
-// Stringer interface
+// Stringer interface implementation
 func (p Properties) String() string {
 	var sb strings.Builder
 	for k, v := range p {
@@ -42,7 +44,9 @@ func (p Properties) String() string {
 
 type AVPItems []core.RadiusAVP
 
-// Merges Radius Items. The new with higher priority
+// Merges Radius Items. The new with higher priority.
+// Used to get radius avps to send from various sources with different
+// priorities.
 func (lp AVPItems) OverrideWith(hp AVPItems) AVPItems {
 	r := hp
 
@@ -69,7 +73,9 @@ func (a AVPItems) Add(b AVPItems) AVPItems {
 	return append(a, b...)
 }
 
-// Represents an entry in a UserFile
+// Represents an entry in a UserFile.
+// This type of user file is an extension of the Livingstone format,
+// using JSON
 type RadiusUserFileEntry struct {
 	Key                      string
 	CheckItems               Properties
@@ -86,11 +92,12 @@ type RadiusUserFile map[string]RadiusUserFileEntry
 // key:
 //
 //		checkItems: {attr: value, attr:value}
-//	 configItems: {attr: value, attr:value}
+//	 	configItems: {attr: value, attr:value}
 //		replyItems: [<AVP>],
-//		nonOverridableReplyItems: [<AVP>] -- typically for Cisco-AVPair
+//		nonOverridableReplyItems: [<AVP>]  -- typically for Cisco-AVPair
 //		oobReplyItems: [<AVP>]			   -- Service definition queries from BNG
 func NewRadiusUserFile(configObjectName string, ci *core.PolicyConfigurationManager) (RadiusUserFile, error) {
+
 	// If we pass nil as last parameter, use the default
 	var myCi *core.PolicyConfigurationManager
 	if ci == nil {
@@ -99,11 +106,13 @@ func NewRadiusUserFile(configObjectName string, ci *core.PolicyConfigurationMana
 		myCi = ci
 	}
 
+	// Read the configuration resource
 	jBytes, err := myCi.CM.GetBytesConfigObject(configObjectName)
 	if err != nil {
 		return RadiusUserFile{}, err
 	}
 
+	// And parse it to a RadiusUserFile
 	ruf := RadiusUserFile{}
 	err = json.Unmarshal(jBytes, &ruf)
 

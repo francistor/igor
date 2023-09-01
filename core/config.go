@@ -12,9 +12,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"text/template"
 	"time"
 
+	"github.com/francistor/igor/clouds"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -77,6 +79,12 @@ type ConfigurationManager struct {
 
 	// Database Handle for access to the configuration database
 	dbHandle *sql.DB
+
+	// HttpClient
+	httpClient *http.Client
+
+	// Authorization header
+	authorizationHeader atomic.Value
 }
 
 // The home location for configuration files not referenced as absolute paths
@@ -106,7 +114,19 @@ func NewConfigurationManager(bootstrapFile string, instanceName string, params m
 		instanceName:  instanceName,
 		bootstrapFile: bootstrapFile,
 		configParams:  params,
+		httpClient: &http.Client{
+			Timeout: HTTP_TIMEOUT_SECONDS * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore invalid SSL certificates
+			},
+			CheckRedirect: func(req *http.Request, via []*http.Request) error { // Do not follow redirects
+				return errors.New("Redirect")
+			},
+		},
 	}
+
+	// Initial value to avoid nil when converting to string
+	cm.authorizationHeader.Store("")
 
 	cm.fillSearchRules(cm.fixBootstrapFileLocation(bootstrapFile, true))
 
@@ -196,7 +216,7 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 
 	if strings.HasPrefix(origin, "database:") {
 		// Database object
-		if objectBytes, err := c.readResource(origin); err == nil {
+		if objectBytes, err := c.readResource(origin, false); err == nil {
 			return objectBytes, nil
 		} else {
 			return nil, err
@@ -205,13 +225,13 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 		// File object
 		// Try first with instance name
 		if c.instanceName != "" {
-			if objectBytes, err := c.readResource(origin + c.instanceName + "/" + innerName); err == nil {
+			if objectBytes, err := c.readResource(origin+c.instanceName+"/"+innerName, false); err == nil {
 				return objectBytes, nil
 			}
 		}
 
 		// Try without instance name
-		if objectBytes, err := c.readResource(origin + innerName); err == nil {
+		if objectBytes, err := c.readResource(origin+innerName, false); err == nil {
 			return objectBytes, nil
 		} else {
 			return nil, err
@@ -219,9 +239,13 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 	}
 }
 
+// To read from a google storage bucket
+// Get a token using curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
+// Get the content using curl -v -o file2.txt -H "Authorization: Bearer $TOKEN" https://storage.googleapis.com/storage/v1/b/igor_telco_minsait_com/o/reverse%20tunneling.txt?alt=media
+
 // Reads the configuration item from the specified location, which may be
 // a file or an http(s) url
-func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
+func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte, error) {
 
 	if strings.HasPrefix(location, "database") {
 		// Format is database:table:keycolumn:paramscolumn
@@ -265,22 +289,32 @@ func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 	} else if strings.HasPrefix(location, "http:") || strings.HasPrefix(location, "https:") {
 		// Read from http
 
-		// Create client with timeout
-		httpClient := http.Client{
-			Timeout: HTTP_TIMEOUT_SECONDS * time.Second,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore invalid SSL certificates
-			},
+		req, _ := http.NewRequest("GET", location, nil)
+
+		// Atomic, to avoid race conditions
+		authHeader := c.authorizationHeader.Load().(string)
+		if authHeader != "" {
+			req.Header.Set("Authorization", authHeader)
 		}
 
-		// Location is a http URL
-		resp, err := httpClient.Get(location)
+		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			return nil, err
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("got status code %d while retrieving %s", resp.StatusCode, location)
+			if (resp.StatusCode < 300 || resp.StatusCode >= 400) && retry {
+				return nil, fmt.Errorf("got status code %d while retrieving %s", resp.StatusCode, location)
+			} else {
+				// It is a redirect. Try to get a token
+				if token, e := clouds.GetAccessTokenFromImplicitServiceAccount(c.httpClient); e != nil {
+					return nil, fmt.Errorf("got %s when getting a bearer token", e)
+				} else {
+					c.authorizationHeader.Store("Bearer: " + token)
+					// Retry with the new token
+					return c.readResource(location, false)
+				}
+			}
 		}
 		if body, err := io.ReadAll(resp.Body); err != nil {
 			return nil, err
@@ -306,7 +340,7 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	var shouldInitDB bool
 
 	// Get the search rules object
-	rules, err := c.readResource(bootstrapFile)
+	rules, err := c.readResource(bootstrapFile, true)
 	if err != nil {
 		panic("could not retrieve the bootstrap file in " + bootstrapFile)
 	}
