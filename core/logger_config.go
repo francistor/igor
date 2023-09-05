@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -98,8 +100,14 @@ func initLogger(cm *ConfigurationManager) {
 
 	// Parse the core logger configuration
 	var coreCfg zap.Config
+	var envOutputPaths = os.Getenv("IGOR_LOG_OUTPUTS")
 	if err := json.Unmarshal(rawConfig.CoreLogConfig, &coreCfg); err != nil {
 		panic("bad core log configuration " + err.Error())
+	}
+	// Add to the output the names specified in the logging environment variable
+	if envOutputPaths != "" {
+		newPaths := strings.Split(envOutputPaths, ",")
+		coreCfg.OutputPaths = append(coreCfg.OutputPaths, newPaths...)
 	}
 
 	// Build a logger with the specified configuration

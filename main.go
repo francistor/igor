@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"os"
 	"time"
 
 	"github.com/francistor/igor/core"
@@ -16,8 +17,14 @@ func main() {
 	// Get the command line arguments
 	bootPtr := flag.String("boot", "resources/searchRules.json", "File or http URL with Configuration Search Rules")
 	instancePtr := flag.String("instance", "", "Name of instance")
+	logLocationPtr := flag.String("log", "", "location of log files")
 
 	flag.Parse()
+
+	// Set environment variable with
+	if *logLocationPtr != "" {
+		os.Setenv("IGOR_LOG_OUTPUTS", *logLocationPtr)
+	}
 
 	// Initialize the Config Object
 	core.InitPolicyConfigInstance(*bootPtr, *instancePtr, nil, true)
