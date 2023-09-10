@@ -17,6 +17,7 @@ const (
 	GOOGLE_TOKEN_API string = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
 )
 
+// Gets an access token from the cloud service we are using, to be used for settint an Authorization hedaer.
 func GetAccessTokenFromImplicitServiceAccount(client *http.Client) (string, error) {
 
 	var token GoogleToken

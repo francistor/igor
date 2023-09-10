@@ -303,17 +303,19 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			if (resp.StatusCode < 300 || resp.StatusCode >= 400) && retry {
-				return nil, fmt.Errorf("got status code %d while retrieving %s", resp.StatusCode, location)
-			} else {
-				// It is a redirect. Try to get a token
+			if (resp.StatusCode >= 300 || resp.StatusCode < 400) && retry {
+				// It is a redirect we are probably being asked for authentication in a cloud storage.
+				// Try to get a token. The GetAccessTokenFromImplicitServiceAccount method uses an environment
+				// variable to detect what cloud we are being executed onto.
 				if token, e := clouds.GetAccessTokenFromImplicitServiceAccount(c.httpClient); e != nil {
 					return nil, fmt.Errorf("got %s when getting a bearer token", e)
 				} else {
 					c.authorizationHeader.Store("Bearer: " + token)
-					// Retry with the new token
+					// Retry with the new token, but in this case do not retry
 					return c.readResource(location, false)
 				}
+			} else {
+				return nil, fmt.Errorf("got status code %d while retrieving %s", resp.StatusCode, location)
 			}
 		}
 		if body, err := io.ReadAll(resp.Body); err != nil {
