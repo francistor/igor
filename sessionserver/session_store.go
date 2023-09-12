@@ -234,7 +234,6 @@ func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) (string, stri
 				s.indexes[indexName][indexValue] = make(map[string]struct{})
 				s.indexes[indexName][indexValue][id] = struct{}{}
 			}
-
 		}
 	}
 

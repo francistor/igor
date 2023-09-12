@@ -53,7 +53,8 @@ type SessionQueryResponse struct {
 
 // Specific type of error, to distinguish from normal operational errors
 type IndexConstraintError struct {
-	offendingIndex string
+	offendingIndex     string
+	offendingSessionId string
 }
 
 // Implementation of the Error interface for IndexConstraintError
@@ -153,31 +154,33 @@ func NewRadiusSessionServer(instanceName string) *RadiusSessionServer {
 }
 
 // Execute the event loop, radius and http servers
-func (rss *RadiusSessionServer) run() {
+func (ss *RadiusSessionServer) run() {
 
 	// Start event loop
-	go rss.eventLoop()
+	go ss.eventLoop()
 
 	// Instantiate the radius server. It starts operating right after instantiation.
-	rss.radiusServer = radiusserver.NewRadiusServer(rss.config.ReceiveFrom, rss.config.RadiusBindAddress, rss.config.RadiusBindPort, func(request *core.RadiusPacket) (*core.RadiusPacket, error) {
-		return rss.HandlePacket(request)
-	})
+	if ss.config.RadiusBindAddress != "" {
+		ss.radiusServer = radiusserver.NewRadiusServer(ss.config.ReceiveFrom, ss.config.RadiusBindAddress, ss.config.RadiusBindPort, func(request *core.RadiusPacket) (*core.RadiusPacket, error) {
+			return ss.HandlePacket(request)
+		})
+	}
 
 	// Instantiate the radius client.
-	rss.radiusClient = radiusclient.NewRadiusClient()
+	ss.radiusClient = radiusclient.NewRadiusClient()
 
 	// Make sure the certificates exists in the current directory
 	certFile, keyFile := core.EnsureCertificates()
 
 	// Will block here
-	err := rss.httpServer.ListenAndServeTLS(certFile, keyFile)
+	err := ss.httpServer.ListenAndServeTLS(certFile, keyFile)
 
 	// HttpServer terminated
 	if !errors.Is(err, http.ErrServerClosed) {
 		panic("error starting http handler with: " + err.Error())
 	}
 
-	close(rss.httpDoneChannel)
+	close(ss.httpDoneChannel)
 }
 
 // Graceful shutdown
@@ -199,7 +202,9 @@ func (ss *RadiusSessionServer) Close() {
 	ss.wg.Wait()
 
 	// Close radius server and client
-	ss.radiusServer.Close()
+	if ss.config.RadiusBindAddress != "" {
+		ss.radiusServer.Close()
+	}
 	ss.radiusClient.SetDown()
 	ss.radiusClient.Close()
 
@@ -260,10 +265,10 @@ func (ss *RadiusSessionServer) eventLoop() {
 
 				// Process the packet. If could not be inserted, return an specific
 				// IndexConstraintError with the name of the offending index
-			} else if _, offendingIndex := ss.PushPacket(ur.Packet); offendingIndex == "" {
+			} else if offendingId, offendingIndex := ss.PushPacket(ur.Packet); offendingIndex == "" {
 				ur.RChan <- nil
 			} else {
-				ur.RChan <- IndexConstraintError{offendingIndex}
+				ur.RChan <- IndexConstraintError{offendingIndex: offendingIndex, offendingSessionId: offendingId}
 			}
 
 			// The response channel is closed by the responder
@@ -375,7 +380,7 @@ func (rss *RadiusSessionServer) HandlePacket(request *core.RadiusPacket) (*core.
 	} else if errors.As(e, &constraintError) {
 		// Not inserted due to constraint
 		core.RecordSessionUpdate(strconv.Itoa(int(request.Code)), "1", constraintError.offendingIndex)
-		return core.NewRadiusResponse(request, false).Add("Reply-Message", "Duplicated entry for index "+constraintError.offendingIndex), nil
+		return core.NewRadiusResponse(request, false).Add("Reply-Message", fmt.Sprintf("Duplicated entry for index %s, session %s", constraintError.offendingIndex, constraintError.offendingSessionId)), nil
 	} else {
 		// Not inserted due to a generic error
 		core.RecordSessionUpdate(strconv.Itoa(int(request.Code)), "1", "")
