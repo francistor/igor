@@ -17,8 +17,12 @@ import (
 	"time"
 
 	"github.com/francistor/igor/clouds"
+	"github.com/francistor/igor/resources"
 	_ "github.com/go-sql-driver/mysql"
 )
+
+// The resources folder is stored in this simulated filesystem
+// Any file can be retreived as a resource located in resource://<whatever>
 
 const (
 	HTTP_TIMEOUT_SECONDS = 5
@@ -324,6 +328,12 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 			return body, nil
 		}
 
+	} else if strings.HasPrefix(location, "resource://") {
+		if resp, err := resources.Fs.ReadFile(location[11:]); err != nil {
+			return nil, err
+		} else {
+			return resp, nil
+		}
 	} else {
 		// Read from file
 		if resp, err := os.ReadFile(igorConfigBase + location); err != nil {

@@ -10,11 +10,17 @@ import (
 
 // Reads a radius dictionary in free radius format and generates a jRadiusDict object, used
 // to generate the final radius dictionary to be used in the application
-func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *jRadiusDict) error {
+func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, parentConfigObj string, dict *jRadiusDict) error {
 
 	// Sanity check
 	if dict == nil {
 		panic("the pointer to the jRadius dictionary was null")
+	}
+
+	// If the name of the object is embedded in an $INCLUDE directive, interpret the path as relative
+	// to the location of the parent object
+	if pos := strings.LastIndex(parentConfigObj, "/"); pos != -1 {
+		configObj = parentConfigObj[0:pos] + "/" + configObj
 	}
 
 	// Retrieve the config object
@@ -51,7 +57,7 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, dict *
 
 		switch words[0] {
 		case "$INCLUDE":
-			err := ParseFreeradiusDictionary(c, words[1], dict)
+			err := ParseFreeradiusDictionary(c, words[1], configObj, dict)
 			if err != nil {
 				return errors.New("dictionary " + words[1] + " with error " + err.Error())
 			}

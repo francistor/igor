@@ -24,7 +24,7 @@ func initRadiusDict(cm *ConfigurationManager) {
 	// First try freeradius dictionary
 	var jDict jRadiusDict
 
-	if err := ParseFreeradiusDictionary(cm, "dictionary", &jDict); err == nil {
+	if err := ParseFreeradiusDictionary(cm, "dictionary", "", &jDict); err == nil {
 		// Try first with radius dictionary
 		radiusDict = newRadiusDictionaryFromJDict(&jDict)
 		GetLogger().Info("freeradius dictionary found")

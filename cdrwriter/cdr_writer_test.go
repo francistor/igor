@@ -300,7 +300,10 @@ func TestElasticWriter(t *testing.T) {
 	ecdrw.Close()
 }
 
+// NOTE: Remove t.Skip() to execute
 func TestBigQueryWriter(t *testing.T) {
+
+	t.Skip()
 
 	// Get the current number of lines in the table
 	currentLines := getBQLinesInTable(t)
@@ -329,7 +332,11 @@ func TestBigQueryWriter(t *testing.T) {
 	}
 }
 
+// NOTE: Remove t.Skip() to execute
 func TestBigQueryGenBackup(t *testing.T) {
+
+	t.Skip()
+
 	var conf BigQueryFormatConf
 	if err := json.Unmarshal([]byte(jBigQueryConfig), &conf); err != nil {
 		t.Fatalf("bad BigQuery format: %s", err)
@@ -355,7 +362,10 @@ func TestBigQueryGenBackup(t *testing.T) {
 	}
 }
 
+// NOTE: Remove t.Skip() to execute
 func TestBigQueryIngestBackup(t *testing.T) {
+
+	t.Skip()
 
 	// Get the current number of lines in the table
 	currentLines := getBQLinesInTable(t)

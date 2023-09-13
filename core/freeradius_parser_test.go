@@ -9,7 +9,7 @@ func TestFreeradiusParser(t *testing.T) {
 	ci := GetPolicyConfig()
 
 	var jDict jRadiusDict
-	err := ParseFreeradiusDictionary(&ci.CM, "dictionary", &jDict)
+	err := ParseFreeradiusDictionary(&ci.CM, "dictionary", "", &jDict)
 	if err != nil {
 		t.Fatal(err)
 	}
