@@ -140,7 +140,7 @@ func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) (string, stri
 	// If packet is not newer, do nothing
 	doInsert, oldSession := s.checkInsert(id, packetType, packet)
 	if !doInsert {
-		core.GetLogger().Error("Ignoring packet")
+		core.GetLogger().Warn("Ignoring packet. New: %s Old: %s", packet, oldSession)
 		return "", ""
 	}
 

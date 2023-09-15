@@ -840,7 +840,7 @@ func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 	avp.Code = avp.DictItem.Code
 	avp.VendorId = avp.DictItem.VendorId
 
-	// Get the tag. Also leaves the work of parsing the interface{} values as string for later, when
+	// Get the tag. Also already does the work of parsing the interface{} values as string for later, when
 	// processing per RadiusAttribute type.
 	var stringValue, isString = value.(string)
 	if avp.DictItem.Tagged {
@@ -900,7 +900,9 @@ func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 		if isString {
 			avp.Value = stringValue
 		} else {
-			return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+			// If here, the attribute cannot be tagged (isString would be true)
+			avp.Value = fmt.Sprintf("%v", value)
+			// TODO: remove --> return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
 		}
 
 	case RadiusTypeAddress, RadiusTypeIPv6Address:

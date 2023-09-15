@@ -121,9 +121,15 @@ func initLogger(cm *ConfigurationManager) {
 	ilogger = logger.Sugar()
 
 	// Handler Loggers Configuration
-
-	if err := json.Unmarshal(rawConfig.HandlerLogConfig, &handlerCfg); err != nil {
-		panic("bad handler log configuration " + err.Error())
+	if rawConfig.HandlerLogConfig != nil {
+		if err := json.Unmarshal(rawConfig.HandlerLogConfig, &handlerCfg); err != nil {
+			panic("bad handler log configuration " + err.Error())
+		}
+	} else {
+		// If not specified, use the same configuration as the core logger
+		if err := json.Unmarshal(rawConfig.CoreLogConfig, &handlerCfg); err != nil {
+			panic("bad handler log configuration " + err.Error())
+		}
 	}
 }
 
