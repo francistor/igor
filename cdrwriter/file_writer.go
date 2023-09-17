@@ -97,7 +97,6 @@ func (w *FileCDRWriter) eventLoop() {
 	}
 
 	close(w.doneChan)
-
 }
 
 // Writes the Radius CDR to file

@@ -187,14 +187,14 @@ func TestHttpRouterHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting http_router_exchanges %s", err)
 	}
-	if val != 1 {
+	if val != "1" {
 		t.Fatalf("number of http_router_exchanges messages was not 1")
 	}
 	val, err = core.GetMetricWithLabels("http_router_exchanges", `{.*path="/routeRadiusRequest".*}`)
 	if err != nil {
 		t.Fatalf("error getting http_router_exchanges %s", err)
 	}
-	if val != 1 {
+	if val != "1" {
 		t.Fatalf("number of http_router_exchanges messages was not 1")
 	}
 

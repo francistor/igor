@@ -246,14 +246,14 @@ func TestDiameterRouteMessagetoHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting http_client_exchanges %s", err)
 	}
-	if val != 1 {
+	if val != "1" {
 		t.Fatalf("number of http_client_exchanges messages was not 1")
 	}
 	val, err = core.GetMetricWithLabels("http_handler_exchanges", `{.*}`)
 	if err != nil {
 		t.Fatalf("error getting http_handler_exchanges %s", err)
 	}
-	if val != 1 {
+	if val != "1" {
 		t.Fatalf("number of http_handler_exchanges messages was not 1")
 	}
 
@@ -394,7 +394,7 @@ func TestRadiusRouteToHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting radius_client_requests %s", err)
 	}
-	if val != 2 {
+	if val != "2" {
 		t.Fatalf("number of radius_client_requests messages was not 2")
 	}
 
@@ -463,14 +463,14 @@ func TestRadiusTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting radius_client_requests %s", err)
 	}
-	if val != 2 {
+	if val != "2" {
 		t.Fatalf("number of radius_client_requests messages to non existing endpoint was not 2")
 	}
 	val, err = core.GetMetricWithLabels("radius_client_timeouts", `{.*}`)
 	if err != nil {
 		t.Fatalf("error getting radius_client_timeouts %s", err)
 	}
-	if val != 2 {
+	if val != "2" {
 		t.Fatalf("number of radius_client_timeouts messages was not 1")
 	}
 
@@ -489,14 +489,14 @@ func TestRadiusTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting radius_client_requests %s", err)
 	}
-	if val != 4 {
+	if val != "4" {
 		t.Fatalf("number of radius_client_requests messages was not 1")
 	}
 	val, err = core.GetMetricWithLabels("radius_client_timeouts", `{.*}`)
 	if err != nil {
 		t.Fatalf("error getting radius_client_timeouts %s", err)
 	}
-	if val != 4 {
+	if val != "4" {
 		t.Fatalf("number of radius_client_timeouts messages was not 1")
 	}
 
@@ -515,35 +515,35 @@ func TestRadiusTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting radius_client_requests %s", err)
 	}
-	if val != 4 {
+	if val != "4" {
 		t.Fatalf("number of radius_client_requests messages was not 4")
 	}
 	val, err = core.GetMetricWithLabels("radius_client_requests", `{.*endpoint="127.0.0.1:11812".*}`)
 	if err != nil {
 		t.Fatalf("error getting radius_client_requests %s", err)
 	}
-	if val != 1 {
+	if val != "1" {
 		t.Fatalf("number of radius_client_requests messages was not 4")
 	}
 	val, err = core.GetMetricWithLabels("radius_client_timeouts", `{.*}`)
 	if err != nil {
 		t.Fatalf("error getting radius_client_timeouts %s", err)
 	}
-	if val != 4 {
+	if val != "4" {
 		t.Fatalf("number of radius_client_timeouts messages was not 1")
 	}
 	val, err = core.GetMetricWithLabels("radius_server_requests", `{.*endpoint="127.0.0.1".*}`)
 	if err != nil {
 		t.Fatalf("error getting radius_server_requests %s", err)
 	}
-	if val != 1 {
+	if val != "1" {
 		t.Fatalf("number of radius_server_requests messages was not 5")
 	}
 	val, err = core.GetMetricWithLabels("radius_server_responses", `{.*endpoint="127.0.0.1".*}`)
 	if err != nil {
 		t.Fatalf("error getting radius_server_responses %s", err)
 	}
-	if val != 1 {
+	if val != "1" {
 		t.Fatalf("number of radius_server_responses messages was not 5")
 	}
 
@@ -557,7 +557,7 @@ func TestRadiusTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting radius_client_timeouts %s", err)
 	}
-	if val != 2 {
+	if val != "2" {
 		t.Fatalf("number of radius_client_timeouts messages was not 6")
 	}
 

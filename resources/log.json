@@ -2,7 +2,7 @@
     "coreLogConfig":{
         "level": "debug",
         "development": true,
-        "encoding": "json",
+        "encoding": "console",
         "outputPaths": ["stdout"],
         "errorOutputPaths": ["stderr"],
         "disableCaller": false,
@@ -21,7 +21,7 @@
     "handlerLogConfig": {
         "level": "info",
         "development": true,
-        "encoding": "json",
+        "encoding": "console",
         "encoderConfig": {
             "messageKey": "message",
             "levelKey": "level",

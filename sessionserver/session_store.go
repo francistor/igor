@@ -293,6 +293,11 @@ func (s *RadiusSessionStore) expireAllEntries(currentExpireDate time.Time, curre
 	s.expireEntries(&s.stoppedSessions, currentLimboDate)
 }
 
+// Returns the total number of sessions
+func (s *RadiusSessionStore) getCount() int {
+	return len(s.sessions)
+}
+
 // Get all the sessions with the specified index name and value
 func (s *RadiusSessionStore) FindByIndex(indexName string, indexValue string, activeOnly bool) []core.RadiusPacket {
 

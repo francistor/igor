@@ -3,6 +3,7 @@ package diampeer
 import (
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -95,7 +96,7 @@ func TestDiameterPeerOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("no metrics found for TestApplication/TestRequest")
 	}
-	if val != 2 {
+	if val != "2" {
 		t.Fatalf("number of TestApplication/TestRequest messages was not 2")
 	}
 	// Should have received several Base / Device-Watchdog
@@ -103,15 +104,15 @@ func TestDiameterPeerOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting diameter_requests_received %s", err)
 	}
-	if val < 2 {
-		t.Fatalf("number of TestApplication/TestRequest messages was not 2")
+	if v, _ := strconv.Atoi(val); v < 2 {
+		t.Fatalf("number of TestApplication/TestRequest messages lower than 2")
 	}
 
 	val, err = core.GetMetricWithLabels("diameter_request_timeouts", `{.*peer="server.igorserver".*}`)
 	if err != nil {
 		t.Fatalf("error getting diameter_request_timeouts %s", err)
 	}
-	if val != 1 {
+	if val != "1" {
 		t.Fatalf("number of diameter_request_timeouts messages was not 1")
 	}
 	// t.Log(metrics)

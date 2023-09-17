@@ -238,6 +238,7 @@ func (ss *RadiusSessionServer) eventLoop() {
 
 			now := time.Now()
 			ss.expireAllEntries(now, now)
+			core.UpdateSessionCounter(ss.getCount())
 
 		case cr := <-ss.controlChannel:
 

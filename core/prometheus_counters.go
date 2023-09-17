@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -100,6 +99,7 @@ func (m *HttpRouterPrometheusMetrics) reset() {
 type SessionServerPrometheusMetrics struct {
 	SessionQueries *prometheus.CounterVec
 	SessionUpdates *prometheus.CounterVec
+	SessionCount   *prometheus.GaugeVec
 }
 
 func (m *SessionServerPrometheusMetrics) reset() {
@@ -317,10 +317,18 @@ func newSessionServerPrometheusMetrics(reg prometheus.Registerer) *SessionServer
 				Help: "Session Server updates",
 			},
 			[]string{"code", "errorcode", "offending_index"}),
+
+		SessionCount: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "session_server_sessions",
+				Help: "Total number of sessions",
+			},
+			[]string{}),
 	}
 
 	reg.MustRegister(m.SessionQueries)
 	reg.MustRegister(m.SessionUpdates)
+	reg.MustRegister(m.SessionCount)
 
 	return m
 }
@@ -441,22 +449,26 @@ func RecordSessionUpdate(code string, errorCode string, offendingIndex string) {
 	pm.SessionServerMetrics.SessionUpdates.With(prometheus.Labels{"code": code, "errorcode": errorCode, "offending_index": offendingIndex}).Inc()
 }
 
+func UpdateSessionCounter(nSessions int) {
+	pm.SessionServerMetrics.SessionCount.With(prometheus.Labels{}).Set(float64(nSessions))
+}
+
 // Helper for testing
-func GetMetricWithLabels(metricName string, labelString string) (int, error) {
+func GetMetricWithLabels(metricName string, labelString string) (string, error) {
 	metrics, err := HttpGet("http://localhost:9090/metrics")
 	if err != nil {
-		return -1, err
+		return "", err
 	}
 
-	regex, err := regexp.Compile(fmt.Sprintf("%s%s ([0-9]+)", metricName, labelString))
+	regex, err := regexp.Compile(fmt.Sprintf("%s%s ([0-9\\.]+)", metricName, labelString))
 	if err != nil {
-		return -1, err
+		return "", err
 	}
 
 	if match := regex.FindStringSubmatch(metrics); len(match) > 1 {
-		return strconv.Atoi(match[1])
+		return match[1], nil
 	} else {
-		return 0, errors.New("metric and label not found")
+		return "", errors.New("metric and label not found")
 	}
 
 }

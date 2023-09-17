@@ -202,6 +202,7 @@ func (rc RadiusClients) initialize() error {
 	for key, radiusClient := range rc {
 
 		// For completeness only, just copy the key, which should be the IP address
+		// if OriginIP is not specified
 		if radiusClient.OriginIP == "" {
 			radiusClient.OriginIP = key + "/32"
 		}

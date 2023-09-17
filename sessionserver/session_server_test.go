@@ -92,14 +92,14 @@ func TestSessionServerSunnyDay(t *testing.T) {
 		t.Fatalf("bad response to session query in start state")
 	}
 	if !strings.Contains(queryResp, "{\"SessionStore-Id\":\"session1/1.1.1.1\"}") {
-		t.Fatalf("bad response to session query in start state")
+		t.Fatalf("bad response to session query in accepted state")
 	}
 
 	val, err := core.GetMetricWithLabels("session_server_updates", `{.*code="1".*}`)
 	if err != nil {
 		t.Fatalf("error getting session_server_updates: %s", err)
 	}
-	if val != 1 {
+	if val != "1" {
 		t.Fatal("number of accept udates was not 1")
 	}
 
@@ -107,7 +107,7 @@ func TestSessionServerSunnyDay(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting session_server_updates: %s", err)
 	}
-	if val != 1 {
+	if val != "1" {
 		t.Fatal("number of start udates was not 1")
 	}
 
@@ -115,14 +115,14 @@ func TestSessionServerSunnyDay(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error getting session_server_queries: %s", err)
 	}
-	if val != 1 {
+	if val != "1" {
 		t.Fatal("number of session_server_queries for Framed-IP-Address was not 1")
 	}
 	val, err = core.GetMetricWithLabels("session_server_queries", `{.*indexname="User-Name".*}`)
 	if err != nil {
 		t.Fatalf("error getting session_server_queries: %s", err)
 	}
-	if val != 2 {
+	if val != "2" {
 		t.Fatal("number of session_server_queries for User-Name was not 2")
 	}
 
@@ -208,8 +208,17 @@ func TestSessionServerSunnyDay(t *testing.T) {
 		t.Fatal("did not get exactly one session")
 	}
 
+	// Check that we have one session using the session counter. The accepted one will be expired
+	val, err = core.GetMetricWithLabels("session_server_sessions", ``)
+	if err != nil {
+		t.Fatalf("error getting session_server_sessions: %s", err)
+	}
+	if val != "1" {
+		t.Fatalf("number of session_server_sessions was not 2 but %s", val)
+	}
+
 	// Wait for expiration of started session
-	// This session could be alive in the worst case for 4 seconds, if the purge interval es 1 second and the expiration time is 3 seconds
+	// This session could be alive in the worst case for 4 seconds, if the purge interval is 1 second and the expiration time is 3 seconds
 	// We need to wait 2 seconds more
 	time.Sleep(2000 * time.Millisecond)
 	queryResp, err = core.HttpGet("https://localhost:18813/sessionserver/v1/sessions?index_name=User-Name&index_value=user1&active_only=false")

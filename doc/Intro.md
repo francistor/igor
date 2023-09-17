@@ -37,10 +37,12 @@ Configuration files are treated as go templates. Parameters are replaced by the 
 ### Bootstrap: Searching the location of the configuration resources
 
 The configuration process starts by accessing the bootstrap configuration file, which must be specified somehow (typicaly in a command line parameter). The file has JSON format with two properties. The `rules` property defines where to look for files ("origin") based on the resource name. Those are checked against a set of regular expressions with one group. The full location of the resource is the `origin` followed by the group matched in the regular expression.
+
 The following example specifies that the `template_http.txt` file is retreived from http, the `radiusclients.database` configuration object is taken from a database (more on this later) and the other objects are to be found as files in the same location as the boostrap file.
 
 ```
 "rules": [
+    {"nameRegex": "(.*dictionary.*)",               "origin": "resource://"},
     {"nameRegex": "(template_http.txt)",            "origin": "http://localhost:8100/"},
     {"nameRegex": "(radiusclients.database)",       "origin": "database:accessNodes:AccessNodeId:Parameters"},
     {"nameRegex": "Gy/(.*)",                        "origin": ""},
@@ -49,7 +51,10 @@ The following example specifies that the `template_http.txt` file is retreived f
 ```
 
 The origin for resources in files is relative to the path where the bootstrap file resides.
+
 If the `origin` starts with `database` the syntax must be `database:<table-name>:<key-column-name>:<parameters-column-name>`. The result of the retrieval will be a JSON file with the values in the `key-column-name` as properties and the corresponding values in `parameters-column-name` as values. For that reason, this column MUST have JSON syntax.
+
+The `resource://` prefix indicates that the object is embedded in the igor executable. All the files in the `resources` directory are available in this way.
 
 If the environment variable `IGOR_CLOUD`` is specified, for example as "Google", then the http(s) resource retrieval will make use of authentication using a service account using the native mechanisms of that cloud. This way, configuration files may be retrieved from the cloud object storage.
 
