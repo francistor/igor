@@ -214,3 +214,37 @@ func TestRadiusClientOnly(t *testing.T) {
 
 	rs.Close()
 }
+
+func TestIdentifiers(t *testing.T) {
+
+	// Create the radius client
+	rc := NewRadiusClient()
+
+	// Create a request radius packet
+	request1 := core.NewRadiusRequest(1)
+	request1.Add("User-Name", "myUserName")
+	request2 := core.NewRadiusRequest(1)
+	request2.Add("User-Name", "myUserName")
+	request3 := core.NewRadiusRequest(1)
+	request3.Add("User-Name", "myUserName")
+	request4 := core.NewRadiusRequest(1)
+	request4.Add("User-Name", "myUserName")
+
+	// Create channel for the request
+	rchan1 := make(chan interface{}, 1)
+	rchan2 := make(chan interface{}, 1)
+	rchan3 := make(chan interface{}, 1)
+	rchan4 := make(chan interface{}, 1)
+
+	rc.RadiusExchange("1.1.1.1:1812", 2000, request1, 200*time.Millisecond, 2, "secret", rchan1)
+	<-rchan1
+	rc.RadiusExchange("1.1.1.1:1813", 2000, request2, 200*time.Millisecond, 2, "secret", rchan2)
+	<-rchan2
+	rc.RadiusExchange("1.1.1.1:1812", 2000, request3, 200*time.Millisecond, 2, "secret", rchan3)
+	<-rchan3
+	rc.RadiusExchange("1.1.1.1:1813", 2000, request4, 200*time.Millisecond, 2, "secret", rchan4)
+	<-rchan4
+
+	rc.SetDown()
+	rc.Close()
+}

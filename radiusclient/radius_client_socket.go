@@ -57,7 +57,7 @@ type ReadErrorMsg struct {
 
 //////////////////////////////////////////////////////////////////////////////////
 
-// Context data for an in flight request. Stored in the requestMap indexed by
+// Context data for an in-flight request. Stored in the requestMap indexed by
 // endpoint and radiusId
 type RequestContext struct {
 
@@ -149,9 +149,11 @@ func (rcs *RadiusClientSocket) SetDown() {
 }
 
 // Closes the event loop channel
-// Use this method only after a PeerDown event has been received
+// Use this method only after a SocketDown event has been received
 // Takes some time to execute
 func (rcs *RadiusClientSocket) Close() {
+
+	// TODO: Consider doing this here, just in case: rcs.eventLoopChannel <- SetDownCommandMsg{}
 
 	// Wait for the readLoop to stop
 	if rcs.readLoopDoneChannel != nil {
@@ -272,11 +274,11 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				// Send the answer to the requester
 				requestContext.rchan <- radiusPacket
 				close(requestContext.rchan)
-
 			}
 
 		case ClientRadiusRequestMsg:
 
+			// Get a radius identifier
 			radiusId, err := rcs.getNextRadiusId(v.endpoint, v.radiusId)
 			if err != nil {
 				core.GetLogger().Errorf("could not get an id: %s", err)
@@ -288,6 +290,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				continue
 			}
 
+			// Serialize to buffer
 			packetBytes, err := v.packet.ToBytes(v.secret, radiusId)
 			if err != nil {
 				core.GetLogger().Errorf("error marshaling packet: %s", err)
@@ -300,6 +303,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 			}
 
 			remoteAddr, _ := net.ResolveUDPAddr("udp", v.endpoint)
+			// Write buffer to socket
 			_, err = rcs.socket.WriteTo(packetBytes, remoteAddr)
 			if err != nil {
 				core.GetLogger().Errorf("error writing packet or socket closed: %v", err)
@@ -438,8 +442,9 @@ func (rcs *RadiusClientSocket) getNextRadiusId(endpoint string, currentRadiusId 
 
 	lastId, found := rcs.lastRadiusIdMap[endpoint]
 	if !found {
-		// Map for this endpoint does not exist yet. Create it
-		rcs.lastRadiusIdMap[endpoint] = 1
+		// Entry for this endpoint does not exist yet. Create it
+		rcs.lastRadiusIdMap[endpoint] = 0
+		lastId = 0
 	}
 
 	// Try to get a radius Id
@@ -450,12 +455,15 @@ func (rcs *RadiusClientSocket) getNextRadiusId(endpoint string, currentRadiusId 
 		} else {
 			nextId = nextId + 1
 		}
-		if _, ok := idMap[nextId]; !ok {
+		if _, exists := idMap[nextId]; !exists {
 			rcs.lastRadiusIdMap[endpoint] = nextId
 			if nextId == 0 {
 				panic("Radius id should never be 0")
 			}
+			core.GetLogger().Debugf("Got id %d for endpoint %s", nextId, endpoint)
 			return nextId, nil
+		} else {
+			core.GetLogger().Debugf("Discarded id %d for endpoint %s", nextId, endpoint)
 		}
 	}
 
