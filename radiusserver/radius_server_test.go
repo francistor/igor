@@ -52,7 +52,7 @@ func TestRadiusServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	requestBytes, err := request.ToBytes("secret", 100)
+	requestBytes, err := request.ToBytes("secret", 100, core.Zero_authenticator, false)
 	if err != nil {
 		t.Fatal(err)
 	}

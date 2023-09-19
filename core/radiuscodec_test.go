@@ -408,7 +408,7 @@ func TestAccessRequest(t *testing.T) {
 	request.Add("Tunnel-Password", theTunnelPassword)
 
 	// Serialize
-	packetBytes, err := request.ToBytes(secret, 0)
+	packetBytes, err := request.ToBytes(secret, 0, Zero_authenticator, false)
 	if err != nil {
 		t.Fatalf("could not serialize packet: %s", err)
 	}
@@ -428,7 +428,7 @@ func TestAccessRequest(t *testing.T) {
 	}
 
 	response := NewRadiusResponse(request, true)
-	responseBytes, err := response.ToBytes(secret, 0)
+	responseBytes, err := response.ToBytes(secret, 0, Zero_authenticator, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -446,7 +446,7 @@ func TestAccountingRequest(t *testing.T) {
 	request.Add("Class", theClass)
 
 	// Serialize
-	packetBytes, err := request.ToBytes(secret, 0)
+	packetBytes, err := request.ToBytes(secret, 0, Zero_authenticator, false)
 	if err != nil {
 		t.Fatalf("could not serialize packet: %s", err)
 	}
@@ -462,7 +462,7 @@ func TestAccountingRequest(t *testing.T) {
 	}
 
 	response := NewRadiusResponse(request, true)
-	responseBytes, err := response.ToBytes(secret, 0)
+	responseBytes, err := response.ToBytes(secret, 0, Zero_authenticator, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -572,7 +572,7 @@ func TestLongAttribute(t *testing.T) {
 	packet.Add("User-Name", "theUserName")
 
 	// Serialize
-	packetBytes, err := packet.ToBytes(secret, 0)
+	packetBytes, err := packet.ToBytes(secret, 0, Zero_authenticator, false)
 	if err != nil {
 		t.Fatalf("could not serialize packet: %s", err)
 	}

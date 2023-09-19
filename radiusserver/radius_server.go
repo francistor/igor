@@ -130,7 +130,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 			}
 
 			// Build the response
-			respBuf, err := response.ToBytes(secret, radiusPacket.Identifier)
+			respBuf, err := response.ToBytes(secret, radiusPacket.Identifier, core.Zero_authenticator, false)
 			if err != nil {
 				core.GetLogger().Errorf("error serializing packet for %s with code %d: %s", addr.String(), code, err)
 				core.RecordRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))

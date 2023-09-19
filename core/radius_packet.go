@@ -150,7 +150,8 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string, ra [16]byte)
 // Writes the radius message to the specified writer
 // ACCESS_REQUEST
 //
-//	Authenticator is created from scratch
+//	Authenticator is created from scratch, or reused from a previous instance of the same packet, in case of
+//	re-transmission
 //
 // OTHER REQUEST
 //
@@ -161,7 +162,7 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string, ra [16]byte)
 //	Authenticator is md5(Code+ID+Length+RequestAuth+Attributes+Secret)
 //
 // id is ignored in responses, where the id from the request and stored in the avp will be used
-func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (int64, error) {
+func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte, reuseAuthenticator [16]byte, reuse bool) (int64, error) {
 
 	currentIndex := int64(0)
 	var err error
@@ -247,7 +248,11 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 	// If it is a response, authenticator will be set to the request authenticator.
 	// Otherwise, set to a new one or to zero
 	if rp.Code == ACCESS_REQUEST {
-		rp.Authenticator = BuildRandomAuthenticator()
+		if reuse {
+			rp.Authenticator = reuseAuthenticator
+		} else {
+			rp.Authenticator = BuildRandomAuthenticator()
+		}
 	} else if rp.Code == ACCOUNTING_REQUEST || rp.Code == DISCONNECT_REQUEST || rp.Code == COA_REQUEST {
 		rp.Authenticator = Zero_authenticator
 	}
@@ -281,7 +286,7 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte) (i
 		// Authenticator is md5(code+identifier+(current authenticator in Authenticator field)+request_attributes+secret)
 		//                                      (wich is a generated one (auth request) zero (other requests) or the authenticator in the request (response))
 
-		// The writer is a bytes buffer but was casted as a simple writer.Uncast
+		// The writer is a bytes buffer but was casted as a simple writer. Uncast
 		byteWriter := scratchWriter.(*bytes.Buffer)
 		tmpPacketBytes := byteWriter.Bytes()
 
@@ -332,11 +337,11 @@ func NewRadiusPacketFromBytes(inputBytes []byte, secret string, ra [16]byte) (*R
 }
 
 // Returns a byte slice with the contents of the AVP
-func (rp *RadiusPacket) ToBytes(secret string, id byte) (data []byte, err error) {
+func (rp *RadiusPacket) ToBytes(secret string, id byte, reuseAuthenticator [16]byte, reuse bool) (data []byte, err error) {
 
 	// Will write the output here
 	var buffer bytes.Buffer
-	if _, err := rp.ToWriter(&buffer, secret, id); err != nil {
+	if _, err := rp.ToWriter(&buffer, secret, id, reuseAuthenticator, reuse); err != nil {
 		return buffer.Bytes(), err
 	}
 

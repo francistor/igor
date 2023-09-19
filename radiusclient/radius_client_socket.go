@@ -30,7 +30,7 @@ type RadiusResponseMsg struct {
 	// The sender
 	remote net.UDPAddr
 
-	// The received packet
+	// The received packetformat
 	packetBytes []byte
 }
 
@@ -40,7 +40,8 @@ type CancelRequestMsg struct {
 	endpoint string
 
 	// To match responses with requests, according to the radius packet format
-	radiusId byte
+	radiusId      byte
+	authenticator [16]byte
 
 	// Currently only "timeout"
 	reason error
@@ -290,8 +291,17 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				continue
 			}
 
+			// If it is a retransmission, v.RadiusId is not zero
+			// Reuse the same authenticator
+			var reuseAuthenticator [16]byte
+			var reuse = false
+			if v.radiusId != 0 {
+				reuseAuthenticator = v.packet.Authenticator
+				reuse = true
+			}
+
 			// Serialize to buffer
-			packetBytes, err := v.packet.ToBytes(v.secret, radiusId)
+			packetBytes, err := v.packet.ToBytes(v.secret, radiusId, reuseAuthenticator, reuse)
 			if err != nil {
 				core.GetLogger().Errorf("error marshaling packet: %s", err)
 				v.rchan <- err
@@ -331,7 +341,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 						rcs.wg.Done()
 					}()
 					if v.serverTries <= 1 {
-						rcs.eventLoopChannel <- CancelRequestMsg{endpoint: v.endpoint, radiusId: radiusId, reason: fmt.Errorf("timeout")}
+						rcs.eventLoopChannel <- CancelRequestMsg{endpoint: v.endpoint, radiusId: radiusId, authenticator: v.packet.Authenticator, reason: fmt.Errorf("timeout")}
 					} else {
 						retriedClientRadiusRequest := v
 						retriedClientRadiusRequest.serverTries--
@@ -361,6 +371,9 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				continue
 			} else if reqCtx, found := epMap[v.radiusId]; !found {
 				core.GetLogger().Debugf("tried to cancel not existing request %s:%d", v.endpoint, v.radiusId)
+				continue
+			} else if reqCtx.authenticator != v.authenticator {
+				core.GetLogger().Debugf("tried to cancel request with unmatching authenticator %s:%d", v.endpoint, v.radiusId)
 				continue
 			} else {
 				reqCtx.rchan <- fmt.Errorf("timeout")
@@ -460,10 +473,7 @@ func (rcs *RadiusClientSocket) getNextRadiusId(endpoint string, currentRadiusId 
 			if nextId == 0 {
 				panic("Radius id should never be 0")
 			}
-			core.GetLogger().Debugf("Got id %d for endpoint %s", nextId, endpoint)
 			return nextId, nil
-		} else {
-			core.GetLogger().Debugf("Discarded id %d for endpoint %s", nextId, endpoint)
 		}
 	}
 
