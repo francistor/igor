@@ -83,7 +83,8 @@ func (cdr *WritableCDR) String() string {
 	return sb.String()
 }
 
-// Need to pass a multiple of 3 lines
+// Need to pass a multiple of 3 lines: name, type, value
+// Used for backups
 func NewWritableCDRFromStrings(lines []string) *WritableCDR {
 
 	cdr := WritableCDR{
@@ -133,6 +134,8 @@ func NewWritableCDRFromStrings(lines []string) *WritableCDR {
 	return &cdr
 }
 
+// Stores the specification of the fields to write: for each table column, what attribute
+// to use as origin, optionally with modifiers
 type BigQueryFormatConf struct {
 	AttributeMap map[string]string
 }

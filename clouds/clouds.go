@@ -25,7 +25,12 @@ func GetAccessTokenFromImplicitServiceAccount(client *http.Client) (string, erro
 	switch strings.ToLower(os.Getenv("IGOR_CLOUD")) {
 	case "google":
 
-		resp, err := client.Get(GOOGLE_TOKEN_API)
+		req, err := http.NewRequest("GET", GOOGLE_TOKEN_API, nil)
+		if err != nil {
+			return "", err
+		}
+		req.Header.Add("Metadata-Flavor", "Google")
+		resp, err := client.Do(req)
 		if err != nil {
 			return "", err
 		}
