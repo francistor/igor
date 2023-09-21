@@ -56,7 +56,7 @@ If the `origin` starts with `database` the syntax must be `database:<table-name>
 
 The `resource://` prefix indicates that the object is embedded in the igor executable. All the files in the `resources` directory are available in this way.
 
-If the environment variable `IGOR_CLOUD`` is specified, for example as "Google", then the http(s) resource retrieval will make use of authentication using a service account using the native mechanisms of that cloud. This way, configuration files may be retrieved from the cloud object storage.
+If the environment variable `IGOR_CLOUD` is specified, for example as "Google", then the http(s) resource retrieval will make use of authentication using a service account using the native mechanisms of that cloud. This way, configuration files may be retrieved from the cloud object storage.
 
 A simple configuration where every resource is in the same directory as the bootstrap file would be
 
@@ -255,5 +255,11 @@ It offers a method for sending a message, which is used by the Diameter Router, 
 ### RadiusClient
 
 The `RadiusClient` is a thin wrapper to manage `RadiusClientSockets`. A `RadiusClientSocket` is created for each origin UDP port. The `RadiusClientSocket` sends the requests to the upstream servers, generating the corresponding radius identifier and keeping track of the outstanding requests, to be matched with the answers and generating timeouts when needed.
+
+## Writting CDR
+
+### BigQuery
+
+ If the execution is not in a Google Virtual Machine, the environment variable `IGOR_CLOUD_CREDENTIALS` must point to a valid credentials file
 
 

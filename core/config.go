@@ -354,7 +354,7 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	// Get the search rules object
 	rules, err := c.readResource(bootstrapFile, true)
 	if err != nil {
-		panic("could not retrieve the bootstrap file in " + bootstrapFile)
+		panic("could not retrieve the bootstrap file in " + bootstrapFile + "due to: " + err.Error())
 	}
 
 	// Parse template
