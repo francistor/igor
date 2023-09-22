@@ -28,7 +28,7 @@ const (
 	HTTP_TIMEOUT_SECONDS = 5
 )
 
-var redirect_error = errors.New("igor-redirect")
+var errRedirect = errors.New("igor-redirect")
 
 // Holds a SearchRule, which specifies where to look for a configuration object
 type SearchRule struct {
@@ -126,7 +126,7 @@ func NewConfigurationManager(bootstrapFile string, instanceName string, params m
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore invalid SSL certificates
 			},
 			CheckRedirect: func(req *http.Request, via []*http.Request) error { // Do not follow redirects
-				return redirect_error
+				return errRedirect
 			},
 		},
 	}
@@ -305,7 +305,7 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			if errors.Is(err, redirect_error) {
+			if errors.Is(err, errRedirect) {
 				// That was our own redirect error, as set in the checkRedirect method of the http client.
 
 				// It is a redirect we are probably being asked for authentication in a cloud storage.
