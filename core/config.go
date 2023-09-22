@@ -305,7 +305,7 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			if errors.Is(err, errRedirect) {
+			if errors.Is(err, errRedirect) && retry {
 				// That was our own redirect error, as set in the checkRedirect method of the http client.
 
 				// It is a redirect we are probably being asked for authentication in a cloud storage.
