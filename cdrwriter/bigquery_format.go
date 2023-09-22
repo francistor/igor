@@ -134,19 +134,13 @@ func NewWritableCDRFromStrings(lines []string) *WritableCDR {
 	return &cdr
 }
 
-// Stores the specification of the fields to write: for each table column, what attribute
-// to use as origin, optionally with modifiers
-type BigQueryFormatConf struct {
+// BigQueryFormat generates the WritableCDR from a radius packet
+type BigQueryFormat struct {
 	AttributeMap map[string]string
 }
 
-// BigQueryFormat generates the WritableCDR from a radius packet
-type BigQueryFormat struct {
-	BigQueryFormatConf
-}
-
 // Creates an instance of BigQueryWriter with the specified configuration
-func NewBigQueryFormat(conf BigQueryFormatConf) *BigQueryFormat {
+func NewBigQueryFormat(conf map[string]string) *BigQueryFormat {
 	return &BigQueryFormat{
 		conf,
 	}

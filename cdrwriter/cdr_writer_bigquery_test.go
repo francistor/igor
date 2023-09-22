@@ -122,7 +122,7 @@ func TestBigqueryWriter(t *testing.T) {
 	// Get the current number of lines in the table
 	currentLines := getBQLinesInTable(t)
 
-	var conf BigQueryFormatConf
+	var conf map[string]string
 	if err := json.Unmarshal([]byte(jBigQueryConfig), &conf); err != nil {
 		t.Fatalf("bad BigQuery format: %s", err)
 	}
@@ -151,7 +151,7 @@ func TestBigqueryGenBackup(t *testing.T) {
 
 	t.Skip()
 
-	var conf BigQueryFormatConf
+	var conf map[string]string
 	if err := json.Unmarshal([]byte(jBigQueryConfig), &conf); err != nil {
 		t.Fatalf("bad BigQuery format: %s", err)
 	}
@@ -185,7 +185,7 @@ func TestBigQueryIngestBackup(t *testing.T) {
 	// Get the current number of lines in the table
 	currentLines := getBQLinesInTable(t)
 
-	var conf BigQueryFormatConf
+	var conf map[string]string
 	if err := json.Unmarshal([]byte(jBigQueryConfig), &conf); err != nil {
 		t.Fatalf("bad BigQuery format: %s", err)
 	}
