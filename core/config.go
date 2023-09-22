@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -305,21 +306,22 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			if errors.Is(err, errRedirect) && retry {
+			// errors.Is should be used
+			if err.(*url.Error).Err == errRedirect && retry {
 				// That was our own redirect error, as set in the checkRedirect method of the http client.
 
 				// It is a redirect we are probably being asked for authentication in a cloud storage.
 				// Try to get a token. The GetAccessTokenFromImplicitServiceAccount method uses an environment
 				// variable to detect what cloud we are being executed onto.
 				if token, e := clouds.GetAccessTokenFromImplicitServiceAccount(c.httpClient); e != nil {
-					return nil, fmt.Errorf("got %v when getting a bearer token", e)
+					return nil, fmt.Errorf("got %v when getting a bearer token: %w", e, e)
 				} else {
 					c.authorizationHeader.Store("Bearer: " + token)
 					// Retry with the new token, but in this case do not retry
 					return c.readResource(location, false)
 				}
 			} else {
-				return nil, err
+				return nil, fmt.Errorf("request for http resource got error %v retry: %v", err, retry)
 			}
 		}
 		defer resp.Body.Close()
@@ -359,13 +361,13 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	// Get the search rules object
 	rules, err := c.readResource(bootstrapFile, true)
 	if err != nil {
-		panic("could not retrieve the bootstrap file in " + bootstrapFile + "due to: " + err.Error())
+		panic("could not retrieve the bootstrap file in " + bootstrapFile + " due to: " + err.Error())
 	}
 
 	// Parse template
 	rules, err = c.untemplateObject(rules)
 	if err != nil {
-		panic("could not parse the bootstrap file in " + bootstrapFile + "due to " + err.Error())
+		panic("could not parse the bootstrap file in " + bootstrapFile + " due to: " + err.Error())
 	}
 
 	// Decode Search Rules and add them to the ConfigurationManager object

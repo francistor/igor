@@ -27,22 +27,22 @@ func GetAccessTokenFromImplicitServiceAccount(client *http.Client) (string, erro
 
 		req, err := http.NewRequest("GET", GOOGLE_TOKEN_API, nil)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("error creating request for token: %w", err)
 		}
 		req.Header.Add("Metadata-Flavor", "Google")
 		resp, err := client.Do(req)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("error doing request for token: %w", err)
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("%w", err)
+			return "", fmt.Errorf("token request got non OK response: %d %w", resp.StatusCode, err)
 		}
 		if body, err := io.ReadAll(resp.Body); err != nil {
-			return "", fmt.Errorf("%w", err)
+			return "", fmt.Errorf("could not read the token %w", err)
 		} else {
 			if err = json.Unmarshal(body, &token); err != nil {
-				return "", fmt.Errorf("%w", err)
+				return "", fmt.Errorf("could not unmarshal the token: %w", err)
 			}
 		}
 
