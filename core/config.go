@@ -28,6 +28,8 @@ const (
 	HTTP_TIMEOUT_SECONDS = 5
 )
 
+var redirect_error = errors.New("igor-redirect")
+
 // Holds a SearchRule, which specifies where to look for a configuration object
 type SearchRule struct {
 	// Regex for the name of the object. If matching, we'll try to locate
@@ -124,7 +126,7 @@ func NewConfigurationManager(bootstrapFile string, instanceName string, params m
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore invalid SSL certificates
 			},
 			CheckRedirect: func(req *http.Request, via []*http.Request) error { // Do not follow redirects
-				return errors.New("Redirect")
+				return redirect_error
 			},
 		},
 	}
@@ -303,24 +305,27 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			if (resp.StatusCode >= 300 || resp.StatusCode < 400) && retry {
+			if errors.Is(err, redirect_error) {
+				// That was our own redirect error, as set in the checkRedirect method of the http client.
+
 				// It is a redirect we are probably being asked for authentication in a cloud storage.
 				// Try to get a token. The GetAccessTokenFromImplicitServiceAccount method uses an environment
 				// variable to detect what cloud we are being executed onto.
 				if token, e := clouds.GetAccessTokenFromImplicitServiceAccount(c.httpClient); e != nil {
-					return nil, fmt.Errorf("got %s when getting a bearer token", e)
+					return nil, fmt.Errorf("got %v when getting a bearer token", e)
 				} else {
 					c.authorizationHeader.Store("Bearer: " + token)
 					// Retry with the new token, but in this case do not retry
 					return c.readResource(location, false)
 				}
 			} else {
-				return nil, fmt.Errorf("got status code %d while retrieving %s", resp.StatusCode, location)
+				return nil, err
 			}
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("got status code %d while retrieving %s", resp.StatusCode, location)
+
 		}
 		if body, err := io.ReadAll(resp.Body); err != nil {
 			return nil, err
