@@ -232,13 +232,13 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 		// File object
 		// Try first with instance name
 		if c.instanceName != "" {
-			if objectBytes, err := c.readResource(origin+c.instanceName+"/"+innerName, false); err == nil {
+			if objectBytes, err := c.readResource(origin+c.instanceName+"/"+innerName, true); err == nil {
 				return objectBytes, nil
 			}
 		}
 
 		// Try without instance name
-		if objectBytes, err := c.readResource(origin+innerName, false); err == nil {
+		if objectBytes, err := c.readResource(origin+innerName, true); err == nil {
 			return objectBytes, nil
 		} else {
 			return nil, err
@@ -321,7 +321,7 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 					return c.readResource(location, false)
 				}
 			} else {
-				return nil, fmt.Errorf("request for http resource got error %v retry: %v", err, retry)
+				return nil, fmt.Errorf("request for http resource %v with auth header %v got error: %v retry: %v", req, req.Header, err, retry)
 			}
 		}
 		defer resp.Body.Close()
