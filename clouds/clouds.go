@@ -13,6 +13,7 @@ type GoogleToken struct {
 	Access_token string
 }
 
+// https://cloud.google.com/docs/authentication/rest
 const (
 	GOOGLE_TOKEN_API string = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
 )

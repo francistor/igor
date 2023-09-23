@@ -320,7 +320,7 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 				if token, e := clouds.GetAccessTokenFromImplicitServiceAccount(c.httpClient); e != nil {
 					return nil, fmt.Errorf("got %v when getting a bearer token: %w", e, e)
 				} else {
-					c.authorizationHeader.Store("Bearer: " + token)
+					c.authorizationHeader.Store("Bearer " + token)
 					// Retry with the new token, but in this case do not retry
 					return c.readResource(location, false)
 				}
