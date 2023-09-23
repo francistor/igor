@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -126,8 +125,13 @@ func NewConfigurationManager(bootstrapFile string, instanceName string, params m
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore invalid SSL certificates
 			},
-			CheckRedirect: func(req *http.Request, via []*http.Request) error { // Do not follow redirects
-				return errRedirect
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				// If requesting a Google interative login, do not redirect and force renewing the token
+				if strings.Contains(req.URL.String(), "InteractiveLogin") {
+					return errRedirect
+				} else {
+					return nil
+				}
 			},
 		},
 	}
@@ -307,7 +311,7 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			// errors.Is should be used
-			if err.(*url.Error).Err == errRedirect && retry {
+			if errors.Is(err, errRedirect) && retry {
 				// That was our own redirect error, as set in the checkRedirect method of the http client.
 
 				// It is a redirect we are probably being asked for authentication in a cloud storage.
