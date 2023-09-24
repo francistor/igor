@@ -45,6 +45,7 @@ The following example specifies that the `template_http.txt` file is retreived f
     {"nameRegex": "(.*dictionary.*)",               "origin": "resource://"},
     {"nameRegex": "(template_http.txt)",            "origin": "http://localhost:8100/"},
     {"nameRegex": "(radiusclients.database)",       "origin": "database:accessNodes:AccessNodeId:Parameters"},
+    {"nameRegex": "(gs_test.txt)",                  "origin": "gs://igor-francisco-cardoso-gil/test/"},  
     {"nameRegex": "Gy/(.*)",                        "origin": ""},
     {"nameRegex": "(.*)",                           "origin": ""}
 ]
@@ -56,7 +57,7 @@ If the `origin` starts with `database` the syntax must be `database:<table-name>
 
 The `resource://` prefix indicates that the object is embedded in the igor executable. All the files in the `resources` directory are available in this way.
 
-If the environment variable `IGOR_CLOUD` is specified, for example as "Google", then the http(s) resource retrieval will make use of authentication using a service account using the native mechanisms of that cloud. This way, configuration files may be retrieved from the cloud object storage.
+The `gs://` prefix indicates that the object is retrieved from Google Storage. ADC authentication is used if the `IGOR_CLOUD_CREDENTIALS` environment variable is not defined (that is, the credentials are taken from the cloud metadata service). Otherwise, the variable is assumed to point to a JSON key file
 
 A simple configuration where every resource is in the same directory as the bootstrap file would be
 

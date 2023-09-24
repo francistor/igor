@@ -403,8 +403,8 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 // directory and in the parent directory, which is useful for tests
 func (c *ConfigurationManager) fixBootstrapFileLocation(bootstrapFileName string, tryWithParent bool) string {
 
-	// Skip if file is in a http location
-	if strings.HasPrefix(bootstrapFileName, "http:") || strings.HasPrefix(bootstrapFileName, "https:") {
+	// Skip if file is in a http or gs location
+	if strings.HasPrefix(bootstrapFileName, "http:") || strings.HasPrefix(bootstrapFileName, "https:") || strings.HasPrefix(bootstrapFileName, "gs:") {
 		return bootstrapFileName
 	}
 
