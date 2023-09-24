@@ -16,6 +16,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/francistor/igor/cloud"
 	"github.com/francistor/igor/resources"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -315,7 +316,7 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 		}
 
 	} else if strings.HasPrefix(location, "gs://") {
-		if resp, err := getGoogleStorageObject(location); err != nil {
+		if resp, err := cloud.GetGoogleStorageObject(location); err != nil {
 			return nil, err
 		} else {
 			return resp, nil

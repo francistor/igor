@@ -1,4 +1,4 @@
-package core
+package cloud
 
 import (
 	"bytes"
@@ -17,10 +17,12 @@ import (
 
 var gsRegex = regexp.MustCompile("gs://(.+)/(.+)")
 
+// Do not use GetLogger() here, since it may have not been initialized
+
 // Retrieves an object from Google Storage.
 // It must be specified as gs://<bucket-name>/<object-name>
 // Returns the contents of the object and an optional error
-func getGoogleStorageObject(objName string) ([]byte, error) {
+func GetGoogleStorageObject(objName string) ([]byte, error) {
 
 	// Get the credentials
 	clientOptions, _ := getGoogleAccessData()
@@ -75,8 +77,6 @@ func getGoogleAccessData() (option.ClientOption, string) {
 	credentialsFile := os.Getenv("IGOR_CLOUD_CREDENTIALS")
 	if credentialsFile != "" {
 
-		GetLogger().Debug("using Google credentials file")
-
 		// To store the json account key file contents
 		var cred struct {
 			Project_id string
@@ -97,8 +97,6 @@ func getGoogleAccessData() (option.ClientOption, string) {
 
 		return options, projectId
 	} else {
-
-		GetLogger().Debug("using Google ADC")
 
 		// Use ADC to get the default credentials including the projectId
 		googleCredentials, err := google.FindDefaultCredentials(context.Background(), compute.ComputeScope)
