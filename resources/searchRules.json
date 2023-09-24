@@ -3,6 +3,7 @@
         {"nameRegex": "(.*dictionary.*)",               "origin": "resource://"},
         {"nameRegex": "(template_http.txt)",            "origin": "http://localhost:8100/"},
         {"nameRegex": "(radiusclients.database)",       "origin": "database:accessNodes:AccessNodeId:Parameters"},
+        {"nameRegex": "(gs_test.txt)",                  "origin": "gs://igor-francisco-cardoso-gil/test/"},   
         {"nameRegex": "Gy/(.*)",                        "origin": ""},
         {"nameRegex": "(.*)",                           "origin": ""}
     ],

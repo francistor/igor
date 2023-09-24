@@ -16,7 +16,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/francistor/igor/clouds"
 	"github.com/francistor/igor/resources"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -298,35 +297,11 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 		return json.Marshal(entries)
 
 	} else if strings.HasPrefix(location, "http:") || strings.HasPrefix(location, "https:") {
+
 		// Read from http
-
-		req, _ := http.NewRequest("GET", location, nil)
-
-		// Atomic, to avoid race conditions
-		authHeader := c.authorizationHeader.Load().(string)
-		if authHeader != "" {
-			req.Header.Set("Authorization", authHeader)
-		}
-
-		resp, err := c.httpClient.Do(req)
+		resp, err := http.Get(location)
 		if err != nil {
-			// errors.Is should be used
-			if errors.Is(err, errRedirect) && retry {
-				// That was our own redirect error, as set in the checkRedirect method of the http client.
-
-				// It is a redirect we are probably being asked for authentication in a cloud storage.
-				// Try to get a token. The GetAccessTokenFromImplicitServiceAccount method uses an environment
-				// variable to detect what cloud we are being executed onto.
-				if token, e := clouds.GetAccessTokenFromImplicitServiceAccount(c.httpClient); e != nil {
-					return nil, fmt.Errorf("got %v when getting a bearer token: %w", e, e)
-				} else {
-					c.authorizationHeader.Store("Bearer " + token)
-					// Retry with the new token, but in this case do not retry
-					return c.readResource(location, false)
-				}
-			} else {
-				return nil, fmt.Errorf("request for http resource %v with auth header %v got error: %v retry: %v", req, req.Header, err, retry)
-			}
+			return nil, fmt.Errorf("request for http resource %v got error: %v retry: %v", location, err, retry)
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
@@ -339,6 +314,12 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 			return body, nil
 		}
 
+	} else if strings.HasPrefix(location, "gs://") {
+		if resp, err := getGoogleStorageObject(location); err != nil {
+			return nil, err
+		} else {
+			return resp, nil
+		}
 	} else if strings.HasPrefix(location, "resource://") {
 		if resp, err := resources.Fs.ReadFile(location[11:]); err != nil {
 			return nil, err

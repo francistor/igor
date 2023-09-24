@@ -302,6 +302,8 @@ func (w *BigQueryCDRWriter) processBackupFiles() {
 	}
 }
 
+// Inserts the contents of the backup file into Bigquery, and deletes
+// the file if successful
 func (w *BigQueryCDRWriter) processBackupFile(fileName string) error {
 
 	var batch []*WritableCDR

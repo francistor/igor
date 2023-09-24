@@ -214,3 +214,17 @@ func TestRadiusSessionStoreConfig(t *testing.T) {
 		t.Fatalf("bad destination IP")
 	}
 }
+
+func TestGoogleStorage(t *testing.T) {
+
+	// export IGOR_CLOUD_CREDENTIALS=/home/francisco/terraform-cardoso2-free.json
+	t.Skip()
+
+	txt, err := GetPolicyConfig().CM.getObject("gs_test.txt")
+	if err != nil {
+		t.Fatalf("error using http to get config object from Google Storage: %s", err)
+	}
+	if !strings.Contains(string(txt), "ok") {
+		t.Fatal("contents of Google storage object are not ok")
+	}
+}
