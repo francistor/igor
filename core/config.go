@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -88,9 +87,6 @@ type ConfigurationManager struct {
 
 	// HttpClient
 	httpClient *http.Client
-
-	// Authorization header
-	authorizationHeader atomic.Value
 }
 
 // The home location for configuration files not referenced as absolute paths
@@ -136,10 +132,10 @@ func NewConfigurationManager(bootstrapFile string, instanceName string, params m
 		},
 	}
 
-	// Initial value to avoid nil when converting to string
-	cm.authorizationHeader.Store("")
-
-	cm.fillSearchRules(cm.fixBootstrapFileLocation(bootstrapFile, true))
+	// Parse the bootstrap configuration file
+	icb, bootstrapResource := cm.fixBootstrapFileLocation(bootstrapFile)
+	igorConfigBase = icb
+	cm.fillSearchRules(bootstrapResource)
 
 	return cm
 }
@@ -233,16 +229,22 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 			return nil, err
 		}
 	} else {
-		// File object
+		// Other object types may have an instance name.
 		// Try first with instance name
+		var prefix string
+		if origin != "" {
+			prefix = origin
+		} else {
+			prefix = igorConfigBase
+		}
 		if c.instanceName != "" {
-			if objectBytes, err := c.readResource(origin+c.instanceName+"/"+innerName, true); err == nil {
+			if objectBytes, err := c.readResource(prefix+c.instanceName+"/"+innerName, false); err == nil {
 				return objectBytes, nil
 			}
 		}
 
 		// Try without instance name
-		if objectBytes, err := c.readResource(origin+innerName, true); err == nil {
+		if objectBytes, err := c.readResource(prefix+innerName, false); err == nil {
 			return objectBytes, nil
 		} else {
 			return nil, err
@@ -250,13 +252,9 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 	}
 }
 
-// To read from a google storage bucket
-// Get a token using curl -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
-// Get the content using curl -v -o file2.txt -H "Authorization: Bearer $TOKEN" https://storage.googleapis.com/storage/v1/b/igor_telco_minsait_com/o/reverse%20tunneling.txt?alt=media
-
 // Reads the configuration item from the specified location, which may be
 // a file or an http(s) url
-func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte, error) {
+func (c *ConfigurationManager) readResource(location string, tryParentForTesting bool) ([]byte, error) {
 
 	if strings.HasPrefix(location, "database") {
 		// Format is database:table:keycolumn:paramscolumn
@@ -302,7 +300,7 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 		// Read from http
 		resp, err := http.Get(location)
 		if err != nil {
-			return nil, fmt.Errorf("request for http resource %v got error: %v retry: %v", location, err, retry)
+			return nil, fmt.Errorf("request for http resource %v got error: %v", location, err)
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
@@ -329,10 +327,28 @@ func (c *ConfigurationManager) readResource(location string, retry bool) ([]byte
 		}
 	} else {
 		// Read from file
-		if resp, err := os.ReadFile(igorConfigBase + location); err != nil {
-			return nil, err
+		if strings.HasPrefix(location, "/") {
+			// Treat as absolute
+			if resp, err := os.ReadFile(location); err != nil {
+				return nil, err
+			} else {
+				return resp, nil
+			}
 		} else {
-			return resp, nil
+			// Relative to the bootstrap file
+			if resp, err := os.ReadFile(igorConfigBase + location); err != nil {
+				if tryParentForTesting {
+					if resp, err := os.ReadFile("../" + igorConfigBase + location); err != nil {
+						return nil, err
+					} else {
+						igorConfigBase = "../" + igorConfigBase
+						return resp, nil
+					}
+				}
+				return nil, err
+			} else {
+				return resp, nil
+			}
 		}
 	}
 }
@@ -400,29 +416,44 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 }
 
 // Sets the core.igorConfigBase variable as the directory where the bootstrap file resides
-// and returns the normalized location of that bootstrap file, looking for it in the current
-// directory and in the parent directory, which is useful for tests
-func (c *ConfigurationManager) fixBootstrapFileLocation(bootstrapFileName string, tryWithParent bool) string {
+// and returns the base location of the configuration, to be used when there is no origin, and
+// the name of the bootrstrap file resource
+func (c *ConfigurationManager) fixBootstrapFileLocation(bootstrapFileName string) (string, string) {
 
-	// Skip if file is in a http or gs location
-	if strings.HasPrefix(bootstrapFileName, "http:") || strings.HasPrefix(bootstrapFileName, "https:") || strings.HasPrefix(bootstrapFileName, "gs:") {
-		return bootstrapFileName
-	}
-
-	// Try first with the specification as it is
-	if fileInfo, err := os.Stat(bootstrapFileName); err == nil {
-		// File found
+	lastSlash := strings.LastIndex(bootstrapFileName, "/")
+	if lastSlash == -1 {
+		// Assumed to be the current directory
 		abs, err := filepath.Abs(bootstrapFileName)
 		if err != nil {
 			panic(err)
 		}
-		igorConfigBase = filepath.Dir(abs) + "/"
-		return fileInfo.Name()
+		return filepath.Dir(abs) + "/", bootstrapFileName
+	} else {
+		return bootstrapFileName[0 : lastSlash+1], bootstrapFileName[lastSlash+1:]
 	}
 
-	if !tryWithParent {
-		panic("could not find the bootstrap file in " + bootstrapFileName)
-	} else {
-		return c.fixBootstrapFileLocation("../"+bootstrapFileName, false)
-	}
+	/*
+
+		// Skip if file is in a http or gs location
+		if strings.HasPrefix(bootstrapFileName, "http:") || strings.HasPrefix(bootstrapFileName, "https:") || strings.HasPrefix(bootstrapFileName, "gs:") {
+			return bootstrapFileName
+		}
+
+		// Try first with the specification as it is
+		if fileInfo, err := os.Stat(bootstrapFileName); err == nil {
+			// File found
+			abs, err := filepath.Abs(bootstrapFileName)
+			if err != nil {
+				panic(err)
+			}
+			igorConfigBase = filepath.Dir(abs) + "/"
+			return fileInfo.Name()
+		}
+
+		if !tryWithParent {
+			panic("could not find the bootstrap file in " + bootstrapFileName)
+		} else {
+			return c.fixBootstrapFileLocation("../"+bootstrapFileName, false)
+		}
+	*/
 }

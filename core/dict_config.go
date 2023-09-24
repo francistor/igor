@@ -12,7 +12,7 @@ func initDiameterDict(cm *ConfigurationManager) {
 	// Diameter
 	coreJSON, err := cm.GetBytesConfigObject("diameterDictionary.json")
 	if err != nil {
-		panic("Could not read diameterDictionary.json")
+		panic("Could not read diameterDictionary.json due to " + err.Error())
 	}
 	diameterDict = NewDiameterDictionaryFromJSON([]byte(coreJSON))
 }
