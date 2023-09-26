@@ -10,25 +10,23 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/francistor/igor/cloud"
 	"google.golang.org/api/googleapi"
-	"google.golang.org/api/option"
 )
 
 var bqdatasetName = "IgorTest2"
 var bqtableName = "TestTable2"
 
 var jBigQueryConfig = `{
-	"attributeMap":{
-		"IgorInt": "Igor-IntegerAttribute",
-		"IgorInt64": "Igor-Integer64Attribute",
-		"IgorOctets": "Igor-OctetsAttribute",
-		"IgorString": "Class:Igor-StringAttribute",
-		"SessionTime": "Acct-Session-Time!Acct-Delay-Time",
-		"InputBytes": "Acct-Input-Octets<Acct-Input-Gigawords",
-		"Status": "Acct-Status-Type",
-		"EventTimestamp": "Igor-TimeAttribute",
-		"AcctSessionId": "Acct-Session-Id"
-	}
+	"IgorInt": "Igor-IntegerAttribute",
+	"IgorInt64": "Igor-Integer64Attribute",
+	"IgorOctets": "Igor-OctetsAttribute",
+	"IgorString": "Class:Igor-StringAttribute",
+	"SessionTime": "Acct-Session-Time!Acct-Delay-Time",
+	"InputBytes": "Acct-Input-Octets<Acct-Input-Gigawords",
+	"Status": "Acct-Status-Type",
+	"EventTimestamp": "Igor-TimeAttribute",
+	"AcctSessionId": "Acct-Session-Id"
 }`
 
 // Used for creating the bigquery resources
@@ -38,6 +36,8 @@ func TestCreateSchema(t *testing.T) {
 
 	t.Skip()
 
+	var err error
+
 	googleCredentialsFile := os.Getenv("IGOR_CLOUD_CREDENTIALS")
 	if googleCredentialsFile == "" {
 		t.Fatal("IGOR_CLOUD_CREDENTIALS not set")
@@ -45,11 +45,7 @@ func TestCreateSchema(t *testing.T) {
 
 	// Create the bigquery client. It will not report any errors until really used
 	ctx := context.Background()
-	client, _, err := getBigqueryClient(ctx)
-	if err != nil {
-		t.Fatalf("could not create bigquery client: %s", err)
-		return
-	}
+	client, _ := getBigqueryClient(ctx)
 	defer client.Close()
 
 	// These are references. No error occurs if the dataset or the table does not
@@ -113,12 +109,6 @@ func TestBigqueryWriter(t *testing.T) {
 
 	t.Skip()
 
-	// Sanity check
-	googleCredentialsFile := os.Getenv("IGOR_CLOUD_CREDENTIALS")
-	if googleCredentialsFile == "" {
-		t.Fatal("IGOR_CLOUD_CREDENTIALS not set")
-	}
-
 	// Get the current number of lines in the table
 	currentLines := getBQLinesInTable(t)
 
@@ -147,9 +137,13 @@ func TestBigqueryWriter(t *testing.T) {
 }
 
 // NOTE: Remove t.Skip() to execute
-func TestBigqueryGenBackup(t *testing.T) {
+func TestBigqueryGenAndIngestBackup(t *testing.T) {
 
 	t.Skip()
+
+	///////////////////////////
+	// Gen backup
+	//////////////////////////
 
 	var conf map[string]string
 	if err := json.Unmarshal([]byte(jBigQueryConfig), &conf); err != nil {
@@ -174,25 +168,16 @@ func TestBigqueryGenBackup(t *testing.T) {
 	if _, err := os.Stat("../cdr/bigquery/bigquery.backup"); err != nil {
 		t.Fatal("backup file not created")
 	}
-}
 
-// NOTE: Remove t.Skip() to execute
-// Depends on the previous test
-func TestBigQueryIngestBackup(t *testing.T) {
-
-	t.Skip()
+	///////////////////////////
+	// Gen backup
+	//////////////////////////
 
 	// Get the current number of lines in the table
 	currentLines := getBQLinesInTable(t)
 
-	var conf map[string]string
-	if err := json.Unmarshal([]byte(jBigQueryConfig), &conf); err != nil {
-		t.Fatalf("bad BigQuery format: %s", err)
-	}
-	bqf := NewBigQueryFormat(conf)
-
 	// Reduced timeout and glitch time
-	bqw := NewBigQueryCDRWriter(bqdatasetName, bqtableName, bqf /* Timeout seconds */, 1 /* Glitch seconds */, 1, "../cdr/bigquery/bigquery.backup")
+	bqw = NewBigQueryCDRWriter(bqdatasetName, bqtableName, bqf /* Timeout seconds */, 1 /* Glitch seconds */, 1, "../cdr/bigquery/bigquery.backup")
 
 	time.Sleep(2 * time.Second)
 	bqw.Close()
@@ -209,10 +194,7 @@ func getBQLinesInTable(t *testing.T) int64 {
 
 	// Create the bigquery client. It will not report any errors until really used
 	ctx := context.Background()
-	client, projectId, err := getBigqueryClient(ctx)
-	if err != nil {
-		t.Fatal("could not create client for Google cloud")
-	}
+	client, projectId := getBigqueryClient(ctx)
 	q := client.Query("SELECT count(*) FROM " + projectId + "." + bqdatasetName + "." + bqtableName)
 
 	it, err := q.Read(ctx)
@@ -231,25 +213,24 @@ func getBQLinesInTable(t *testing.T) int64 {
 // Helper to create a bigquery client and the project name
 // Use defer .Close() on the Client returned
 // Returns a bigquery client, a project_id and an error
-func getBigqueryClient(ctx context.Context) (*bigquery.Client, string, error) {
-	googleCredentialsFile := os.Getenv("IGOR_CLOUD_CREDENTIALS")
+func getBigqueryClient(ctx context.Context) (*bigquery.Client, string) {
 
-	var cred struct {
-		Project_id string
-	}
+	var client *bigquery.Client
+	var err error
 
-	if credBytes, err := os.ReadFile(googleCredentialsFile); err != nil {
-		panic("credentials file " + googleCredentialsFile + " read error: " + err.Error())
+	options, projectId := cloud.GetGoogleAccessData()
+	if options != nil {
+		// Using credentials file
+		// Create the bigquery client. It will not report any errors until really used
+		if client, err = bigquery.NewClient(ctx, projectId, options); err != nil {
+			panic("could not create bigquery client: " + err.Error())
+		}
 	} else {
-		json.Unmarshal(credBytes, &cred)
+		// Create the bigquery client. It will not report any errors until really used
+		if client, err = bigquery.NewClient(ctx, projectId); err != nil {
+			panic("could not create bigquery client: " + err.Error())
+		}
 	}
 
-	if cred.Project_id == "" {
-		panic("credentials file " + googleCredentialsFile + " could not be parsed ")
-	}
-
-	options := option.WithCredentialsFile(googleCredentialsFile)
-
-	client, err := bigquery.NewClient(ctx, cred.Project_id, options)
-	return client, cred.Project_id, err
+	return client, projectId
 }

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,10 +12,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/francistor/igor/cloud"
 	"github.com/francistor/igor/core"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/compute/v1"
-	"google.golang.org/api/option"
 )
 
 const (
@@ -48,7 +45,7 @@ type BigQueryCDRWriter struct {
 	backupFileName string
 
 	// Formatter
-	formatter *BigQueryFormat
+	formatter *BigqueryFormat
 
 	// For sending periodics singals to empty batch
 	ticker *time.Ticker
@@ -60,7 +57,7 @@ type BigQueryCDRWriter struct {
 // Builds a writer
 // The attributeMap applies only for Radius
 // The key is the name of the attribute to be written. The value is the name of the attribute in the CDR
-func NewBigQueryCDRWriter(datasetName string, tableName string, formatter *BigQueryFormat, timeoutSeconds int, glitchSeconds int, backupFileName string) *BigQueryCDRWriter {
+func NewBigQueryCDRWriter(datasetName string, tableName string, formatter *BigqueryFormat, timeoutSeconds int, glitchSeconds int, backupFileName string) *BigQueryCDRWriter {
 
 	ctx := context.Background()
 
@@ -71,47 +68,19 @@ func NewBigQueryCDRWriter(datasetName string, tableName string, formatter *BigQu
 		panic("while initializing, could not create directory " + filepath.Dir(backupFileName) + " :" + err.Error())
 	}
 
-	var projectId string
 	var client *bigquery.Client
 	var err error
 
-	// If passing client credentials, use them to build the bigquery client. The projectId is one of the properties
-	// of the JSON credentials file
-	credentialsFile := os.Getenv("IGOR_CLOUD_CREDENTIALS")
-	if credentialsFile != "" {
-		var cred struct {
-			Project_id string
-		}
-
-		if credBytes, err := os.ReadFile(credentialsFile); err != nil {
-			panic("credentials file " + credentialsFile + " read error: " + err.Error())
-		} else {
-			json.Unmarshal(credBytes, &cred)
-		}
-
-		if cred.Project_id == "" {
-			panic("credentials file " + credentialsFile + " could not be parsed ")
-		}
-		projectId = cred.Project_id
-
-		options := option.WithCredentialsFile(credentialsFile)
-
+	options, projectId := cloud.GetGoogleAccessData()
+	if options != nil {
+		// Using credentials file
 		// Create the bigquery client. It will not report any errors until really used
-		client, err = bigquery.NewClient(ctx, projectId, options)
-		if err != nil {
+		if client, err = bigquery.NewClient(ctx, projectId, options); err != nil {
 			panic("could not create bigquery client: " + err.Error())
 		}
 	} else {
-
-		// Use ADC to get the default credentials including the projectId
-		cred, err := google.FindDefaultCredentials(ctx, compute.ComputeScope)
-		if err != nil {
-			panic("could not get default credentials. Are we running in a Google Cloud? " + err.Error())
-		}
-
 		// Create the bigquery client. It will not report any errors until really used
-		client, err = bigquery.NewClient(ctx, cred.ProjectID)
-		if err != nil {
+		if client, err = bigquery.NewClient(ctx, projectId); err != nil {
 			panic("could not create bigquery client: " + err.Error())
 		}
 	}

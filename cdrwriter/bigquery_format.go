@@ -135,19 +135,19 @@ func NewWritableCDRFromStrings(lines []string) *WritableCDR {
 }
 
 // BigQueryFormat generates the WritableCDR from a radius packet
-type BigQueryFormat struct {
+type BigqueryFormat struct {
 	AttributeMap map[string]string
 }
 
 // Creates an instance of BigQueryWriter with the specified configuration
-func NewBigQueryFormat(conf map[string]string) *BigQueryFormat {
-	return &BigQueryFormat{
+func NewBigQueryFormat(conf map[string]string) *BigqueryFormat {
+	return &BigqueryFormat{
 		conf,
 	}
 }
 
 // From the Radius packet, generates an object that is insertable in BigQuery
-func (bq *BigQueryFormat) GetWritableCDR(rp *core.RadiusPacket) *WritableCDR {
+func (bq *BigqueryFormat) GetWritableCDR(rp *core.RadiusPacket) *WritableCDR {
 
 	cdr := WritableCDR{
 		fields: make(map[string]bigquery.Value),

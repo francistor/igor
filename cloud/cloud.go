@@ -8,7 +8,9 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"sync"
 
+	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/storage"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
@@ -16,6 +18,8 @@ import (
 )
 
 var gsRegex = regexp.MustCompile("gs://(.+)/(.+)")
+var gStorageClient *storage.Client
+var mutex sync.Mutex
 
 // Do not use GetLogger() here, since it may have not been initialized
 
@@ -25,24 +29,26 @@ var gsRegex = regexp.MustCompile("gs://(.+)/(.+)")
 func GetGoogleStorageObject(objName string) ([]byte, error) {
 
 	// Get the credentials
-	clientOptions, _ := getGoogleAccessData()
+	clientOptions, _ := GetGoogleAccessData()
 
 	// Create Google Storage client
-	var gs *storage.Client
 	var err error
 
 	ctx := context.Background()
 
 	// Depending on whether we are using specific credentials file or ADC
-	if clientOptions == nil {
-		gs, err = storage.NewClient(ctx)
-	} else {
-		gs, err = storage.NewClient(ctx, clientOptions)
+	mutex.Lock()
+	if gStorageClient == nil {
+		if clientOptions == nil {
+			gStorageClient, err = storage.NewClient(ctx)
+		} else {
+			gStorageClient, err = storage.NewClient(ctx, clientOptions)
+		}
+		if err != nil {
+			panic("error creating Google storage client " + err.Error())
+		}
 	}
-	if err != nil {
-		panic("error creating Google storage client " + err.Error())
-	}
-	defer gs.Close()
+	mutex.Unlock()
 
 	// Get the bucket and file names
 	matches := gsRegex.FindStringSubmatch(objName)
@@ -50,7 +56,7 @@ func GetGoogleStorageObject(objName string) ([]byte, error) {
 		panic("bad gs URL specification: " + objName)
 	}
 
-	bucket := gs.Bucket(matches[1])
+	bucket := gStorageClient.Bucket(matches[1])
 	obj := bucket.Object(matches[2])
 	objReader, err := obj.NewReader(ctx)
 	if err != nil {
@@ -64,11 +70,25 @@ func GetGoogleStorageObject(objName string) ([]byte, error) {
 	return contents.Bytes(), nil
 }
 
+func GetBigqueryClient(ctx context.Context) (*bigquery.Client, error) {
+
+	// Get the credentials
+	clientOptions, projectId := GetGoogleAccessData()
+
+	if clientOptions == nil {
+		return bigquery.NewClient(ctx, projectId)
+	} else {
+		return bigquery.NewClient(ctx, projectId, clientOptions)
+	}
+}
+
 // Returns the options to use in client building and the project-id
 // using the specified credentials file or Google ADC credentials.
 // If options is not nil, they must be used to create the client, because specific
 // credentials are needed. Otherwise, use the default client creation.
-func getGoogleAccessData() (option.ClientOption, string) {
+// Returns the clientOptions for client building and the project_id
+// Does not return error. Panics.
+func GetGoogleAccessData() (option.ClientOption, string) {
 
 	var projectId string
 
@@ -101,7 +121,7 @@ func getGoogleAccessData() (option.ClientOption, string) {
 		// Use ADC to get the default credentials including the projectId
 		googleCredentials, err := google.FindDefaultCredentials(context.Background(), compute.ComputeScope)
 		if err != nil {
-			panic("could not get default credentials. Are we running in a Google Cloud? " + err.Error())
+			panic("could not get default credentials. Not running in Google cloud or IGOR_CLOUD_CREDENTIALS not set " + err.Error())
 		}
 
 		return nil, googleCredentials.ProjectID

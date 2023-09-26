@@ -27,8 +27,6 @@ const (
 	HTTP_TIMEOUT_SECONDS = 5
 )
 
-var errRedirect = errors.New("igor-redirect")
-
 // Holds a SearchRule, which specifies where to look for a configuration object
 type SearchRule struct {
 	// Regex for the name of the object. If matching, we'll try to locate
@@ -121,21 +119,13 @@ func NewConfigurationManager(bootstrapFile string, instanceName string, params m
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore invalid SSL certificates
 			},
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				// If requesting a Google interative login, do not redirect and force renewing the token
-				if strings.Contains(req.URL.String(), "InteractiveLogin") {
-					return errRedirect
-				} else {
-					return nil
-				}
-			},
 		},
 	}
 
 	// Parse the bootstrap configuration file
-	icb, bootstrapResource := cm.fixBootstrapFileLocation(bootstrapFile)
+	icb, bootstrapResource := cm.decomposeFileLocation(bootstrapFile)
 	igorConfigBase = icb
-	cm.fillSearchRules(bootstrapResource)
+	cm.fillSearchRules(icb + bootstrapResource)
 
 	return cm
 }
@@ -223,7 +213,7 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 
 	if strings.HasPrefix(origin, "database:") {
 		// Database object
-		if objectBytes, err := c.readResource(origin, false); err == nil {
+		if objectBytes, err := c.readResource("", origin, false); err == nil {
 			return objectBytes, nil
 		} else {
 			return nil, err
@@ -238,13 +228,13 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 			prefix = igorConfigBase
 		}
 		if c.instanceName != "" {
-			if objectBytes, err := c.readResource(prefix+c.instanceName+"/"+innerName, false); err == nil {
+			if objectBytes, err := c.readResource(prefix, c.instanceName+"/"+innerName, false); err == nil {
 				return objectBytes, nil
 			}
 		}
 
 		// Try without instance name
-		if objectBytes, err := c.readResource(prefix+innerName, false); err == nil {
+		if objectBytes, err := c.readResource(prefix, innerName, false); err == nil {
 			return objectBytes, nil
 		} else {
 			return nil, err
@@ -252,9 +242,11 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 	}
 }
 
-// Reads the configuration item from the specified location, which may be
-// a file or an http(s) url
-func (c *ConfigurationManager) readResource(location string, tryParentForTesting bool) ([]byte, error) {
+// Reads the configuration item from the specified location.
+func (c *ConfigurationManager) readResource(prefix string, name string, tryParentForTesting bool) ([]byte, error) {
+
+	// Used except for relative file schema
+	location := prefix + name
 
 	if strings.HasPrefix(location, "database") {
 		// Format is database:table:keycolumn:paramscolumn
@@ -335,10 +327,10 @@ func (c *ConfigurationManager) readResource(location string, tryParentForTesting
 				return resp, nil
 			}
 		} else {
-			// Relative to the bootstrap file
-			if resp, err := os.ReadFile(igorConfigBase + location); err != nil {
+			// Treat as relative to the bootstrap file
+			if resp, err := os.ReadFile(igorConfigBase + name); err != nil {
 				if tryParentForTesting {
-					if resp, err := os.ReadFile("../" + igorConfigBase + location); err != nil {
+					if resp, err := os.ReadFile("../" + igorConfigBase + name); err != nil {
 						return nil, err
 					} else {
 						igorConfigBase = "../" + igorConfigBase
@@ -361,7 +353,8 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	var shouldInitDB bool
 
 	// Get the search rules object
-	rules, err := c.readResource(bootstrapFile, true)
+	p, n := c.decomposeFileLocation(bootstrapFile)
+	rules, err := c.readResource(p, n, true)
 	if err != nil {
 		panic("could not retrieve the bootstrap file in " + bootstrapFile + " due to: " + err.Error())
 	}
@@ -418,7 +411,8 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 // Sets the core.igorConfigBase variable as the directory where the bootstrap file resides
 // and returns the base location of the configuration, to be used when there is no origin, and
 // the name of the bootrstrap file resource
-func (c *ConfigurationManager) fixBootstrapFileLocation(bootstrapFileName string) (string, string) {
+// TODO: Replace by path
+func (c *ConfigurationManager) decomposeFileLocation(bootstrapFileName string) (string, string) {
 
 	lastSlash := strings.LastIndex(bootstrapFileName, "/")
 	if lastSlash == -1 {

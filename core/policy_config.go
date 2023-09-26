@@ -96,7 +96,7 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string,
 		GetLogger().Info("radius server will not start")
 	}
 
-	// Try to load for the benefit of the RadiusRouterRouter, but do not panic if configuration
+	// Try to load for the benefit of the RadiusRouter, but do not panic if configuration
 	// not found
 	if cerr = policyConfig.UpdateRadiusClients(); cerr != nil && radiusServerEnabled {
 		panic(cerr)

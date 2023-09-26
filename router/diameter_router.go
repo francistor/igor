@@ -142,8 +142,21 @@ func (router *DiameterRouter) Close() {
 func (router *DiameterRouter) startAndAccept() {
 	logger := core.GetLogger()
 
-	// Server socket
 	serverConf := router.ci.DiameterServerConf()
+
+	// Start ticker
+	peerCheckInterval := serverConf.PeerCheckTimeSeconds
+	if peerCheckInterval == 0 {
+		peerCheckInterval = DEFAULT_PEER_CHECK_INTERVAL_SECONDS
+	}
+	router.peerTableTicker = time.NewTicker(time.Duration(peerCheckInterval) * time.Second)
+
+	// Do not start server if not configured
+	if serverConf.BindPort == 0 {
+		return
+	}
+
+	// Server socket
 	listenAddrAndPort := fmt.Sprintf("%s:%d", serverConf.BindAddress, serverConf.BindPort)
 	listener, err := net.Listen("tcp4", listenAddrAndPort)
 	if err != nil {
@@ -199,13 +212,6 @@ func (router *DiameterRouter) startAndAccept() {
 			)
 		}
 	}()
-
-	// Start ticker
-	peerCheckInterval := serverConf.PeerCheckTimeSeconds
-	if peerCheckInterval == 0 {
-		peerCheckInterval = DEFAULT_PEER_CHECK_INTERVAL_SECONDS
-	}
-	router.peerTableTicker = time.NewTicker(time.Duration(peerCheckInterval) * time.Second)
 }
 
 // Actor model event loop
