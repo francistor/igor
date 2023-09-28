@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"os"
 	"path"
@@ -31,7 +32,7 @@ func EnsureCertificates() (string, string) {
 	var certFile string = os.Getenv("IGOR_HTTPS_CERT_FILE")
 	var keyFile string = os.Getenv("IGOR_HTTPS_KEY_FILE")
 
-	// Check whether environment variables exist
+	// Check whether environment variables exist. Location is relative to bootstrap file
 	if certFile != "" && keyFile != "" {
 		if path.IsAbs(certFile) {
 			return certFile, keyFile
@@ -40,18 +41,19 @@ func EnsureCertificates() (string, string) {
 		}
 	}
 
-	// Locations of the files to be created are relative to the base config directory (bootstrap file)
-	if igorConfigBase != "" {
-		certFile = igorConfigBase + "../cert.pem"
-		keyFile = igorConfigBase + "../key.pem"
-	} else {
-		certFile = "cert.pem"
-		keyFile = "key.pem"
+	// Locations of the files to be created are relative to the current directory
+	currentDir, err := os.Getwd()
+	if err != nil {
+		panic("error getting current directory: " + err.Error())
 	}
+	certFile = currentDir + "/cert.pem"
+	keyFile = currentDir + "/key.pem"
 
 	// Return if the file already exists
 	if _, err := os.Stat(certFile); err == nil {
-		return certFile, keyFile
+		if _, err := os.Stat(keyFile); err == nil {
+			return certFile, keyFile
+		}
 	}
 
 	// Generation of the certificate and key
@@ -121,5 +123,6 @@ func EnsureCertificates() (string, string) {
 		panic("Error closing key.pem " + err.Error())
 	}
 
+	fmt.Println("Ensure certificates", certFile, keyFile)
 	return certFile, keyFile
 }

@@ -66,7 +66,8 @@ func getE2EId() uint32 {
 func GetStateId(clean bool, next bool) int {
 
 	// Get the contents of the file
-	stateIdFileName := igorConfigBase + "../state-id"
+	currentDir, _ := os.Getwd()
+	stateIdFileName := currentDir + "/state-id"
 
 	if clean {
 		os.Remove(stateIdFileName)
@@ -91,7 +92,8 @@ func GetStateId(clean bool, next bool) int {
 // Writes the specified state-id in the state-id file
 func writeStateId(stateId int) int {
 
-	stateIdFileName := igorConfigBase + "../state-id"
+	currentDir, _ := os.Getwd()
+	stateIdFileName := currentDir + "/state-id"
 
 	if os.WriteFile(stateIdFileName, []byte(fmt.Sprintf("%d", stateId)), 0660) != nil {
 		panic("could not write state-id file")
