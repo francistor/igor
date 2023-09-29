@@ -43,7 +43,7 @@ func TestMain(m *testing.M) {
 	exitCode := m.Run()
 
 	// Clean cdr files
-	os.RemoveAll(cdrDirectoryName)
+	//os.RemoveAll(cdrDirectoryName)
 
 	os.Exit(exitCode)
 }
@@ -304,7 +304,8 @@ func buildSimpleRadiusPacket(t *testing.T) core.RadiusPacket {
 			{"Acct-Session-Time": 3600},
 			{"Acct-Delay-Time": 2},
 			{"Acct-Session-Id": "session-1"},
-			{"NAS-IP-Address": "127.0.0.1"}
+			{"NAS-IP-Address": "127.0.0.1"},
+			{"Acct-Status-Type": "Stop"}
 		]
 	}`
 

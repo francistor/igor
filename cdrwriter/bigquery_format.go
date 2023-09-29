@@ -3,6 +3,7 @@ package cdrwriter
 import (
 	"encoding/hex"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -75,6 +76,10 @@ func (cdr *WritableCDR) String() string {
 			sb.WriteString("S")
 			sb.WriteString("\n")
 			sb.WriteString(stringVal)
+		} else if ipAddrVal, ok := v.(net.IP); ok {
+			sb.WriteString("S")
+			sb.WriteString("\n")
+			sb.WriteString(ipAddrVal.String())
 		}
 		sb.WriteString("\n")
 	}

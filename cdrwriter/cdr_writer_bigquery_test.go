@@ -26,7 +26,8 @@ var jBigQueryConfig = `{
 	"InputBytes": "Acct-Input-Octets<Acct-Input-Gigawords",
 	"Status": "Acct-Status-Type",
 	"EventTimestamp": "Igor-TimeAttribute",
-	"AcctSessionId": "Acct-Session-Id"
+	"AcctSessionId": "Acct-Session-Id",
+	"FramedIPAddress": "Igor-AddressAttribute"
 }`
 
 // Used for creating the bigquery resources

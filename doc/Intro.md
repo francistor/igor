@@ -131,6 +131,20 @@ Igor provides some utilities for the development of handlers.
 
 * The `handler.AVPFilters` object implements a helper for filtering radius packets: removing attributes, adding attributes with a specific value, or explicitly copying a list of attributes. This object is parametrized with a configuration object exemplified in the `radiusFiters.json` file.
 
+
+### Environment variables
+
+The following environment variables may be used
+
+* `IGOR_LOG_OUTPUTS` comma separated files where the logs will be written. If not specified, only the paths in `log.json` resource will be used
+* `IGOR_CLOUD_CREDENTIALS` file with cloud credentials
+* `IGOR_HTTPS_CERT_FILE` and `IGOR_HTTPS_KEY_FILE` file names for the key and server certificate for using http. If not set, key and certificate are looked for or created in the current directory
+* `IGOR_ABORT_IF_DB_ERROR`
+
+Used for testing
+
+* `IGOR_TEST_NO_MYSQL` if set to true, the tests will not start the mysql container
+
 ### Standard configuration management
 
 A `ConfigurationManager` object provides basic methods to manipulate configuration resources. It loads a bootstrap file and gets an instance name to be used when searching for objects, and retrieves them either as JSON object or just the raw bytes. Objects may be stored as local files, http URLs or in a database.
