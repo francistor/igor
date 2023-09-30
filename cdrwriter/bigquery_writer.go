@@ -171,7 +171,7 @@ loop:
 				// Not written to bq and batch not reset.
 				core.GetLogger().Errorf("bq writer error: %s", err)
 
-				// Only if we are outside the glitch interval, backup the CDR
+				// Only if we are outside the glitch interval, backup the CDR batch
 				if time.Since(lastError) > w.glitchTime && len(batch) > 0 {
 					core.GetLogger().Errorf("backing up CDR!")
 

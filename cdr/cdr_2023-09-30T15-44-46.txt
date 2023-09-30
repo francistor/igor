@@ -1,4 +1,4 @@
-2023-09-30T01:21:06 CEST
+2023-09-30T15:44:46 CEST
 Igor-OctetsAttribute="0102030405060708090a0b"
 Igor-StringAttribute="stringvalue"
 Igor-StringAttribute="anotherStringvalue"
@@ -18,5 +18,4 @@ Acct-Session-Time=3600
 Acct-Delay-Time=2
 Acct-Session-Id="session-1"
 NAS-IP-Address="127.0.0.1"
-Acct-Status-Type="Stop"
 

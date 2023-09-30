@@ -232,6 +232,20 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				continue
 			} else {
 
+				// Check authenticator
+				if !core.ValidateResponseAuthenticator(v.packetBytes, requestContext.authenticator, requestContext.secret) {
+					// If not valid, discard silently. May be not corresponding to our request. Probably this is an old response
+					// to a reused id
+					// Do not stop timer
+					core.RecordRadiusClientResponseDrop(endpoint, code)
+					core.GetLogger().Debugf("bad authenticator from %s", endpoint)
+
+					// Send the answer to the requester
+					// requestContext.rchan <- fmt.Errorf("bad authenticator")
+					// close(requestContext.rchan)
+					continue
+				}
+
 				// Cancel timer
 				if requestContext.timer.Stop() {
 					// The after func has not been called
@@ -246,17 +260,6 @@ func (rcs *RadiusClientSocket) eventLoop() {
 
 				// Remove from outstanding requests
 				delete(epReqMap, radiusId)
-
-				// Check authenticator
-				if !core.ValidateResponseAuthenticator(v.packetBytes, requestContext.authenticator, requestContext.secret) {
-					core.RecordRadiusClientResponseDrop(endpoint, code)
-					core.GetLogger().Warnf("bad authenticator from %s", endpoint)
-
-					// Send the answer to the requester
-					requestContext.rchan <- fmt.Errorf("bad authenticator")
-					close(requestContext.rchan)
-					continue
-				}
 
 				// Decode the packet
 				radiusPacket, err := core.NewRadiusPacketFromBytes(v.packetBytes, requestContext.secret, requestContext.authenticator)

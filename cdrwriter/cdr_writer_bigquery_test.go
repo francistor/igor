@@ -122,6 +122,7 @@ func TestBigqueryWriter(t *testing.T) {
 	bqw := NewBigQueryCDRWriter(bqdatasetName, bqtableName, bqf /* Timeout seconds */, 10 /* Glitch seconds */, 60, "../cdr/bigquery/bigquery.backup")
 
 	rp := buildSimpleRadiusPacket(t)
+	rp.Add("Acct-Status-Type", "Stop")
 
 	// The same packet will be written twice
 	bqw.WriteRadiusCDR(&rp)
@@ -157,6 +158,7 @@ func TestBigqueryGenAndIngestBackup(t *testing.T) {
 	bqw._forceBigQueryError = true
 
 	rp := buildSimpleRadiusPacket(t)
+	rp.Add("Acct-Status-Type", "Stop")
 
 	// The same packet will be written twice
 	bqw.WriteRadiusCDR(&rp)

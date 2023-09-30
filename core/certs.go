@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"fmt"
 	"math/big"
 	"os"
 	"path"
@@ -123,6 +122,5 @@ func EnsureCertificates() (string, string) {
 		panic("Error closing key.pem " + err.Error())
 	}
 
-	fmt.Println("Ensure certificates", certFile, keyFile)
 	return certFile, keyFile
 }

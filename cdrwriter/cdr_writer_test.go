@@ -163,7 +163,7 @@ func TestElasticFormat(t *testing.T) {
 
 	rp := buildSimpleRadiusPacket(t)
 
-	// Accounting start
+	// Accounting stop
 	rp.Add("Acct-Status-Type", "Stop")
 	esCDR := ef.GetRadiusCDRString(&rp)
 
@@ -304,8 +304,7 @@ func buildSimpleRadiusPacket(t *testing.T) core.RadiusPacket {
 			{"Acct-Session-Time": 3600},
 			{"Acct-Delay-Time": 2},
 			{"Acct-Session-Id": "session-1"},
-			{"NAS-IP-Address": "127.0.0.1"},
-			{"Acct-Status-Type": "Stop"}
+			{"NAS-IP-Address": "127.0.0.1"}
 		]
 	}`
 
