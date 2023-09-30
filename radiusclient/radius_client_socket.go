@@ -231,6 +231,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				core.GetLogger().Debugf("unsolicited or stalled response from endpoint %s and id %d", endpoint, radiusId)
 				continue
 			} else if core.ValidateResponseAuthenticator(v.packetBytes, requestContext.authenticator, requestContext.secret) {
+
 				// Cancel timer
 				if requestContext.timer.Stop() {
 					// The after func has not been called
@@ -274,7 +275,15 @@ func (rcs *RadiusClientSocket) eventLoop() {
 			}
 		case ClientRadiusRequestMsg:
 
-			// Get a radius identifier
+			// If retransmission, make sure the context is still available, not deleted by a response received.
+			// Otherwise, we are creating a context referencing a closed channel
+			if v.radiusId != 0 {
+				if rcs.requestsMap[v.endpoint] == nil || rcs.requestsMap[v.endpoint][v.radiusId].rchan == nil {
+					continue
+				}
+			}
+
+			// Get a radius identifier, or reuses the existing one if it is a server retransmission
 			radiusId, err := rcs.getNextRadiusId(v.endpoint, v.radiusId)
 			if err != nil {
 				core.GetLogger().Errorf("could not get an id: %s", err)
@@ -371,9 +380,10 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				core.GetLogger().Debugf("tried to cancel request with unmatching authenticator %s:%d", v.endpoint, v.radiusId)
 				continue
 			} else {
+				delete(epMap, v.radiusId)
 				reqCtx.rchan <- fmt.Errorf("timeout")
 				close(reqCtx.rchan)
-				delete(rcs.requestsMap[v.endpoint], v.radiusId)
+
 			}
 		}
 	}
@@ -430,10 +440,10 @@ func (rcs *RadiusClientSocket) SendRadiusRequest(request ClientRadiusRequestMsg)
 	rcs.eventLoopChannel <- request
 }
 
-// Gets the next radiusid to use, or error if all are busy
-// Allocates the nested map if not already instantiated
+// Gets the next radiusid to use, or error if all are busy.
+// Allocates the nested map if not already instantiated.
 // After calling this function it can be ensured that the requestsMap contains
-// a map for the specifed endpoint
+// a map for the specifed endpoint.
 // Id 0 is special and never allocated. If currentRadiusId is not 0, returns the same
 func (rcs *RadiusClientSocket) getNextRadiusId(endpoint string, currentRadiusId byte) (byte, error) {
 
