@@ -230,22 +230,7 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				core.RecordRadiusClientResponseStalled(endpoint, code)
 				core.GetLogger().Debugf("unsolicited or stalled response from endpoint %s and id %d", endpoint, radiusId)
 				continue
-			} else {
-
-				// Check authenticator
-				if !core.ValidateResponseAuthenticator(v.packetBytes, requestContext.authenticator, requestContext.secret) {
-					// If not valid, discard silently. May be not corresponding to our request. Probably this is an old response
-					// to a reused id
-					// Do not stop timer
-					core.RecordRadiusClientResponseDrop(endpoint, code)
-					core.GetLogger().Debugf("bad authenticator from %s", endpoint)
-
-					// Send the answer to the requester
-					// requestContext.rchan <- fmt.Errorf("bad authenticator")
-					// close(requestContext.rchan)
-					continue
-				}
-
+			} else if core.ValidateResponseAuthenticator(v.packetBytes, requestContext.authenticator, requestContext.secret) {
 				// Cancel timer
 				if requestContext.timer.Stop() {
 					// The after func has not been called
@@ -278,8 +263,15 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				// Send the answer to the requester
 				requestContext.rchan <- radiusPacket
 				close(requestContext.rchan)
-			}
 
+			} else {
+				// Authenticator not valid
+				// If not valid, discard silently. May be not corresponding to our request. Probably this is an old response
+				// to a reused id
+				// Do not stop timer
+				core.RecordRadiusClientResponseDrop(endpoint, code)
+				core.GetLogger().Debugf("bad authenticator from %s", endpoint)
+			}
 		case ClientRadiusRequestMsg:
 
 			// Get a radius identifier
