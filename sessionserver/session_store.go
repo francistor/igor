@@ -103,7 +103,7 @@ func (s *RadiusSessionStore) checkInsert(id string, packetType int, packet *core
 		return true, existingEntry
 	}
 
-	return false, nil
+	return false, existingEntry
 }
 
 // Adds a new entry to the store.
@@ -140,7 +140,7 @@ func (s *RadiusSessionStore) PushPacket(packet *core.RadiusPacket) (string, stri
 	// If packet is not newer, do nothing
 	doInsert, oldSession := s.checkInsert(id, packetType, packet)
 	if !doInsert {
-		core.GetLogger().Warnf("Ignoring packet. New: %s Old: %s", packet, oldSession)
+		core.GetLogger().Warnf("Ignoring packet. New: %v Old: %v", packet, oldSession)
 		return "", ""
 	}
 
