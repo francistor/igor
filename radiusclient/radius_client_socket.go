@@ -278,7 +278,9 @@ func (rcs *RadiusClientSocket) eventLoop() {
 			// If retransmission, make sure the context is still available, not deleted by a response received.
 			// Otherwise, we are creating a context referencing a closed channel
 			if v.radiusId != 0 {
-				if rcs.requestsMap[v.endpoint] == nil || rcs.requestsMap[v.endpoint][v.radiusId].rchan == nil {
+				if rcs.requestsMap[v.endpoint] == nil ||
+					rcs.requestsMap[v.endpoint][v.radiusId].rchan == nil || // The context was deleted by a response to this packet
+					rcs.requestsMap[v.endpoint][v.radiusId].authenticator != v.packet.Authenticator { // Previous case (deleted context) and re-created by another request
 					continue
 				}
 			}
