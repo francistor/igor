@@ -113,10 +113,10 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, parent
 			if len(words) < 4 {
 				return errors.New("invalid ATTRIBUTE " + line)
 			}
-			// Removing a possible dot in the begining of the code
-			code, err := strconv.Atoi(strings.TrimPrefix(words[2], "."))
+			// TODO: Ignoring codes starting with a dot. They are "tlv" type
+			code, err := strconv.Atoi(words[2])
 			if err != nil {
-				return errors.New("invalid ATTRIBUTE " + line)
+				break
 			}
 
 			// Options: comma separated value
@@ -208,6 +208,7 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, parent
 	return nil
 }
 
+// TODO: Parse tlv as proper attribute
 func parseRadiusType(t string) string {
 	switch t {
 	case "integer", "uint32", "byte", "short", "signed", "time_delta":

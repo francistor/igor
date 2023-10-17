@@ -35,7 +35,7 @@ type RadiusAVP struct {
 
 // AVP in the wire is
 //    code: 1 byte
-//    length: 1 byte
+//    length: 1 byte - includes the code and the length
 //    If code == 26
 //      vendorId: 4 bytes
 //      code: 1 byte
