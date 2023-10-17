@@ -385,7 +385,6 @@ func (rcs *RadiusClientSocket) eventLoop() {
 				delete(epMap, v.radiusId)
 				reqCtx.rchan <- fmt.Errorf("timeout")
 				close(reqCtx.rchan)
-
 			}
 		}
 	}

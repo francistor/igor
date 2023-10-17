@@ -116,6 +116,8 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string, ra [16]byte)
 			return currentIndex, err
 		}
 
+		GetLogger().Debugf("read AVP %d/%d:%v", nextAVP.VendorId, nextAVP.Code, nextAVP.Value)
+
 		avpsLen := len(rp.AVPs)
 		// Support for concat attributes
 		if nextAVP.DictItem.Concat && // Current has concat attribute
