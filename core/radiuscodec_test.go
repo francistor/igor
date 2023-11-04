@@ -597,6 +597,30 @@ func TestCiscoAVPair(t *testing.T) {
 	}
 }
 
+func TestMessageAuthenticator(t *testing.T) {
+
+	request := NewRadiusRequest(ACCESS_REQUEST)
+	request.Add("User-Name", "myUserName")
+	request.AddMessageAuthenticator()
+
+	// Serialize
+	packetBytes, err := request.ToBytes(secret, 0, Zero_authenticator, false)
+	if err != nil {
+		t.Fatalf("could not serialize packet: %s", err)
+	}
+
+	// Unserialize
+	recoveredPacket, err := NewRadiusPacketFromBytes(packetBytes, secret, Zero_authenticator)
+	if err != nil {
+		t.Fatalf("could not unserialize packet: %s", err)
+	}
+
+	// Check message-authenticator
+	if !recoveredPacket.ValidateMessageAuthenticator(packetBytes, "mysecret") {
+		t.Fatalf("invalid message-authenticator")
+	}
+}
+
 func TestAddIfNotPresent(t *testing.T) {
 	jsonPacket := `{
 		"Code": 1,

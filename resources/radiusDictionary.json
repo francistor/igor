@@ -280,6 +280,11 @@
                     "concat": true
                 },
                 {
+                    "code": 80,
+                    "name": "Message-Authenticator",
+                    "type": "Octets"
+                },
+                {
                     "code": 95,
                     "name": "NAS-IPv6-Address",
                     "type": "IPv6Address"

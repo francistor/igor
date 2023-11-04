@@ -124,7 +124,9 @@ func NewMetricsServer(bindAddress string, port int) *InstrumentationServer {
 	pm.SessionServerMetrics = newSessionServerPrometheusMetrics(server.prometheusRegistry)
 
 	// Start instrumentation server
-	go server.httpLoop(bindAddress, port)
+	if port != 0 {
+		go server.httpLoop(bindAddress, port)
+	}
 
 	// Start instrumentation processing loop
 	go server.metricServerLoop()
@@ -220,7 +222,11 @@ func (is *InstrumentationServer) metricServerLoop() {
 
 		case <-is.controlChan:
 			// Shutdown server
-			is.httpMetricsServer.Shutdown(context.Background())
+			if is.httpMetricsServer != nil {
+				is.httpMetricsServer.Shutdown(context.Background())
+			} else {
+				close(is.doneChan)
+			}
 			return
 
 		case query := <-is.queryChan:

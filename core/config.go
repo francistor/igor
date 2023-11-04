@@ -199,6 +199,9 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 
 	for _, rule := range c.searchRules.Rules {
 		if matches := rule.Regex.FindStringSubmatch(objectName); matches != nil {
+			if len(matches) < 1 {
+				panic("regular expression without group. Use () to define your object name")
+			}
 			innerName = matches[1]
 			origin = rule.Origin
 			break

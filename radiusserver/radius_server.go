@@ -104,11 +104,20 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 			continue
 		}
 
-		// Validate the packet
+		// Validate the request authenticator
 		if radiusPacket.Code != core.ACCESS_REQUEST {
 			if !core.ValidateRequestAuthenticator(reqBuf[:packetSize], radiusClient.Secret) {
 				core.RecordRadiusServerDrop(clientIPAddr, strconv.Itoa(int(radiusPacket.Code)))
-				core.GetLogger().Warnf("invalid request packet %s\n", radiusPacket)
+				core.GetLogger().Warnf("invalid request packet. Bad authenticator %s\n", radiusPacket)
+				continue
+			}
+		}
+
+		// Validate the message authenticator, if present
+		if radiusPacket.HasMessageAuthenticator() {
+			if !radiusPacket.ValidateMessageAuthenticator(reqBuf[:packetSize], radiusClient.Secret) {
+				core.RecordRadiusServerDrop(clientIPAddr, strconv.Itoa(int(radiusPacket.Code)))
+				core.GetLogger().Warnf("invalid request packet. Bad message authenticator %s\n", radiusPacket)
 				continue
 			}
 		}
@@ -117,25 +126,27 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 		core.GetLogger().Debugf("<- Server received RadiusPacket %s\n", radiusPacket)
 
 		// Wait for response
-		go func(radiusPacket *core.RadiusPacket, secret string, addr net.Addr) {
+		go func(requestPacket *core.RadiusPacket, secret string, addr net.Addr) {
 
-			code := radiusPacket.Code
+			code := requestPacket.Code
 
-			response, err := rs.handler(radiusPacket)
+			responsePacket, err := rs.handler(requestPacket)
 
 			if err != nil {
-				core.GetLogger().Errorf("discarding packet for %s with code %d: %s", addr.String(), radiusPacket.Code, err)
+				core.GetLogger().Errorf("discarding packet for %s with code %d: %s", addr.String(), requestPacket.Code, err)
 				core.RecordRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))
 				return
 			}
 
 			// Build the response
-			respBuf, err := response.ToBytes(secret, radiusPacket.Identifier, core.Zero_authenticator, false)
+			respBuf, err := responsePacket.ToBytes(secret, requestPacket.Identifier, core.Zero_authenticator, false)
 			if err != nil {
 				core.GetLogger().Errorf("error serializing packet for %s with code %d: %s", addr.String(), code, err)
 				core.RecordRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))
 				return
 			}
+
+			// Write to socker
 			if _, err = socket.WriteTo(respBuf, addr); err != nil {
 				core.GetLogger().Errorf("error sending packet to %s with code %d: %s", addr.String(), code, err)
 				core.RecordRadiusServerDrop(clientIPAddr, strconv.Itoa(int(code)))
@@ -143,7 +154,7 @@ func (rs *RadiusServer) readLoop(socket net.PacketConn) {
 			}
 
 			core.RecordRadiusServerResponse(clientIPAddr, strconv.Itoa(int(code)))
-			core.GetLogger().Debugf("-> Server sent RadiusPacket %s\n", response)
+			core.GetLogger().Debugf("-> Server sent RadiusPacket %s\n", responsePacket)
 
 		}(radiusPacket, radiusClient.Secret, clientAddr)
 	}

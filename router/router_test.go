@@ -402,7 +402,6 @@ func TestRadiusRouteToHTTP(t *testing.T) {
 	server.Close()
 
 	httpHandler.Close()
-
 }
 
 func TestRadiusHandleLocal(t *testing.T) {

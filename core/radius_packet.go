@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/json"
@@ -61,6 +62,14 @@ type RadiusPacket struct {
 	// of the request
 	Authenticator [16]byte
 
+	// The message authenticator is a Radius attribute that "signs" the packet
+	// It is calculated as the HMAC-MD5 of the full packet where the Message-Authenticator attribute
+	// is filled with zeroes. In the response, it is calculated the same way
+	messageAuthenticator [16]byte
+	// The position of the start of the Request-Authenticator AVP
+	// If zero, the Request-Authenticator is not present
+	messageAuthenticatorIndex int64
+
 	// The AVPs of the radius packet
 	AVPs []RadiusAVP
 }
@@ -116,7 +125,13 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string, ra [16]byte)
 			return currentIndex, err
 		}
 
-		//GetLogger().Debugf("read AVP %d/%d [%s] %v", nextAVP.VendorId, nextAVP.Code, nextAVP.DictItem.Name, nextAVP.Value)
+		// Set Message-Authenticator if found
+		// 80 is the code for Message-Authenticator
+		if nextAVP.Code == 80 {
+			rp.messageAuthenticatorIndex = currentIndex
+			// Conversion from slice to array
+			rp.messageAuthenticator = *(*[16]byte)(nextAVP.Value.([]byte)[0:16])
+		}
 
 		avpsLen := len(rp.AVPs)
 		// Support for concat attributes
@@ -259,6 +274,7 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte, re
 		rp.Authenticator = Zero_authenticator
 	}
 	// else Do nothing. Authenticator will be set to the one in the request
+
 	if err = binary.Write(scratchWriter, binary.BigEndian, rp.Authenticator); err != nil {
 		return 0, err
 	}
@@ -273,7 +289,32 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte, re
 		currentIndex += int64(n)
 	}
 
-	// Saninty check
+	// Generate Message-Authenticator if necessary
+	// We are for now only sending Message-Authenticator in responses
+	// NewRadiusResponse will have signal that this needs to be done by setting messageAuthenticatorIndex to -1
+	if rp.messageAuthenticatorIndex != 0 {
+
+		// Type is 80, and len is 18 bytes
+		var zeroMessageAuthenticatorBytes = [18]byte{80, 18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+
+		// Calculate the contents of the Message-Authenticator
+		// Create the hmac coder
+		mac := hmac.New(md5.New, []byte(secret))
+		// Write the packet without yet the message-authenticator attribute and with the request authenticator
+		mac.Write(scratchWriter.(*bytes.Buffer).Bytes())
+		// Write a zeroed message-authenticator
+		mac.Write(zeroMessageAuthenticatorBytes[:])
+		// Calculate the value
+		messageAuthenticator := mac.Sum(nil)
+
+		// Append the contents of the AVP. The lenght will already have the correct value (+18)
+		scratchWriter.Write(zeroMessageAuthenticatorBytes[0:2])
+		scratchWriter.Write(messageAuthenticator[0:16])
+
+		currentIndex += 18
+	}
+
+	// Sanity check
 	if currentIndex != int64(packetLen) {
 		panicString := fmt.Sprintf("assert failed. Bad message size. Current index: %d - Packetlen: %d", currentIndex, packetLen)
 		panic(panicString)
@@ -350,11 +391,42 @@ func (rp *RadiusPacket) ToBytes(secret string, id byte, reuseAuthenticator [16]b
 	return buffer.Bytes(), nil
 }
 
+// Exposes whether tne radius packet has a message authenticator attribute
+func (rp *RadiusPacket) HasMessageAuthenticator() bool {
+	return rp.messageAuthenticatorIndex != 0
+}
+
+// Forces to include a Message-Authenticator
+func (rp *RadiusPacket) AddMessageAuthenticator() {
+	rp.messageAuthenticatorIndex = -1
+}
+
+// Validates the Message-Authenticator
+func (rp *RadiusPacket) ValidateMessageAuthenticator(packetBytes []byte, secret string) bool {
+
+	var zeroedMessageAuthenticator [16]byte
+
+	mac := hmac.New(md5.New, []byte(secret))
+	mac.Write(packetBytes[0 : rp.messageAuthenticatorIndex+2])
+	mac.Write(zeroedMessageAuthenticator[0:16])
+	if len(packetBytes) > int(rp.messageAuthenticatorIndex+18) {
+		mac.Write(packetBytes[(rp.messageAuthenticatorIndex + 18):])
+	}
+
+	expectedMAC := mac.Sum(nil)
+	return hmac.Equal(rp.messageAuthenticator[:], expectedMAC)
+}
+
 // Returns the size of the Radius packet
 func (rp *RadiusPacket) Len() uint16 {
 	var avpLen uint16 = 0
 	for i := range rp.AVPs {
 		avpLen += uint16(rp.AVPs[i].Len())
+	}
+
+	// Add 18 more bytes if will have Message-Authenticator
+	if rp.HasMessageAuthenticator() {
+		avpLen = avpLen + 18
 	}
 
 	// Header always has 20 bytes
@@ -634,7 +706,14 @@ func NewRadiusResponse(request *RadiusPacket, isSuccess bool) *RadiusPacket {
 	} else {
 		code = request.Code + 2
 	}
-	return &RadiusPacket{Code: code, Identifier: request.Identifier, Authenticator: request.Authenticator}
+
+	var maIndex int64
+	if request.messageAuthenticatorIndex != 0 {
+		maIndex = -1
+	} else {
+		maIndex = 0
+	}
+	return &RadiusPacket{Code: code, Identifier: request.Identifier, Authenticator: request.Authenticator, messageAuthenticatorIndex: maIndex}
 }
 
 // Converts a proxy response into the response to the original request, tweaking the Authenticator
