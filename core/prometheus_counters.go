@@ -455,7 +455,7 @@ func UpdateSessionCounter(nSessions int) {
 
 // Helper for testing
 func GetMetricWithLabels(metricName string, labelString string) (string, error) {
-	metrics, err := HttpGet("http://localhost:9090/metrics")
+	metrics, err := HttpGet("http://localhost:9109/metrics")
 	if err != nil {
 		return "", err
 	}
