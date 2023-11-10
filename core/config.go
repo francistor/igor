@@ -3,6 +3,7 @@ package core
 import (
 	"crypto/tls"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -85,6 +86,11 @@ type ConfigurationManager struct {
 
 	// HttpClient
 	httpClient *http.Client
+
+	// Filesystem with embedded resources. Additional to resources.Fs, which will
+	// hold the igor library resources, this one is used to store resources
+	// created in the user applications
+	localFS embed.FS
 }
 
 // The home location for configuration files not referenced as absolute paths
@@ -92,7 +98,7 @@ var igorConfigBase string
 
 // Creates and initializes a ConfigurationManager
 // The <params> argument is used as parameter to the objects, treated as templates
-func NewConfigurationManager(bootstrapFile string, instanceName string, params map[string]string) ConfigurationManager {
+func NewConfigurationManager(bootstrapFile string, instanceName string, params map[string]string, localFs embed.FS) ConfigurationManager {
 
 	// To avoid null pointers, create an emtpy map if not passed
 	if params == nil {
@@ -114,6 +120,7 @@ func NewConfigurationManager(bootstrapFile string, instanceName string, params m
 		instanceName:  instanceName,
 		bootstrapFile: bootstrapFile,
 		configParams:  params,
+		localFS:       localFs,
 		httpClient: &http.Client{
 			Timeout: HTTP_TIMEOUT_SECONDS * time.Second,
 			Transport: &http.Transport{
@@ -316,6 +323,12 @@ func (c *ConfigurationManager) readResource(prefix string, name string, tryParen
 		}
 	} else if strings.HasPrefix(location, "resource://") {
 		if resp, err := resources.Fs.ReadFile(location[11:]); err != nil {
+			return nil, err
+		} else {
+			return resp, nil
+		}
+	} else if strings.HasPrefix(location, "local://") {
+		if resp, err := c.localFS.ReadFile(location[8:]); err != nil {
 			return nil, err
 		} else {
 			return resp, nil

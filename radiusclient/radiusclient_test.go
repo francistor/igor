@@ -1,6 +1,7 @@
 package radiusclient
 
 import (
+	"embed"
 	"os"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func echoHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", nil, true)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", nil, embed.FS{}, true)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())

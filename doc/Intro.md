@@ -47,6 +47,7 @@ The following example specifies that the `template_http.txt` file is retreived f
     {"nameRegex": "(radiusclients.database)",       "origin": "database:accessNodes:AccessNodeId:Parameters"},
     {"nameRegex": "(gs_test.txt)",                  "origin": "gs://igor-francisco-cardoso-gil/test/"},  
     {"nameRegex": "Gy/(.*)",                        "origin": ""},
+    {"nameRegex": "(localResource.txt)",            "origin": "local://"},
     {"nameRegex": "(.*)",                           "origin": ""}
 ]
 ```
@@ -55,7 +56,10 @@ The origin for resources in files is relative to the path where the bootstrap fi
 
 If the `origin` starts with `database` the syntax must be `database:<table-name>:<key-column-name>:<parameters-column-name>`. The result of the retrieval will be a JSON file with the values in the `key-column-name` as properties and the corresponding values in `parameters-column-name` as values. For that reason, this column MUST have JSON syntax.
 
-The `resource://` prefix indicates that the object is embedded in the igor executable. All the files in the `resources` directory are available in this way.
+The `resource://` prefix indicates that the object is embedded in the igor library. All the files in the `resources` directory are available in this way.
+
+The `local://` prefix indicates that the object is embedded in the executable. When instantiating a ConfigurationManager, there is a paramter that
+may point to an `embed.FS` hosting some application specific files.
 
 The `gs://` prefix indicates that the object is retrieved from Google Storage. ADC authentication is used if the `IGOR_CLOUD_CREDENTIALS` environment variable is not defined (that is, the credentials are taken from the cloud metadata service). Otherwise, the variable is assumed to point to a JSON key file
 

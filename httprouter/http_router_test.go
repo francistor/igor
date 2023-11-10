@@ -2,6 +2,7 @@ package httprouter
 
 import (
 	"crypto/tls"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -60,8 +61,8 @@ func TestMain(m *testing.M) {
 	bootstrapFile := "resources/searchRules.json"
 
 	// Initialize policy
-	core.InitPolicyConfigInstance(bootstrapFile, "testServer", nil, true)
-	core.InitPolicyConfigInstance(bootstrapFile, "testSuperServer", nil, false)
+	core.InitPolicyConfigInstance(bootstrapFile, "testServer", nil, embed.FS{}, true)
+	core.InitPolicyConfigInstance(bootstrapFile, "testSuperServer", nil, embed.FS{}, false)
 
 	// Execute the tests and exit
 	exitCode := m.Run()

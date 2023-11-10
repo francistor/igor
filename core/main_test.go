@@ -3,11 +3,13 @@ package core
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"fmt"
 	"net/http"
 	"os"
 	"testing"
 
+	"github.com/francistor/igor/resources"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -53,9 +55,10 @@ func TestMain(m *testing.M) {
 	bootFile := "resources/searchRules.json"
 	instanceName := "testConfig"
 
-	InitPolicyConfigInstance(bootFile, instanceName, nil, true)
-	InitHttpHandlerConfigInstance(bootFile, instanceName, nil, false)
-	InitRadiusSessionServerConfigInstance(bootFile, instanceName, nil, false)
+	// Using resources.Fs as local filesystem for testing
+	InitPolicyConfigInstance(bootFile, instanceName, nil, resources.Fs, true)
+	InitHttpHandlerConfigInstance(bootFile, instanceName, nil, embed.FS{}, false)
+	InitRadiusSessionServerConfigInstance(bootFile, instanceName, nil, embed.FS{}, false)
 
 	// Execute the tests
 	os.Exit(m.Run())

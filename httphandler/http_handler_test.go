@@ -2,6 +2,7 @@ package httphandler
 
 import (
 	"crypto/tls"
+	"embed"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -77,10 +78,10 @@ func TestMain(m *testing.M) {
 	// Initialize the Config Object as done in main.go
 	bootstrapFile := "resources/searchRules.json"
 	instanceName := "testServer"
-	core.InitHttpHandlerConfigInstance(bootstrapFile, instanceName, nil, true)
+	core.InitHttpHandlerConfigInstance(bootstrapFile, instanceName, nil, embed.FS{}, true)
 
 	// TODO: Needed to generate answers with origin diameter server name
-	core.InitPolicyConfigInstance(bootstrapFile, instanceName, nil, false)
+	core.InitPolicyConfigInstance(bootstrapFile, instanceName, nil, embed.FS{}, false)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())

@@ -5,6 +5,7 @@
         {"nameRegex": "(radiusclients.database)",       "origin": "database:accessNodes:AccessNodeId:Parameters"},
         {"nameRegex": "(gs_test.txt)",                  "origin": "gs://igor-francisco-cardoso-gil/test/"},   
         {"nameRegex": "Gy/(.*)",                        "origin": ""},
+        {"nameRegex": "(localResource.txt)",            "origin": "local://"},
         {"nameRegex": "(.*)",                           "origin": ""}
     ],
     "db": {

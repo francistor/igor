@@ -1,6 +1,7 @@
 package core
 
 import (
+	"embed"
 	"fmt"
 	"net"
 	"strings"
@@ -32,7 +33,7 @@ var policyConfigs []*PolicyConfigurationManager = make([]*PolicyConfigurationMan
 // Adds a Policy (Radius and Diameter) configuration object with the specified name to the list of policyConfigs
 // if isDefault is true, also initializes the logger and the dictionaries, which are shared among all instances
 func InitPolicyConfigInstance(bootstrapFile string, instanceName string,
-	configParams map[string]string, isDefault bool) *PolicyConfigurationManager {
+	configParams map[string]string, localFs embed.FS, isDefault bool) *PolicyConfigurationManager {
 
 	// Check not already instantiated.Not perfect, since it is subject to race conditions,
 	// but anyway multiple configuration managers are only used for testing, where
@@ -45,7 +46,7 @@ func InitPolicyConfigInstance(bootstrapFile string, instanceName string,
 
 	// Better to create asap
 	policyConfig := PolicyConfigurationManager{
-		CM:                   NewConfigurationManager(bootstrapFile, instanceName, configParams),
+		CM:                   NewConfigurationManager(bootstrapFile, instanceName, configParams, localFs),
 		diameterServerConfig: NewConfigObject[DiameterServerConfig]("diameterServer.json"),
 		diameterRoutes:       NewConfigObject[DiameterRoutingRules]("diameterRoutes.json"),
 		diameterPeers:        NewConfigObject[DiameterPeers]("diameterPeers.json"),

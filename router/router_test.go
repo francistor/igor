@@ -2,6 +2,7 @@ package router
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
 	"os"
 	"sync/atomic"
@@ -79,12 +80,12 @@ func httpRadiusHandler(request *core.RadiusPacket) (*core.RadiusPacket, error) {
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", nil, true)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testClient", nil, false)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testSuperServer", nil, false)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", nil, false)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", nil, false)
-	core.InitHttpHandlerConfigInstance("resources/searchRules.json", "testServer", nil, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", nil, embed.FS{}, true)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClient", nil, embed.FS{}, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testSuperServer", nil, embed.FS{}, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", nil, embed.FS{}, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", nil, embed.FS{}, false)
+	core.InitHttpHandlerConfigInstance("resources/searchRules.json", "testServer", nil, embed.FS{}, false)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())

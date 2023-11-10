@@ -1,6 +1,7 @@
 package diampeer
 
 import (
+	"embed"
 	"net"
 	"os"
 	"strconv"
@@ -36,11 +37,11 @@ func MyMessageHandler(request *core.DiameterMessage) (*core.DiameterMessage, err
 func TestMain(m *testing.M) {
 
 	// Initialize the Config Objects
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", nil, true)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testClient", nil, false)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", nil, false)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", nil, false)
-	core.InitPolicyConfigInstance("resources/searchRules.json", "testServerBadOriginNetwork", nil, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServer", nil, embed.FS{}, true)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClient", nil, embed.FS{}, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownClient", nil, embed.FS{}, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testClientUnknownServer", nil, embed.FS{}, false)
+	core.InitPolicyConfigInstance("resources/searchRules.json", "testServerBadOriginNetwork", nil, embed.FS{}, false)
 
 	// Execute the tests and exit
 	os.Exit(m.Run())

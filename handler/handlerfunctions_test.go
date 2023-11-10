@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -16,7 +17,7 @@ func TestMain(m *testing.M) {
 	bootFile := "resources/searchRules.json"
 	instanceName := "testConfig"
 
-	core.InitPolicyConfigInstance(bootFile, instanceName, nil, true)
+	core.InitPolicyConfigInstance(bootFile, instanceName, nil, embed.FS{}, true)
 
 	os.Exit(m.Run())
 }

@@ -228,3 +228,14 @@ func TestGoogleStorage(t *testing.T) {
 		t.Fatal("contents of Google storage object are not ok")
 	}
 }
+
+func TestLocalResource(t *testing.T) {
+
+	txt, err := GetPolicyConfig().CM.getObject("localResource.txt")
+	if err != nil {
+		t.Fatalf("error retrieving from local resources: %s", err)
+	}
+	if !strings.Contains(string(txt), "ok") {
+		t.Fatal("contents of local resource are not ok")
+	}
+}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"flag"
 	"os"
 	"time"
@@ -27,7 +28,7 @@ func main() {
 	}
 
 	// Initialize the Config Object
-	core.InitPolicyConfigInstance(*bootPtr, *instancePtr, nil, true)
+	core.InitPolicyConfigInstance(*bootPtr, *instancePtr, nil, embed.FS{}, true)
 
 	// Get logger
 	logger := core.GetLogger()

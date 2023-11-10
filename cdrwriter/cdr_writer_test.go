@@ -1,6 +1,7 @@
 package cdrwriter
 
 import (
+	"embed"
 	"encoding/json"
 	"os"
 	"strings"
@@ -37,7 +38,7 @@ var jElasticConfig = `
 
 // Initializer of the test suite.
 func TestMain(m *testing.M) {
-	core.InitPolicyConfigInstance(bootstrapFile, instanceName, nil, true)
+	core.InitPolicyConfigInstance(bootstrapFile, instanceName, nil, embed.FS{}, true)
 
 	// Execute the tests
 	exitCode := m.Run()

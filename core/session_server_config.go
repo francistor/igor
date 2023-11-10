@@ -1,6 +1,7 @@
 package core
 
 import (
+	"embed"
 	"time"
 )
 
@@ -16,7 +17,7 @@ type RadiusSessionServerConfigurationManager struct {
 var radiusSessionServerConfigs []*RadiusSessionServerConfigurationManager = make([]*RadiusSessionServerConfigurationManager, 0)
 
 // Adds a Handler configuration object with the specified name
-func InitRadiusSessionServerConfigInstance(bootstrapFile string, instanceName string, configParams map[string]string, isDefault bool) *RadiusSessionServerConfigurationManager {
+func InitRadiusSessionServerConfigInstance(bootstrapFile string, instanceName string, configParams map[string]string, localFs embed.FS, isDefault bool) *RadiusSessionServerConfigurationManager {
 
 	// Check not already instantiated
 	for i := range radiusSessionServerConfigs {
@@ -27,7 +28,7 @@ func InitRadiusSessionServerConfigInstance(bootstrapFile string, instanceName st
 
 	// Better to create asap
 	radiusSessionServerConfig := RadiusSessionServerConfigurationManager{
-		CM:                        NewConfigurationManager(bootstrapFile, instanceName, configParams),
+		CM:                        NewConfigurationManager(bootstrapFile, instanceName, configParams, localFs),
 		radiusSessionServerConfig: NewConfigObject[RadiusSessionServerConfig]("radiusSessionServer.json"),
 	}
 
