@@ -291,7 +291,7 @@ func (rp *RadiusPacket) ToWriter(outWriter io.Writer, secret string, id byte, re
 
 	// Generate Message-Authenticator if necessary
 	// We are for now only sending Message-Authenticator in responses
-	// NewRadiusResponse will have signal that this needs to be done by setting messageAuthenticatorIndex to -1
+	// NewRadiusResponse will have signalled that this needs to be done by setting messageAuthenticatorIndex to -1
 	if rp.messageAuthenticatorIndex != 0 {
 
 		// Type is 80, and len is 18 bytes
@@ -709,11 +709,19 @@ func NewRadiusResponse(request *RadiusPacket, isSuccess bool) *RadiusPacket {
 
 	var maIndex int64
 	if request.messageAuthenticatorIndex != 0 {
-		maIndex = -1
+		maIndex = -1 // Force writing message authenticator in response
 	} else {
 		maIndex = 0
 	}
-	return &RadiusPacket{Code: code, Identifier: request.Identifier, Authenticator: request.Authenticator, messageAuthenticatorIndex: maIndex}
+
+	radiusPacket := &RadiusPacket{Code: code, Identifier: request.Identifier, Authenticator: request.Authenticator, messageAuthenticatorIndex: maIndex}
+
+	// Echo the Proxy-State attribute if present
+	if proxyState, notFound := request.GetAVP("Proxy-State"); notFound != nil {
+		return radiusPacket
+	} else {
+		return radiusPacket.AddAVP(&proxyState)
+	}
 }
 
 // Converts a proxy response into the response to the original request, tweaking the Authenticator
