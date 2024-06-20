@@ -119,7 +119,6 @@ func (rp *RadiusPacket) FromReader(reader io.Reader, secret string, ra [16]byte)
 	rp.AVPs = make([]RadiusAVP, 0)
 	for currentIndex < int64(packetLen) {
 		nextAVP := RadiusAVP{}
-
 		bytesRead, err := nextAVP.FromReader(reader, authenticator, secret)
 		if err != nil {
 			return currentIndex, err

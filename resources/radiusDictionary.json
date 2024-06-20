@@ -512,6 +512,11 @@
                     "type": "String"
                 },
                 {
+                    "code": 112,
+                    "name": "Session-Start-Time",
+                    "type": "Time"
+                },
+                {
                     "code": 114,
                     "name": "BRAS-NAS-IP-Address",
                     "type": "String"
@@ -535,6 +540,11 @@
                     "code": 151,
                     "name": "AccessPort",
                     "type": "Integer"
+                },
+                {
+                    "code": 165,
+                    "name": "User-IPv6-Prefix",
+                    "type": "IPv6Prefix"
                 }
             ]
         },

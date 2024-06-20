@@ -1,0 +1,21 @@
+2024-06-20T22:05:59 CEST
+Igor-OctetsAttribute="0102030405060708090a0b"
+Igor-StringAttribute="stringvalue"
+Igor-StringAttribute="anotherStringvalue"
+Igor-IntegerAttribute="Zero"
+Igor-IntegerAttribute="One"
+Igor-IntegerAttribute="One"
+Igor-AddressAttribute="127.0.0.1"
+Igor-TimeAttribute="1986-11-26T03:34:08 UTC"
+Igor-IPv6AddressAttribute="bebe:cafe::"
+Igor-IPv6PrefixAttribute="bebe:cafe:cccc::0/64"
+Igor-InterfaceIdAttribute="00aabbccddeeff11"
+Igor-Integer64AttributeIgor-TaggedStringAttribute="myString:1"
+Igor-SaltedOctetsAttribute="1122aabbccdd"
+Acct-Input-Octets=1000
+Acct-Input-Gigawords=1
+Acct-Session-Time=3600
+Acct-Delay-Time=2
+Acct-Session-Id="session-1"
+NAS-IP-Address="127.0.0.1"
+

@@ -35,6 +35,47 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func Test1(t *testing.T) {
+	// Get the configuration
+	pci := core.GetPolicyConfigInstance("testServer")
+	serverConf := pci.RadiusServerConf()
+
+	// Instantiate a radius server
+	rs := radiusserver.NewRadiusServer(core.GetPolicyConfigInstance("testServer").RadiusClients(), serverConf.BindAddress, serverConf.AuthPort, echoHandler)
+
+	// Wait fo the server to be created
+	time.Sleep(100 * time.Millisecond)
+
+	// Create the RadiusClientSocket
+	cchan := make(chan interface{})
+	rcs := NewRadiusClientSocket(cchan, "192.168.122.1", 18120)
+
+	// Create a request radius packet
+	request := core.NewRadiusRequest(43)
+	request.Add("Acct-Session-Id", "session-standard-1")
+	request.Add("PSA-Operation", "queryByIP")
+	request.Add("Framed-IP-Address", "127.0.1.1")
+
+	// Create channel for the request
+	rchan1 := make(chan interface{}, 1)
+	m1 := ClientRadiusRequestMsg{
+		endpoint: "192.168.122.53:1812",
+		packet:   request,
+		timeout:  1 * time.Second,
+		secret:   "secret",
+		rchan:    rchan1,
+	}
+	rcs.SendRadiusRequest(m1)
+
+	// Verify answer
+	<-rchan1
+
+	rcs.SetDown()
+	rcs.Close()
+	rs.Close()
+
+}
+
 func TestRadiusClientSocket(t *testing.T) {
 	// Get the configuration
 	pci := core.GetPolicyConfigInstance("testServer")

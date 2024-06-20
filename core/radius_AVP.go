@@ -51,10 +51,10 @@ type RadiusAVP struct {
 // Returns the number of bytes read
 func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secret string) (n int64, err error) {
 
-	var avpLen byte
+	var avpLen byte         // The length of the AVP including all fields
 	var vendorCode byte = 0 // If vendor specific, will be not 26 but the specific vendor code
-	var vendorLen byte = 0
-	var dataLen byte
+	var vendorLen byte = 0  // The length of the vendor specific AVP, including vendor code, vendor lenght and payload
+	var dataLen byte        // The length of the payload, in a standard or vendor specific AVP. Includes tag & salt until calculated and deducted
 	var salt [2]byte
 
 	currentIndex := int64(0)
@@ -129,10 +129,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		dataLen = dataLen - 2
 	}
 
-	// Sanity check
-	if dataLen <= 0 {
-		return currentIndex, fmt.Errorf("invalid AVP data length")
-	}
+	// Sanity check dataLen <= 0 removed
 
 	// The contents of the following variables will be replaced if Encrypted or Salted, so that
 	// we'll read from the intermediate buffer, with decrypted contents, instead of the original
@@ -272,24 +269,25 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		return currentIndex, nil
 
 	case RadiusTypeIPv6Prefix:
-		// Radius Type IPv6 prefix. Encoded as 1 byte padding, 1 byte prefix length, and 16 bytes with prefix.
+		// Radius Type IPv6 prefix. Encoded as 1 byte padding, 1 byte prefix length, and up to 16 bytes with prefix.
 		var dummy byte
 		var prefixLen byte
 		address := make([]byte, 16)
+		payloadAddress := address[:payloadLen-2] // The bytes really in the AVP could be less
 		if err := binary.Read(payloadReader, binary.BigEndian, &dummy); err != nil {
 			return currentIndex, err
 		}
 		if err := binary.Read(payloadReader, binary.BigEndian, &prefixLen); err != nil {
 			return currentIndex + 1, err
 		}
-		if err := binary.Read(payloadReader, binary.BigEndian, &address); err != nil {
+		if err := binary.Read(payloadReader, binary.BigEndian, &payloadAddress); err != nil {
 			return currentIndex + 2, err
 		}
 
 		avp.Value = net.IP(address).String() + "/" + fmt.Sprintf("%d", prefixLen)
 
 		if !drained {
-			currentIndex += 18
+			currentIndex += int64(payloadLen)
 		}
 		return currentIndex, err
 
