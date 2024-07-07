@@ -7,6 +7,7 @@
 state-id
 google*.json
 igor
+cdr/cdr*
 
 # Test binary, built with `go test -c`
 *.test

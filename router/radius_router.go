@@ -516,7 +516,10 @@ func (router *RadiusRouter) getRouteParams(req RoutableRadiusRequest) []RadiusRe
 			originPort: originPorts[rand.Intn(len(originPorts))],
 			secret:     req.Secret,
 		}
-		params = append(params, routeParam)
+		if routeParam.endpoint != "" {
+			// If could not resolve IP address, leave params emtpy
+			params = append(params, routeParam)
+		}
 
 	} else {
 		// Server group
@@ -585,7 +588,11 @@ func (router *RadiusRouter) getRouteParams(req RoutableRadiusRequest) []RadiusRe
 					secret:     server.conf.Secret,
 					hasErrors:  server.numErrors > 0,
 				}
-				params = append(params, routeParam)
+				if sName != "" {
+					// If IP address could not be found or incorrect, return empty set so that an error is sent
+					params = append(params, routeParam)
+				}
+
 			}
 		} else {
 			core.GetLogger().Errorf("%s server group not found", req.Destination)
@@ -635,12 +642,14 @@ func (router *RadiusRouter) parseRadiusServersTable() core.RadiusServersTable {
 func normalizeEndpoint(endpoint string) string {
 	addrPort := strings.Split(endpoint, ":")
 	if len(addrPort) != 2 {
-		panic("bad endpoint format " + endpoint)
+		core.GetLogger().Errorf("bad endpoint format {}", endpoint)
+		return ""
 	}
 
 	IPPtr, err := net.ResolveIPAddr("", addrPort[0])
 	if err != nil {
-		panic("bad endpoint format " + endpoint)
+		core.GetLogger().Errorf("could not resolve name {}", addrPort[0])
+		return ""
 	}
 	return IPPtr.String() + ":" + addrPort[1]
 }
@@ -649,7 +658,8 @@ func normalizeEndpoint(endpoint string) string {
 func normalizeIPAddress(ipAddress string) string {
 	IPPtr, err := net.ResolveIPAddr("", ipAddress)
 	if err != nil {
-		panic("bad server name or ip address format " + ipAddress)
+		core.GetLogger().Errorf("could not resolve IP address or name", ipAddress)
+		return ""
 	}
 	return IPPtr.String()
 }

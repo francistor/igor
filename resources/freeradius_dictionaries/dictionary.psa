@@ -13,10 +13,13 @@ ATTRIBUTE	CampaignData	            107	string
 ATTRIBUTE	Operation			        108	string
 ATTRIBUTE	IndexName	                109	string
 ATTRIBUTE	IndexValue	                110	string
+ATTRIBUTE   Session-Start-Time          112 date
 
 ATTRIBUTE	BRAS-NAS-IP-Address			114	string
 ATTRIBUTE	MAC-Address	                117	string
 ATTRIBUTE	LegacyClientId	            119	string
+
+ATTRIBUTE   User-IPv6-Prefix            165 ipv6prefix
 
 ATTRIBUTE   AccessId                    150 string
 ATTRIBUTE   AccessPort                  151 integer

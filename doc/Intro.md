@@ -58,8 +58,7 @@ If the `origin` starts with `database` the syntax must be `database:<table-name>
 
 The `resource://` prefix indicates that the object is embedded in the igor library. All the files in the `resources` directory are available in this way.
 
-The `local://` prefix indicates that the object is embedded in the executable. When instantiating a ConfigurationManager, there is a paramter that
-may point to an `embed.FS` hosting some application specific files.
+The `local://` prefix indicates that the object is embedded in the executable. When instantiating a ConfigurationManager, there is a parameter that may point to an `embed.FS` hosting some application specific files.
 
 The `gs://` prefix indicates that the object is retrieved from Google Storage. ADC authentication is used if the `IGOR_CLOUD_CREDENTIALS` environment variable is not defined (that is, the credentials are taken from the cloud metadata service). Otherwise, the variable is assumed to point to a JSON key file
 
