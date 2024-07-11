@@ -592,7 +592,6 @@ func (router *RadiusRouter) getRouteParams(req RoutableRadiusRequest) []RadiusRe
 					// If IP address could not be found or incorrect, return empty set so that an error is sent
 					params = append(params, routeParam)
 				}
-
 			}
 		} else {
 			core.GetLogger().Errorf("%s server group not found", req.Destination)
@@ -658,7 +657,7 @@ func normalizeEndpoint(endpoint string) string {
 func normalizeIPAddress(ipAddress string) string {
 	IPPtr, err := net.ResolveIPAddr("", ipAddress)
 	if err != nil {
-		core.GetLogger().Errorf("could not resolve IP address or name", ipAddress)
+		core.GetLogger().Errorf("could not resolve IP address or name {}", ipAddress)
 		return ""
 	}
 	return IPPtr.String()

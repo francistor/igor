@@ -869,7 +869,7 @@ func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 		} else {
 			var octetsValue, ok = value.([]byte)
 			if !ok {
-				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T: %s", avp.DictItem.RadiusType, value, value)
 			}
 			avp.Value = octetsValue
 		}
@@ -890,7 +890,7 @@ func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 		} else {
 			avp.Value, err = toInt64(value)
 			if err != nil {
-				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T: %s", avp.DictItem.RadiusType, value, value)
 			}
 		}
 
@@ -900,7 +900,7 @@ func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 		} else {
 			// If here, the attribute cannot be tagged (isString would be true)
 			avp.Value = fmt.Sprintf("%v", value)
-			// TODO: remove --> return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+			// TODO: remove --> return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T: %s", avp.DictItem.RadiusType, value, value)
 		}
 
 	case RadiusTypeAddress, RadiusTypeIPv6Address:
@@ -908,14 +908,14 @@ func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 		if isString {
 			addressValue := net.ParseIP(stringValue)
 			if addressValue == nil {
-				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T: %s", avp.DictItem.RadiusType, value, value)
 			} else {
 				avp.Value = addressValue
 			}
 		} else {
 			addressValue, ok := value.(net.IP)
 			if !ok {
-				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T: %s", avp.DictItem.RadiusType, value, value)
 			} else {
 				avp.Value = addressValue
 			}
@@ -925,12 +925,12 @@ func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 		if isString {
 			avp.Value, err = time.Parse(TimeFormatString, stringValue)
 			if err != nil {
-				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T %s: %s", avp.DictItem.RadiusType, value, value, err)
+				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T: %s - %s", avp.DictItem.RadiusType, value, value, err)
 			}
 		} else {
 			timeValue, ok := value.(time.Time)
 			if !ok {
-				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T", avp.DictItem.RadiusType, value)
+				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T: %s", avp.DictItem.RadiusType, value, value)
 			}
 			avp.Value = timeValue
 		}
