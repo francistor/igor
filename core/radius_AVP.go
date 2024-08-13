@@ -878,7 +878,7 @@ func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 
 		if isString {
 			// Try dictionary
-			if intValue, found := avp.DictItem.EnumValues[stringValue]; !found {
+			if intValue, found := avp.DictItem.EnumNames[stringValue]; !found {
 				// Try parse as number
 				avp.Value, err = strconv.ParseInt(stringValue, 10, 64)
 				if err != nil {

@@ -131,10 +131,13 @@ func (r *RadiusClient) eventLoop() {
 			case SocketDownEvent:
 				// Close and delete from map
 				rcs := v.Sender
-				delete(r.clientSockets, rcs.port)
 
-				// While the socket is closed, another one may be created and assigned to the map
-				go v.Sender.Close()
+				// Close and delete only if not already done
+				if _, found := r.clientSockets[rcs.port]; found {
+					// While the socket is closed, another one may be created and assigned to the map
+					go v.Sender.Close()
+					delete(r.clientSockets, rcs.port)
+				}
 
 				// Check if we are completely finished
 				if r.status == StatusTerminated && len(r.clientSockets) == 0 {

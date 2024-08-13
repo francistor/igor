@@ -193,12 +193,12 @@ func ParseFreeradiusDictionary(c *ConfigurationManager, configObj string, parent
 				if attr.Name == words[1] {
 
 					// Initialize if necessary
-					if attr.EnumValues == nil {
-						dict.Avps[currentVendorAVPsIndex].Attributes[i].EnumValues = make(map[string]int)
+					if attr.EnumNames == nil {
+						dict.Avps[currentVendorAVPsIndex].Attributes[i].EnumNames = make(map[string]int)
 					}
 
 					// Add item
-					dict.Avps[currentVendorAVPsIndex].Attributes[i].EnumValues[words[2]] = val
+					dict.Avps[currentVendorAVPsIndex].Attributes[i].EnumNames[words[2]] = val
 					break
 				}
 			}

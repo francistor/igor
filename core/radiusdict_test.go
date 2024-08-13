@@ -19,8 +19,8 @@ func TestRadiusDict(t *testing.T) {
 	if avp.VendorId != 0 {
 		t.Errorf("Code {0, 1} Vendor was not vendorId 0")
 	}
-	if avp.EnumValues != nil {
-		t.Errorf("Code {0, 1} values was not nil")
+	if avp.EnumNames != nil {
+		t.Errorf("Code {0, 1} names was not nil")
 	}
 	if avp.EnumCodes != nil {
 		t.Errorf("Code {0, 1} codes was not nil")
@@ -52,10 +52,10 @@ func TestRadiusDict(t *testing.T) {
 	if avp.VendorId != 0 {
 		t.Errorf("Service-Type Vendor was not 0")
 	}
-	if avp.EnumValues == nil {
-		t.Errorf("Service-Type EnumValues was nil")
+	if avp.EnumNames == nil {
+		t.Errorf("Service-Type EnumNames was nil")
 	}
-	if avp.EnumValues["Callback-Login"] != 3 {
+	if avp.EnumNames["Callback-Login"] != 3 {
 		t.Errorf("Service-Type Callback-Login was not 3")
 	}
 	if avp.EnumCodes[4] != "Callback-Framed" {

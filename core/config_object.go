@@ -7,6 +7,8 @@ import (
 	"text/template"
 )
 
+// Utilities for building and updating objects from configuration objects
+
 // If the object implements this interface, this method will be executed after each
 // update, typically for cooking the derived attributes
 type Initializable interface {
@@ -33,16 +35,15 @@ func (co *ConfigObject[T]) Update(cm *ConfigurationManager) error {
 	var theObject T
 	if err := cm.BuildObjectFromJsonConfig(co.objectName, &theObject); err != nil {
 		return err
-	} else {
-		// Passing &theObject so that both pointer and value initializers are executed
-		if initializable, ok := any(&theObject).(Initializable); ok {
-			if err := initializable.initialize(); err != nil {
-				return err
-			}
-		}
-		co.o = &theObject
-		return nil
 	}
+	// Passing &theObject so that both pointer and value initializers are executed
+	if initializable, ok := any(&theObject).(Initializable); ok {
+		if err := initializable.initialize(); err != nil {
+			return err
+		}
+	}
+	co.o = &theObject
+	return nil
 }
 
 // Provides access to the configuration object. Returns a copy, so the underlying
@@ -53,15 +54,18 @@ func (co *ConfigObject[T]) Get() T {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Represents an object that will be populated from two configuration resources.
-// Those configuration resources are a template and a set of parameters for that template.
+// Represents an object that will be populated from two configuration resources:
+// a template and a set of parameters for that template.
+//
 // T is the type of the template object, P is the type of the parameter object
 // The parametersObject is a map of strings to P.
 // For instance, T may be a RadiusUserFile, and P a struct holding parameters such as speed and timeouts
 // The end result will be a map of the keys in the ParametersObject to RadiusUserFile built from
 // the specified template and parameters replaced.
+// This way, configuration files with a lot of repetitions can be summarized in a parametrized template plus
+// another resource with only the varying parameters.
 type TemplatedMapConfigObject[T, P any] struct {
-	o                    *map[string]T
+	o                    map[string]T
 	templateObjectName   string
 	parametersObjectName string
 }
@@ -74,7 +78,7 @@ func NewTemplatedMapConfigObject[T, P any](templateObjectName string, parameters
 	return &tco
 }
 
-// Reads the configuration from the associated resource and initializes it,
+// Reads the configuration from the associated resources and initializes it,
 // if an initialize() method is defined
 func (tco *TemplatedMapConfigObject[T, P]) Update(cm *ConfigurationManager) error {
 
@@ -111,20 +115,22 @@ func (tco *TemplatedMapConfigObject[T, P]) Update(cm *ConfigurationManager) erro
 		theMap[k] = v
 	}
 
-	tco.o = &theMap
+	tco.o = theMap
 
 	return nil
 }
 
-// Provides access to the configuration object.
+// Provides access to the configuration object. The internal map
+// is returned: no copy is performed here
 func (tco *TemplatedMapConfigObject[T, P]) Get() map[string]T {
-	return *tco.o
+	return tco.o
 }
 
 // Provides access to the specified entry of the configuration object.
+// Returns a copy, so that it can be safely used
 func (tco *TemplatedMapConfigObject[T, P]) GetKey(key string) (T, error) {
-	var theMap = *tco.o
-	if co, found := theMap[key]; !found {
+
+	if co, found := tco.o[key]; !found {
 		return co, fmt.Errorf("key %s not found", key)
 	} else {
 		return co, nil

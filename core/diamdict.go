@@ -2,7 +2,6 @@ package core
 
 /*
 Helpers for reading and using the Diameter dictionary
-
 */
 
 import (
@@ -31,7 +30,7 @@ const (
 	DiameterTypeEnumerated   = 14
 	DiameterTypeIPFilterRule = 15
 
-	// Radius types
+	// Radius types for Diameter ecnapsulation
 	DiameterTypeIPv4Address = 1001
 	DiameterTypeIPv6Address = 1002
 	DiameterTypeIPv6Prefix  = 1003
@@ -54,15 +53,21 @@ type GroupedProperties struct {
 	MaxOccurs int
 }
 
-// Diameter Dictionary elements
+// Diameter Dictionary element
 type DiameterAVPDictItem struct {
-	VendorId     uint32 // 3 bytes required according to RFC 6733
-	Code         uint32 // 3 bytes required according to RFC 6733
-	Name         string
-	DiameterType DiameterAVPType              // One of the constants above
-	EnumValues   map[string]int               // non nil only in enum type
-	EnumCodes    map[int]string               // non  nil only in enum type
-	Group        map[string]GroupedProperties // non nil only in grouped type
+	// 3 bytes required according to RFC 6733
+	VendorId uint32
+	// 3 bytes required according to RFC 6733
+	Code uint32
+	Name string
+	// One of the constants above
+	DiameterType DiameterAVPType
+	// Map of Names to codes
+	EnumNames map[string]int
+	// Map of codes (ints) to Names
+	EnumCodes map[int]string
+	// non nil only in grouped type. Key is the internal attribute name
+	Group map[string]GroupedProperties
 }
 
 // Represents a Diameter Command
@@ -211,11 +216,11 @@ The following types are helpers for unserializing the JSON Diameter Dictionary
 
 // To Unmarshall Dictionary from Json
 type jDiameterAVP struct {
-	Code       uint32
-	Name       string
-	Type       string
-	EnumValues map[string]int
-	Group      map[string]GroupedProperties
+	Code      uint32
+	Name      string
+	Type      string
+	EnumNames map[string]int
+	Group     map[string]GroupedProperties
 }
 
 type jDiameterVendorAVPs struct {
@@ -281,9 +286,9 @@ func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) DiameterAVPDictItem 
 	}
 
 	var codes map[int]string
-	if javp.EnumValues != nil {
+	if javp.EnumNames != nil {
 		codes = make(map[int]string)
-		for enumName, enumValue := range javp.EnumValues {
+		for enumName, enumValue := range javp.EnumNames {
 			codes[enumValue] = enumName
 		}
 	}
@@ -298,7 +303,7 @@ func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) DiameterAVPDictItem 
 		Code:         javp.Code,
 		Name:         namePrefix + javp.Name,
 		DiameterType: diameterType,
-		EnumValues:   javp.EnumValues,
+		EnumNames:    javp.EnumNames,
 		EnumCodes:    codes,
 		Group:        javp.Group,
 	}

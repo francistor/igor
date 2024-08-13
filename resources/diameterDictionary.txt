@@ -14,7 +14,7 @@
                 name: <>,
                 type: <>,
                 group: {<name>: {mandatory: <value>, minOccurs: <value>, maxOccurs: <value>}}
-                enumValues:
+                enumNames:
                 {
                     <name>: <value>
                 } 

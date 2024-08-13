@@ -905,7 +905,7 @@ func NewDiameterAVP(name string, value interface{}) (*DiameterAVP, error) {
 				return &avp, fmt.Errorf("error creating diameter avp %s with type %d and value of type %T", name, avp.DictItem.DiameterType, value)
 			}
 			var intValue int
-			intValue, ok = avp.DictItem.EnumValues[stringValue]
+			intValue, ok = avp.DictItem.EnumNames[stringValue]
 			if !ok {
 				return &avp, fmt.Errorf("%s value not in dictionary for %s", stringValue, name)
 			}

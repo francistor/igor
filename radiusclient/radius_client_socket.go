@@ -194,26 +194,37 @@ func (rcs *RadiusClientSocket) eventLoop() {
 
 		case ReadErrorMsg:
 
-			rcs.socket.Close()
+			// Check in order to not send socketDownEvent twice
+			if atomic.LoadInt32(&rcs.status) != StatusTerminated {
 
-			// Terminate the outsanding requests
-			rcs.cancelAll()
+				// Set the status
+				atomic.StoreInt32(&rcs.status, StatusTerminated)
 
-			// Tell the radiusclient we are down
-			rcs.controlChannel <- SocketDownEvent{Sender: rcs, Error: v.Error}
+				rcs.socket.Close()
+
+				// Terminate the outsanding requests
+				rcs.cancelAll()
+
+				// Tell the radiusclient we are down
+				rcs.controlChannel <- SocketDownEvent{Sender: rcs, Error: v.Error}
+			}
 
 		case SetDownCommandMsg:
 
-			// Set the status
-			atomic.StoreInt32(&rcs.status, StatusTerminated)
+			// Check in order to not send socketDownEvent twice
+			if atomic.LoadInt32(&rcs.status) != StatusTerminated {
+				// Set the status
+				atomic.StoreInt32(&rcs.status, StatusTerminated)
 
-			rcs.socket.Close()
+				rcs.socket.Close()
 
-			// Terminate the outsanding requests
-			rcs.cancelAll()
+				// Terminate the outsanding requests
+				rcs.cancelAll()
 
-			// Tell the radiusclient we are down
-			rcs.controlChannel <- SocketDownEvent{Sender: rcs}
+				// Tell the radiusclient we are down
+				// TODO: may send two socketDownEvent ? Would cause closing twice from radius_socket
+				rcs.controlChannel <- SocketDownEvent{Sender: rcs}
+			}
 
 			// Received message in the UDP Socket. Sent by the readLoop
 		case RadiusResponseMsg:

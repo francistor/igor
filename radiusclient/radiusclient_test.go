@@ -278,13 +278,13 @@ func TestIdentifiers(t *testing.T) {
 	rchan3 := make(chan interface{}, 1)
 	rchan4 := make(chan interface{}, 1)
 
-	rc.RadiusExchange("1.1.1.1:1812", 2000, request1, 200*time.Millisecond, 2, "secret", rchan1)
+	rc.RadiusExchange("1.1.1.1:1812", 2001, request1, 200*time.Millisecond, 2, "secret", rchan1)
 	<-rchan1
-	rc.RadiusExchange("1.1.1.1:1813", 2000, request2, 200*time.Millisecond, 2, "secret", rchan2)
+	rc.RadiusExchange("1.1.1.1:1813", 2001, request2, 200*time.Millisecond, 2, "secret", rchan2)
 	<-rchan2
-	rc.RadiusExchange("1.1.1.1:1812", 2000, request3, 200*time.Millisecond, 2, "secret", rchan3)
+	rc.RadiusExchange("1.1.1.1:1812", 2001, request3, 200*time.Millisecond, 2, "secret", rchan3)
 	<-rchan3
-	rc.RadiusExchange("1.1.1.1:1813", 2000, request4, 200*time.Millisecond, 2, "secret", rchan4)
+	rc.RadiusExchange("1.1.1.1:1813", 2001, request4, 200*time.Millisecond, 2, "secret", rchan4)
 	<-rchan4
 
 	rc.SetDown()

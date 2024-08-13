@@ -36,7 +36,7 @@
                     "code": 6,
                     "name": "Service-Type",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "Login": 1,
                         "Framed": 2,
@@ -138,7 +138,7 @@
                     "code": 61,
                     "name": "NAS-Port-Type",
                     "type": "Enumerated",
-                    "enumValues": 
+                    "enumNames": 
                     {
                         "Sync": 0,
                         "Async": 1,
@@ -150,7 +150,7 @@
                     "code": 64,
                     "name": "Tunnel-Type",
                     "type": "Enumerated",
-                    "enumValues": 
+                    "enumNames": 
                     {
                         "PPTP": 1,
                         "L2F": 2,
@@ -162,7 +162,7 @@
                     "code": 65,
                     "name": "Tunnel-Medium-Type",
                     "type": "Enumerated",
-                    "enumValues": 
+                    "enumNames": 
                     {
                         "IPv4": 1,
                         "IPv6": 2
@@ -267,7 +267,7 @@
                     "code": 258,
                     "name": "Auth-Application-Id",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "Base": 0,
                         "NASREQ": 1,
@@ -282,7 +282,7 @@
                     "code": 259,
                     "name": "Acct-Application-Id",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "Base": 0,
                         "NASREQ": 1,
@@ -308,7 +308,7 @@
                     "code": 261,
                     "name": "Redirect-Host-Usage",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "DONT_CACHE": 0,
                         "ALL_SESSION": 1,
@@ -363,7 +363,7 @@
                     "code": 273,
                     "name": "Disconnect-Cause",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "Rebooting": 0,
                         "Busy": 1,
@@ -374,7 +374,7 @@
                     "code": 274,
                     "name": "Auth-Request-Type",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "AUTHENTICATE_ONLY": 1,
                         "AUTHORIZE_ONLY": 2,
@@ -454,7 +454,7 @@
                     "code": 295,
                     "name": "Termination-Cause",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "DIAMETER_LOGOUT": 1,
                         "DIAMETER_SERVICE_NOT_PROVIDED": 2,
@@ -475,7 +475,7 @@
                     "code": 299,
                     "name": "Inband-Security-Id",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "NoInbandSecurity": 0,
                         "TLS": 1
@@ -539,7 +539,7 @@
                     "code": 403,
                     "name": "CHAP-Algorithm",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "CHAP-With-MD5": 5
                     }
@@ -593,7 +593,7 @@
                     "code": 416,
                     "name": "CC-Request-Type",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "Initial": 1,
                         "Update": 2,
@@ -610,7 +610,7 @@
                     "code": 418,
                     "name": "CC-Session-Failover",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "FAILOVER_NOT_SUPPORTED": 0,
                         "FAILOVER_SUPPORTED": 1
@@ -635,7 +635,7 @@
                     "code": 422,
                     "name": "Check-Balance-Result",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "ENOUGH_CREDIT": 0,
                         "NO_CREDIT": 1
@@ -656,7 +656,7 @@
                     "code": 427,
                     "name": "Credit-Control-Failure-Handling",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "TERMINATE": 0,
                         "CONTINUE": 1,
@@ -667,7 +667,7 @@
                     "code": 428,
                     "name": "Direct-Debiting-Failure-Handling",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "TERMINATE_OR_BUFFER": 0,
                         "CONTINUE": 1
@@ -716,7 +716,7 @@
                     "code": 433,
                     "name": "Redirect-Address-Type",
                     "type": "Enumerated",
-                    "enumValues": 
+                    "enumNames": 
                     {
                         "IPV4": 0,
                         "IPV6": 1,
@@ -743,7 +743,7 @@
                     "code": 436,
                     "name": "Requested-Action",
                     "type": "Enumerated",
-                    "enumValues": 
+                    "enumNames": 
                     {
                         "DIRECT_DEBITING": 0,
                         "REFUND_ACCOUNT": 1,
@@ -846,7 +846,7 @@
                     "code": 449,
                     "name": "Final-Unit-Action",
                     "type": "Enumerated",
-                    "enumValues": 
+                    "enumNames": 
                     {
                         "TERMINATE": 0,
                         "REDIRECT": 1,
@@ -857,7 +857,7 @@
                     "code": 452,
                     "name": "Tariff-Change-Usage",
                     "type": "Enumerated",
-                    "enumValues": 
+                    "enumNames": 
                     {
                         "UNIT_BEFORE_TARIFF_CHANGE": 0,
                         "UNIT_AFTER_TARIFF_CHANGE": 1,
@@ -911,7 +911,7 @@
                     "code": 459,
                     "name": "User-Equipment-Info-Type",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "IMEISV": 0,
                         "MAC": 1,
@@ -933,7 +933,7 @@
                     "code": 480,
                     "name": "Accounting-Record-Type",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "EVENT_RECORD": 1,
                         "START_RECORD": 2,
@@ -945,7 +945,7 @@
                     "code": 450,
                     "name": "Subscription-Id-Type",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "EndUserE164": 0,
                         "EndUserIMSI": 1,
@@ -958,7 +958,7 @@
                     "code": 455,
                     "name": "Multiple-Services-Indicator",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "MULTIPLE_SERVICES_NOT_SUPPORTED": 0,
                         "MULTIPLE_SERVICES_SUPPORTED": 1
@@ -969,7 +969,7 @@
                     "code": 483,
                     "name": "Accounting-Realtime-Required",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "DELIVER_AND_GRANT": 1,
                         "GRANT_AND_STORE": 2,
@@ -1016,7 +1016,7 @@
                     "code": 511,
                     "name": "Flow-Status",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "ENABLED-UPLINK": 0,
                         "ENABLED-DOWNLINK": 1,
                         "ENABLED": 2,
@@ -1043,7 +1043,7 @@
                     "code": 529,
                     "name": "AF-Signalling-Protocol",
                     "type": "Enumerated",
-                    "enumValues":{
+                    "enumNames":{
                         "NO_INFORMATION": 0,
                         "SIP": 1
                     }
@@ -1062,7 +1062,7 @@
                     "code": 536,
                     "name": "Required-Access-Info",
                     "type": "Enumerated",
-                    "enumValues":{
+                    "enumNames":{
                         "USER_LOCATION": 0,
                         "MS_TIME_ZONE": 1
                     }
@@ -1116,7 +1116,7 @@
                     "code": 1006,
                     "name": "Event-Trigger",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "SGSN_CHANGE": 0,
                         "QOS_CHANGE": 1,
                         "RAT_CHANGE":2,
@@ -1163,7 +1163,7 @@
                     "code": 1007,
                     "name": "Metering-Method",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "DURATION": 0,
                         "VOLUME": 1,
                         "DURATION_VOLUME": 2
@@ -1173,7 +1173,7 @@
                     "code": 1008,
                     "name": "Offline",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "DISABLE_OFFLINE": 0,
                         "ENABLE_OFFLINE": 1
                     }
@@ -1182,7 +1182,7 @@
                     "code": 1009,
                     "name": "Online",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "DISABLE_ONLINE": 0,
                         "ENABLE_ONLINE": 1
                     }
@@ -1196,7 +1196,7 @@
                     "code": 1011,
                     "name": "Reporting-Level",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "SERVICE_IDENTIFIER_LEVEL": 0,
                         "RATING_GROUP_LEVEL": 1,
                         "SPONSORED_CONNECTIVITY_LEVEL": 2
@@ -1229,7 +1229,7 @@
                     "code": 1015,
                     "name": "PDP-Session-Operation",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "PDP_SESSION_TERMINATION": 0
                     }
                 },
@@ -1254,7 +1254,7 @@
                     "code": 1019,
                     "name": "PCC-Rule-Status",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "ACTIVE": 0,
                         "INACTIVE": 1,
@@ -1280,7 +1280,7 @@
                     "code": 1027,
                     "name": "IP-CAN-Type",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "3GPP-GPRS": 0,
                         "DOCSIS": 1,
@@ -1295,7 +1295,7 @@
                     "code": 1028,
                     "name": "QoS-Class-Identifier",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "CLASS0": 0,
                         "CLASS1": 1,
@@ -1313,7 +1313,7 @@
                     "code": 1030,
                     "name": "Rule-Failure-Code",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "UNKNOWN_RULE_NAME": 1,
                         "RATING_GROUP_ERROR": 2,
                         "SERVICE_IDENTIFIER_ERROR": 3,
@@ -1336,7 +1336,7 @@
                     "code": 1032,
                     "name": "3G-RAT-Type",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "UTRAN": 1,
                         "GERAN": 2,
                         "WLAN": 3,
@@ -1396,7 +1396,7 @@
                     "code": 1047,
                     "name": "Pre-emption-Capability",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "enabled": 0,
                         "disabled": 1
@@ -1406,7 +1406,7 @@
                     "code": 1048,
                     "name": "Pre-emption-Vulnerability",
                     "type": "Enumerated",
-                    "enumValues":
+                    "enumNames":
                     {
                         "enabled": 0,
                         "disabled": 1
@@ -1507,7 +1507,7 @@
                     "code": 1063,
                     "name": "Resource-Allocation-Notification",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "ENABLE_NOTIFICATION": 0
                     }
                 },
@@ -1520,7 +1520,7 @@
                     "code": 1073,
                     "name": "Charging-Correlation-Indicator",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "CHARGING_IDENTIFIER_REQUIRED": 1
                     }
                 },
@@ -1542,7 +1542,7 @@
                     "code": 1080,
                     "name": "Flow-Direction",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "UNSPECIFIED": 0,
                         "DOWNLINK": 1,
                         "UPLINK": 2,
@@ -1553,7 +1553,7 @@
                     "code": 1099,
                     "name": "PS-to-CS-Session-Continuity",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "VIDEO_PS2CS_CONT_CANDIDATE": 0
                     }
                 }
@@ -1647,7 +1647,7 @@
                     "code": 17,
                     "name": "myEnumerated",
                     "type": "Enumerated",
-                    "enumValues": {
+                    "enumNames": {
                         "zero": 0,
                         "one": 1,
                         "two": 2

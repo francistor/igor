@@ -36,7 +36,7 @@ type RadiusAVPDictItem struct {
 	Code       byte
 	Name       string
 	RadiusType RadiusAVPType  // One of the constants above
-	EnumValues map[string]int // non nil only in enum type
+	EnumNames  map[string]int // non nil only in enum type
 	EnumCodes  map[int]string // non  nil only in enum type
 	Encrypted  bool
 	Tagged     bool
@@ -128,15 +128,15 @@ The following types are helpers for unserializing the JSON Radius Dictionary
 
 // To Unmarshall Dictionary from Json
 type jRadiusAVP struct {
-	Code       byte
-	Name       string
-	Type       string
-	EnumValues map[string]int
-	Encrypted  bool
-	Tagged     bool
-	Salted     bool
-	WithLen    bool
-	Concat     bool
+	Code      byte
+	Name      string
+	Type      string
+	EnumNames map[string]int
+	Encrypted bool
+	Tagged    bool
+	Salted    bool
+	WithLen   bool
+	Concat    bool
 }
 
 type jRadiusVendorAVPs struct {
@@ -193,10 +193,10 @@ func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) RadiusAVPDictItem {
 
 	// Build the map for enum values
 	var codes map[int]string
-	if javp.EnumValues != nil {
+	if javp.EnumNames != nil {
 		codes = make(map[int]string)
-		for enumName, enumValue := range javp.EnumValues {
-			codes[enumValue] = enumName
+		for enumName, enumCode := range javp.EnumNames {
+			codes[enumCode] = enumName
 		}
 	}
 
@@ -210,7 +210,7 @@ func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) RadiusAVPDictItem {
 		Code:       javp.Code,
 		Name:       namePrefix + javp.Name,
 		RadiusType: radiusType,
-		EnumValues: javp.EnumValues,
+		EnumNames:  javp.EnumNames,
 		EnumCodes:  codes,
 		Encrypted:  javp.Encrypted,
 		Tagged:     javp.Tagged,
