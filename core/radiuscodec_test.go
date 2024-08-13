@@ -41,9 +41,7 @@ func TestPasswordAVP(t *testing.T) {
 	binaryAVP, _ := avp.ToBytes(authenticator, secret)
 	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP, authenticator, secret)
 	rebuiltPassword := rebuiltAVP.GetString()
-	if err != nil {
-		t.Fatalf(err.Error())
-	} else if rebuiltPassword != password {
+	if rebuiltPassword != password {
 		t.Errorf("password does not match. Got %s", rebuiltPassword)
 	}
 }
@@ -67,9 +65,7 @@ func TestTunnelPasswordAVP(t *testing.T) {
 	binaryAVP, _ := avp.ToBytes(authenticator, secret)
 	rebuiltAVP, _, _ := RadiusAVPFromBytes(binaryAVP, authenticator, secret)
 	rebuiltPassword := rebuiltAVP.GetString()
-	if err != nil {
-		t.Fatalf(err.Error())
-	} else if rebuiltPassword != password {
+	if rebuiltPassword != password {
 		t.Errorf("password does not match. Got %s", rebuiltPassword)
 	}
 }

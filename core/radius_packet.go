@@ -485,9 +485,7 @@ func (rp *RadiusPacket) ReplaceAVP(avp *RadiusAVP) *RadiusPacket {
 
 // Adds a list of AVP to the message
 func (rp *RadiusPacket) AddAVPs(avps []RadiusAVP) *RadiusPacket {
-	for i := range avps {
-		rp.AVPs = append(rp.AVPs, avps[i])
-	}
+	rp.AVPs = append(rp.AVPs, avps...)
 	return rp
 }
 

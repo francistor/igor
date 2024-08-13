@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -33,19 +34,21 @@ type SearchRule struct {
 	// Regex for the name of the object. If matching, we'll try to locate
 	// it prepending the Origin property to compose the URL (file or http)
 	// The regex will contain a matching group that will be the part used to
-	// look for the object. For instance, in "Gy/(.*)", the part after "Gy/"
-	// will be taken as the resource name to look after when retreiving an object
-	// name such as Gy/peers.json
+	// compose the file or http url name to retrieve. For instance, in "Gy/(.*)",
+	// the part after "Gy/" will be taken as the last part of the resource name
+	// retrieve, e.g. Gy/peers.json --> http://<host:port>/base/peers.json
+
 	NameRegex string
 
 	// Compiled form of nameRegex
 	Regex *regexp.Regexp
 
-	// Can be a URL or a path
+	// Can be a URL or a path. URLs may include http://, file:// but also
+	// local://, and resource://. db: is also treated specially
 	Origin string
 }
 
-// The applicable Search Rules. Holds also the configuration for the configuration database
+// The applicable Search Rules. Holds also the settings for the configuration database
 type SearchRules struct {
 	Rules []SearchRule
 	Db    struct {
@@ -55,41 +58,41 @@ type SearchRules struct {
 	}
 }
 
-// Basic objects and methods to manage configuration files without yet
+// Basic objects and methods to manage configuration object names without yet
 // interpreting them. To be embedded in a handlerConfig or policyConfig object
 // Multiple "instances" can coexist in a single executable (mainly for testing)
-// The hierarchy is
+// The call stack is as follows:
 // - BuildJSONConfigObject or GetBytesConfigObject or GetRawBytesConfigObject
-// - Call getObject. Implements the logic to try first with instance name
-// - Call getResource. Reads from database, http or file
+// - Call GetObject. Implements the logic to try first with instance name
+// - Call readResource. Reads from database, http or file
 // No cache is implemented. Any call to retreive an object will go to the source
 type ConfigurationManager struct {
 
 	// Configuration objects are to be searched for in a path that contains
 	// the instanceName first and, if not found, in a path without it. This
-	// way a general configuration can be overriden
+	// way a general and shared configuration can be overriden
 	instanceName string
 
-	// The bootstrap file is the first configuration file read, and it contains
-	// the rules for searching other files. It can be a local file or a URL
+	// The bootstrap file is the first resource read, and it contains
+	// the rules for searching other resources. It can be a local file or a URL
 	bootstrapFile string
 
-	// The contents of the bootstrapFile are parsed here
+	// The contents of the bootstrapFile are parsed and stored here
 	searchRules SearchRules
 
 	// Global configuration parameters. Used as parameters for the configuration
-	// objects, if they retrieved as templates.
+	// objects, when they are as templates.
 	configParams map[string]string
 
 	// Database Handle for access to the configuration database
 	dbHandle *sql.DB
 
-	// HttpClient
+	// HttpClient for retrieving http resources
 	httpClient *http.Client
 
 	// Filesystem with embedded resources. Additional to resources.Fs, which will
 	// hold the igor library resources, this one is used to store resources
-	// created in the user applications
+	// created in the user applications, when origin is set to local://
 	localFS embed.FS
 }
 
@@ -106,13 +109,10 @@ func NewConfigurationManager(bootstrapFile string, instanceName string, params m
 	}
 
 	// Add relevant environment variables to the params object
+	var rx *regexp.Regexp = regexp.MustCompile("(?i)IGOR_(.+)=(.+)")
 	for _, envKV := range os.Environ() {
-		if strings.HasPrefix(envKV, "igor_") || strings.HasPrefix(envKV, "IGOR_") {
-			envKV = strings.TrimPrefix(envKV, "igor_")
-			envKV = strings.TrimPrefix(envKV, "IGOR_")
-
-			kv := strings.Split(envKV, "=")
-			params[kv[0]] = kv[1]
+		if match := rx.FindStringSubmatch(envKV); match != nil {
+			params[match[1]] = match[2]
 		}
 	}
 
@@ -132,15 +132,30 @@ func NewConfigurationManager(bootstrapFile string, instanceName string, params m
 	// Parse the bootstrap configuration file
 	icb, bootstrapResource := cm.decomposeFileLocation(bootstrapFile)
 	igorConfigBase = icb
-	cm.fillSearchRules(icb + bootstrapResource)
+
+	// Hack for testing. The location of the bootstrap file may be in the parent directory of
+	// the specified one. If this is the case, patch igorConfigBase
+	if _, error := cm.readResource(igorConfigBase, bootstrapResource); error != nil {
+		if strings.Contains(bootstrapResource, "://") {
+			panic("could  not read bootstrap resource from " + bootstrapFile)
+		}
+		igorConfigBase = path.Clean("../"+igorConfigBase) + "/" // Clean removes the trailing slash
+		// Try again here, just to show clean error
+		if _, error := cm.readResource(igorConfigBase, bootstrapResource); error != nil {
+			panic("could not read bootstrap file from " + bootstrapFile + " or its parent directory (hack testing only) " + error.Error())
+		}
+	}
+	// End of hack
+
+	cm.fillSearchRules(igorConfigBase, bootstrapResource)
 
 	return cm
 }
 
-// Parses the object as a template using the parameters ofthe configuration instance.
+// Parses the object as a template using the parameters of the configuration instance.
 func (c *ConfigurationManager) untemplateObject(obj []byte) ([]byte, error) {
 
-	// Parse the template
+	// Parse the template. The name is irrelevant
 	tmpl, err := template.New("igor_template").Parse(string(obj))
 	if err != nil {
 		return nil, err
@@ -158,7 +173,7 @@ func (c *ConfigurationManager) untemplateObject(obj []byte) ([]byte, error) {
 // interpreted as JSON. The contents of the object are treated as a template with
 // parameters, which are replaced by the contents of the map passed at initialization
 // of the ConfigurationManager
-func (c *ConfigurationManager) BuildJSONConfigObject(objectName string, obj any) error {
+func (c *ConfigurationManager) BuildObjectFromJsonConfig(objectName string, obj any) error {
 
 	jb, err := c.getObject(objectName)
 	if err != nil {
@@ -173,9 +188,7 @@ func (c *ConfigurationManager) BuildJSONConfigObject(objectName string, obj any)
 	return json.Unmarshal(parsed, obj)
 }
 
-// Fills the object passed as parameter with the configuration object which is
-// interpreted as raw text. This version treats the contents as a template to be
-// parsed
+// Retrieves and untemplates the specified object name
 func (c *ConfigurationManager) GetBytesConfigObject(objectName string) ([]byte, error) {
 
 	cb, err := c.getObject(objectName)
@@ -221,39 +234,41 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 
 	// Found, origin var contains the prefix
 
+	// database objects do not have an instance name
 	if strings.HasPrefix(origin, "database:") {
 		// Database object
-		if objectBytes, err := c.readResource("", origin, false); err == nil {
-			return objectBytes, nil
-		} else {
+		objectBytes, err := c.readResource("", origin)
+		if err != nil {
 			return nil, err
 		}
-	} else {
-		// Other object types may have an instance name.
-		// Try first with instance name
-		var prefix string
-		if origin != "" {
-			prefix = origin
-		} else {
-			prefix = igorConfigBase
-		}
-		if c.instanceName != "" {
-			if objectBytes, err := c.readResource(prefix, c.instanceName+"/"+innerName, false); err == nil {
-				return objectBytes, nil
-			}
-		}
+		return objectBytes, nil
+	}
 
-		// Try without instance name
-		if objectBytes, err := c.readResource(prefix, innerName, false); err == nil {
+	// Other object types may have an instance name.
+
+	// Cook origin, explicit or implicit
+	var prefix = origin
+	if prefix == "" {
+		prefix = igorConfigBase
+	}
+
+	// Try first with instance name
+	if c.instanceName != "" {
+		if objectBytes, err := c.readResource(prefix, c.instanceName+"/"+innerName); err == nil {
 			return objectBytes, nil
-		} else {
-			return nil, err
 		}
 	}
+
+	// Try without instance name
+	objectBytes, err := c.readResource(prefix, innerName)
+	if err != nil {
+		return nil, err
+	}
+	return objectBytes, nil
 }
 
 // Reads the configuration item from the specified location.
-func (c *ConfigurationManager) readResource(prefix string, name string, tryParentForTesting bool) ([]byte, error) {
+func (c *ConfigurationManager) readResource(prefix string, name string) ([]byte, error) {
 
 	// Used except for relative file schema
 	location := prefix + name
@@ -263,6 +278,9 @@ func (c *ConfigurationManager) readResource(prefix string, name string, tryParen
 		// The returned object is always a JSON whose first level are properties, not arrays
 		// as per the values of the keycolumn
 		items := strings.Split(location, ":")
+		if len(items) != 4 {
+			panic("database origin has format not matching database:table:keycolumn:paramscolumn")
+		}
 		tableName := items[1]
 		keyColumn := items[2]
 		paramsColumn := items[3]
@@ -272,12 +290,12 @@ func (c *ConfigurationManager) readResource(prefix string, name string, tryParen
 
 		stmt, err := c.dbHandle.Prepare(fmt.Sprintf("select %s, %s from %s", keyColumn, paramsColumn, tableName))
 		if err != nil {
-			return nil, fmt.Errorf("error reading from database. %s, %w", location, err)
+			return nil, fmt.Errorf("error preparing statement: %s, %w", location, err)
 		}
 		defer stmt.Close()
 		rows, err := stmt.Query()
 		if err != nil {
-			return nil, fmt.Errorf("error reading from database. %s, %w", location, err)
+			return nil, fmt.Errorf("error reading from database: %s, %w", location, err)
 		}
 		defer rows.Close()
 
@@ -286,18 +304,20 @@ func (c *ConfigurationManager) readResource(prefix string, name string, tryParen
 			var v json.RawMessage
 			err := rows.Scan(&k, &v)
 			if err != nil {
-				return nil, fmt.Errorf("error reading from database. %s, %w", location, err)
+				return nil, fmt.Errorf("error reading row from database: %s, %w", location, err)
 			}
 			entries[k] = &v
 		}
 		err = rows.Err()
 		if err != nil {
-			return nil, fmt.Errorf("error reading from database. %s, %w", location, err)
+			return nil, fmt.Errorf("final error reading from database: %s, %w", location, err)
 		}
 
 		return json.Marshal(entries)
 
-	} else if strings.HasPrefix(location, "http:") || strings.HasPrefix(location, "https:") {
+	}
+
+	if strings.HasPrefix(location, "http:") || strings.HasPrefix(location, "https:") {
 
 		// Read from http
 		resp, err := http.Get(location)
@@ -307,78 +327,77 @@ func (c *ConfigurationManager) readResource(prefix string, name string, tryParen
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("got status code %d while retrieving %s", resp.StatusCode, location)
-
-		}
-		if body, err := io.ReadAll(resp.Body); err != nil {
-			return nil, err
-		} else {
-			return body, nil
 		}
 
-	} else if strings.HasPrefix(location, "gs://") {
-		if resp, err := cloud.GetGoogleStorageObject(location); err != nil {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
 			return nil, err
-		} else {
-			return resp, nil
 		}
-	} else if strings.HasPrefix(location, "resource://") {
-		if resp, err := resources.Fs.ReadFile(location[11:]); err != nil {
-			return nil, err
-		} else {
-			return resp, nil
-		}
-	} else if strings.HasPrefix(location, "local://") {
-		if resp, err := c.localFS.ReadFile(location[8:]); err != nil {
-			return nil, err
-		} else {
-			return resp, nil
-		}
-	} else {
-		// Read from file
-		if strings.HasPrefix(location, "/") {
-			// Treat as absolute
-			if resp, err := os.ReadFile(location); err != nil {
-				return nil, err
-			} else {
-				return resp, nil
-			}
-		} else {
-			// Treat as relative to the bootstrap file
-			if resp, err := os.ReadFile(igorConfigBase + name); err != nil {
-				if tryParentForTesting {
-					if resp, err := os.ReadFile("../" + igorConfigBase + name); err != nil {
-						return nil, err
-					} else {
-						igorConfigBase = "../" + igorConfigBase
-						return resp, nil
-					}
-				}
-				return nil, err
-			} else {
-				return resp, nil
-			}
-		}
+		return body, nil
 	}
+
+	if strings.HasPrefix(location, "gs://") {
+		resp, err := cloud.GetGoogleStorageObject(location)
+		if err != nil {
+			return nil, err
+		}
+
+		return resp, nil
+	}
+
+	if strings.HasPrefix(location, "resource://") {
+		resp, err := resources.Fs.ReadFile(location[11:])
+		if err != nil {
+			return nil, err
+		}
+
+		return resp, nil
+	}
+
+	if strings.HasPrefix(location, "local://") {
+		resp, err := c.localFS.ReadFile(location[8:])
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	}
+
+	// Read from file (absolute)
+	if strings.HasPrefix(location, "/") {
+		// Treat as absolute
+		resp, err := os.ReadFile(location)
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	}
+
+	// Treat as relative to the bootstrap file
+	resp, err := os.ReadFile(igorConfigBase + name)
+	//resp, err := os.ReadFile(location)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 // Reads the bootstrap file and fills the search rules for the Configuration Manager.
 // To be called upon instantiation of the ConfigurationManager.
 // The bootstrap file is not subject to instance searching rules: must reside in the specified location without
 // appending instance name
-func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
+func (c *ConfigurationManager) fillSearchRules(base string, bootstrapFile string) {
 	var shouldInitDB bool
 
 	// Get the search rules object
-	p, n := c.decomposeFileLocation(bootstrapFile)
-	rules, err := c.readResource(p, n, true)
+	rules, err := c.readResource(base, bootstrapFile)
 	if err != nil {
-		panic("could not retrieve the bootstrap file in " + bootstrapFile + " due to: " + err.Error())
+		panic("could not retrieve the bootstrap file in " + base + "/" + bootstrapFile + " due to: " + err.Error())
 	}
 
 	// Parse template
 	rules, err = c.untemplateObject(rules)
 	if err != nil {
-		panic("could not parse the bootstrap file in " + bootstrapFile + " due to: " + err.Error())
+		panic("could not parse the bootstrap file in " + base + "/" + bootstrapFile + " due to: " + err.Error())
 	}
 
 	// Decode Search Rules and add them to the ConfigurationManager object
@@ -424,46 +443,21 @@ func (c *ConfigurationManager) fillSearchRules(bootstrapFile string) {
 	}
 }
 
-// Sets the core.igorConfigBase variable as the directory where the bootstrap file resides
-// and returns the base location of the configuration, to be used when there is no origin, and
-// the name of the bootrstrap file resource
-// TODO: Replace by path
+// Returns the igorBase and the resource name for the bootstrap object, calculated as the
+// base path and file name respectively. If bootstrapFileName is a file name without path or
+// URL specification, it is asumed to reside in the current directory, which is set as igorBase
 func (c *ConfigurationManager) decomposeFileLocation(bootstrapFileName string) (string, string) {
 
 	lastSlash := strings.LastIndex(bootstrapFileName, "/")
+
 	if lastSlash == -1 {
 		// Assumed to be the current directory
-		abs, err := filepath.Abs(bootstrapFileName)
-		if err != nil {
+		if abs, err := filepath.Abs(bootstrapFileName); err != nil {
 			panic(err)
+		} else {
+			return filepath.Dir(abs) + "/", bootstrapFileName
 		}
-		return filepath.Dir(abs) + "/", bootstrapFileName
-	} else {
-		return bootstrapFileName[0 : lastSlash+1], bootstrapFileName[lastSlash+1:]
 	}
 
-	/*
-
-		// Skip if file is in a http or gs location
-		if strings.HasPrefix(bootstrapFileName, "http:") || strings.HasPrefix(bootstrapFileName, "https:") || strings.HasPrefix(bootstrapFileName, "gs:") {
-			return bootstrapFileName
-		}
-
-		// Try first with the specification as it is
-		if fileInfo, err := os.Stat(bootstrapFileName); err == nil {
-			// File found
-			abs, err := filepath.Abs(bootstrapFileName)
-			if err != nil {
-				panic(err)
-			}
-			igorConfigBase = filepath.Dir(abs) + "/"
-			return fileInfo.Name()
-		}
-
-		if !tryWithParent {
-			panic("could not find the bootstrap file in " + bootstrapFileName)
-		} else {
-			return c.fixBootstrapFileLocation("../"+bootstrapFileName, false)
-		}
-	*/
+	return bootstrapFileName[0 : lastSlash+1], bootstrapFileName[lastSlash+1:]
 }

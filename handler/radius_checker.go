@@ -126,7 +126,7 @@ func NewRadiusPacketChecks(configObjectName string, ci *core.PolicyConfiguration
 
 	// Read the configuration object
 	var entries map[string]interface{}
-	err := myCi.CM.BuildJSONConfigObject(configObjectName, &entries)
+	err := myCi.CM.BuildObjectFromJsonConfig(configObjectName, &entries)
 	if err != nil {
 		return checks, err
 	}

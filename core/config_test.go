@@ -30,7 +30,7 @@ func TestDatabaseObject(t *testing.T) {
 	}
 
 	var rcEntries map[string]RadiusClientEntry
-	err := GetPolicyConfig().CM.BuildJSONConfigObject("radiusclients.database", &rcEntries)
+	err := GetPolicyConfig().CM.BuildObjectFromJsonConfig("radiusclients.database", &rcEntries)
 
 	if err != nil {
 		t.Fatalf("could not read radiusclients.database: %s", err)

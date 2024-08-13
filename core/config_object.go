@@ -31,7 +31,7 @@ func NewConfigObject[T any](name string) *ConfigObject[T] {
 func (co *ConfigObject[T]) Update(cm *ConfigurationManager) error {
 
 	var theObject T
-	if err := cm.BuildJSONConfigObject(co.objectName, &theObject); err != nil {
+	if err := cm.BuildObjectFromJsonConfig(co.objectName, &theObject); err != nil {
 		return err
 	} else {
 		// Passing &theObject so that both pointer and value initializers are executed
@@ -90,7 +90,7 @@ func (tco *TemplatedMapConfigObject[T, P]) Update(cm *ConfigurationManager) erro
 
 	// Retrieve the map of template parameter objects
 	var parametersSet map[string]P
-	err = cm.BuildJSONConfigObject(tco.parametersObjectName, &parametersSet)
+	err = cm.BuildObjectFromJsonConfig(tco.parametersObjectName, &parametersSet)
 	if err != nil {
 		return err
 	}
