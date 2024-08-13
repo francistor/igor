@@ -135,13 +135,13 @@ func NewConfigurationManager(bootstrapFile string, instanceName string, params m
 
 	// Hack for testing. The location of the bootstrap file may be in the parent directory of
 	// the specified one. If this is the case, patch igorConfigBase
-	if _, error := cm.readResource(igorConfigBase, bootstrapResource); error != nil {
+	if _, error := cm.readResource(igorConfigBase + bootstrapResource); error != nil {
 		if strings.Contains(bootstrapResource, "://") {
 			panic("could  not read bootstrap resource from " + bootstrapFile)
 		}
 		igorConfigBase = path.Clean("../"+igorConfigBase) + "/" // Clean removes the trailing slash
 		// Try again here, just to show clean error
-		if _, error := cm.readResource(igorConfigBase, bootstrapResource); error != nil {
+		if _, error := cm.readResource(igorConfigBase + bootstrapResource); error != nil {
 			panic("could not read bootstrap file from " + bootstrapFile + " or its parent directory (hack testing only) " + error.Error())
 		}
 	}
@@ -237,7 +237,7 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 	// database objects do not have an instance name
 	if strings.HasPrefix(origin, "database:") {
 		// Database object
-		objectBytes, err := c.readResource("", origin)
+		objectBytes, err := c.readResource(origin)
 		if err != nil {
 			return nil, err
 		}
@@ -254,13 +254,13 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 
 	// Try first with instance name
 	if c.instanceName != "" {
-		if objectBytes, err := c.readResource(prefix, c.instanceName+"/"+innerName); err == nil {
+		if objectBytes, err := c.readResource(prefix + c.instanceName + "/" + innerName); err == nil {
 			return objectBytes, nil
 		}
 	}
 
 	// Try without instance name
-	objectBytes, err := c.readResource(prefix, innerName)
+	objectBytes, err := c.readResource(prefix + innerName)
 	if err != nil {
 		return nil, err
 	}
@@ -268,10 +268,7 @@ func (c *ConfigurationManager) getObject(objectName string) ([]byte, error) {
 }
 
 // Reads the configuration item from the specified location.
-func (c *ConfigurationManager) readResource(prefix string, name string) ([]byte, error) {
-
-	// Used except for relative file schema
-	location := prefix + name
+func (c *ConfigurationManager) readResource(location string) ([]byte, error) {
 
 	if strings.HasPrefix(location, "database") {
 		// Format is database:table:keycolumn:paramscolumn
@@ -362,19 +359,8 @@ func (c *ConfigurationManager) readResource(prefix string, name string) ([]byte,
 		return resp, nil
 	}
 
-	// Read from file (absolute)
-	if strings.HasPrefix(location, "/") {
-		// Treat as absolute
-		resp, err := os.ReadFile(location)
-		if err != nil {
-			return nil, err
-		}
-		return resp, nil
-	}
-
-	// Treat as relative to the bootstrap file
-	resp, err := os.ReadFile(igorConfigBase + name)
-	//resp, err := os.ReadFile(location)
+	// Read from file
+	resp, err := os.ReadFile(location)
 	if err != nil {
 		return nil, err
 	}
@@ -389,15 +375,15 @@ func (c *ConfigurationManager) fillSearchRules(base string, bootstrapFile string
 	var shouldInitDB bool
 
 	// Get the search rules object
-	rules, err := c.readResource(base, bootstrapFile)
+	rules, err := c.readResource(base + bootstrapFile)
 	if err != nil {
-		panic("could not retrieve the bootstrap file in " + base + "/" + bootstrapFile + " due to: " + err.Error())
+		panic("could not retrieve the bootstrap file in " + base + bootstrapFile + " due to: " + err.Error())
 	}
 
 	// Parse template
 	rules, err = c.untemplateObject(rules)
 	if err != nil {
-		panic("could not parse the bootstrap file in " + base + "/" + bootstrapFile + " due to: " + err.Error())
+		panic("could not parse the bootstrap file in " + base + bootstrapFile + " due to: " + err.Error())
 	}
 
 	// Decode Search Rules and add them to the ConfigurationManager object
@@ -414,7 +400,7 @@ func (c *ConfigurationManager) fillSearchRules(base string, bootstrapFile string
 		origin := c.searchRules.Rules[i].Origin
 		if strings.HasPrefix(origin, "database") {
 			shouldInitDB = true
-			if len(strings.Split(c.searchRules.Rules[i].Origin, ":")) != 4 {
+			if len(strings.Split(origin, ":")) != 4 {
 				panic("bad format for database search rule: " + origin)
 			}
 		}
@@ -422,23 +408,19 @@ func (c *ConfigurationManager) fillSearchRules(base string, bootstrapFile string
 
 	// Create database handle
 	if shouldInitDB {
-		if c.searchRules.Db.Driver != "" && c.searchRules.Db.Url != "" {
-			c.dbHandle, err = sql.Open(c.searchRules.Db.Driver, c.searchRules.Db.Url)
-			if err != nil {
-				panic("could not create database object " + c.searchRules.Db.Driver)
-			}
-			c.dbHandle.SetMaxOpenConns(c.searchRules.Db.MaxOpenConns)
-
-			// If IGOR_ABORT_IF_DB_ERROR is defined, panic on database error
-			if os.Getenv("IGOR_ABORT_IF_DB_ERROR") != "" {
-				err = c.dbHandle.Ping()
-				if err != nil {
-					// If the database is not available, die
-					panic("could not ping database in " + c.searchRules.Db.Url)
-				}
-			}
-		} else {
+		if c.searchRules.Db.Driver == "" || c.searchRules.Db.Url == "" {
 			panic("db access parameters not specified in searchrules")
+		}
+
+		c.dbHandle, err = sql.Open(c.searchRules.Db.Driver, c.searchRules.Db.Url)
+		if err != nil {
+			panic("could not create database object " + c.searchRules.Db.Driver)
+		}
+		c.dbHandle.SetMaxOpenConns(c.searchRules.Db.MaxOpenConns)
+
+		// If IGOR_ABORT_IF_DB_ERROR is defined, panic on database error
+		if os.Getenv("IGOR_ABORT_IF_DB_ERROR") != "" && c.dbHandle.Ping() != nil {
+			panic("could not ping database in " + c.searchRules.Db.Url)
 		}
 	}
 }
