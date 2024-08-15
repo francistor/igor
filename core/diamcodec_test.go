@@ -505,6 +505,7 @@ func TestGroupedDiameterAVP(t *testing.T) {
 
 	// Navigate to the values
 	recoveredAVPl1 := recoveredAVPl0.GetAllAVP("Igor-myGrouped")[0]
+
 	newInt, _ := recoveredAVPl1.GetAVP("Igor-myInteger32")
 	if newInt.GetInt() != theInt {
 		t.Error("Integer value does not match or not found in Group")

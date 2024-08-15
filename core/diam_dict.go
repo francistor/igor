@@ -1,7 +1,7 @@
 package core
 
 /*
-Helpers for reading and using the Diameter dictionary
+A Diameter dictionary contains methods for getting AVP, application and command names from codes and viceversa.
 */
 
 import (
@@ -131,7 +131,7 @@ func (dd *DiameterDict) GetAVPFromName(name string) (*DiameterAVPDictItem, error
 	}
 }
 
-// Returns a DiameterAppplication given the appid and command code
+// Returns a DiameterAppplication given the appid
 func (dd *DiameterDict) GetApplication(appId uint32) (*DiameterApplication, error) {
 	if app, ok := dd.AppByCode[appId]; !ok {
 		return nil, fmt.Errorf("appId %d not found", appId)
@@ -148,9 +148,9 @@ func (dd *DiameterDict) GetCommand(appId uint32, commandCode uint32) (*DiameterC
 		} else {
 			return nil, fmt.Errorf("appId %d and command %d not found", appId, commandCode)
 		}
-	} else {
-		return nil, fmt.Errorf("appId %d not found", appId)
 	}
+
+	return nil, fmt.Errorf("appId %d not found", appId)
 }
 
 // Returns a Diameter Dictionary object from its serialized representation
@@ -159,10 +159,10 @@ func NewDiameterDictionaryFromJSON(data []byte) *DiameterDict {
 	// Unmarshall from JSON
 	var jDict jDiameterDict
 	if err := json.Unmarshal(data, &jDict); err != nil {
-		panic("bad diameter dictionary format " + err.Error())
+		panic("bad diameter dictionary format: " + err.Error())
 	}
 
-	// Build the dictionary
+	// Build the dictionary from the contents of the unserialized jDict
 	var dict DiameterDict
 
 	// Build the vendor maps
@@ -239,6 +239,7 @@ type jDiameterDict struct {
 }
 
 func (javp jDiameterAVP) toAVPDictItem(v uint32, vs string) DiameterAVPDictItem {
+
 	var diameterType DiameterAVPType
 	switch javp.Type {
 	case "None":

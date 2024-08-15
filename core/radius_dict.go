@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+/*
+A Radius dictionary contains methods for getting AVP names from codes and viceversa
+*/
+
 type RadiusAVPType int
 
 const (
@@ -116,7 +120,7 @@ func NewRadiusDictionaryFromJSON(data []byte) *RadiusDict {
 	// Unmarshall from JSON
 	var jDict jRadiusDict
 	if err := json.Unmarshal(data, &jDict); err != nil {
-		panic("bad radius dictionary format " + err.Error())
+		panic("bad radius dictionary format: " + err.Error())
 	}
 
 	return newRadiusDictionaryFromJDict(&jDict)
@@ -158,7 +162,6 @@ type jRadiusDict struct {
 // Builds a cooked AVPDictItem from the raw Json representation
 func (javp jRadiusAVP) toAVPDictItem(v uint32, vs string) RadiusAVPDictItem {
 
-	// Sanity check
 	var radiusType RadiusAVPType
 	switch javp.Type {
 	case "None":
