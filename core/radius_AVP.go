@@ -15,6 +15,18 @@ import (
 	"time"
 )
 
+// Types and utility methods for Radius AVP manipulation
+// AVP in the wire is
+//    code: 1 byte
+//    length: 1 byte - includes the code and the length
+//    If code == 26
+//      vendorId: 4 bytes
+//      code: 1 byte
+//      length: 1 byte - the length of the code, length and value in the contents of the VSA
+//      value - may be prepended by a 1 byte tag and 2 byte salt
+//    Else
+//      value
+
 var ipv6PrefixRegex = regexp.MustCompile(`[0-9a-fA-F:\.]+/[0-9]+`)
 
 // Represents the contents of a Radius Attribute-Value pair
@@ -33,19 +45,9 @@ type RadiusAVP struct {
 	DictItem *RadiusAVPDictItem
 }
 
-// AVP in the wire is
-//    code: 1 byte
-//    length: 1 byte - includes the code and the length
-//    If code == 26
-//      vendorId: 4 bytes
-//      code: 1 byte
-//      length: 1 byte - the length of the code, length and value in the contents of the VSA
-//      value - may be prepended by a 1 byte tag and 2 byte salt
-//    Else
-//      value
-
 // Encrypted attributes are padded with 0s when written, and those bytes are not removed when read from the Reader
-// That means the contents will not match
+// That means the contents will not match.
+// This is how radius works, not our implementation.
 
 // Builds a radius AVP read from the specified reader.
 // Returns the number of bytes read
@@ -53,7 +55,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 
 	var avpLen byte         // The length of the AVP including all fields
 	var vendorCode byte = 0 // If vendor specific, will be not 26 but the specific vendor code
-	var vendorLen byte = 0  // The length of the vendor specific AVP, including vendor code, vendor lenght and payload
+	var vendorLen byte = 0  // The length of the vendor specific AVP, including vendor code, vendor length and payload
 	var dataLen byte        // The length of the payload, in a standard or vendor specific AVP. Includes tag & salt until calculated and deducted
 	var salt [2]byte
 
@@ -79,7 +81,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		}
 		currentIndex += 4
 
-		// Get vendorCode
+		// Get vendor specific code
 		if err := binary.Read(reader, binary.BigEndian, &vendorCode); err != nil {
 			return currentIndex, err
 		}
@@ -94,7 +96,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		avp.Code = vendorCode
 
 		// SanityCheck
-		if !(vendorLen == avpLen-6) { // Substracting 4 bytes for vendorId, 1 byte for vendorCode and 1 byte for vendorLen
+		if !(vendorLen == avpLen-6) { // Substracting 4 bytes for vendorId, 1 byte for code and 1 byte for len
 			return currentIndex, fmt.Errorf("bad avp coding. Expected length of vendor specific attribute does not match")
 		}
 
@@ -130,6 +132,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 	}
 
 	// Sanity check dataLen <= 0 removed
+	// It is in the RFC, but Nokia AAA may send attributes not honoring this (e.g. empty string)
 
 	// The contents of the following variables will be replaced if Encrypted or Salted, so that
 	// we'll read from the intermediate buffer, with decrypted contents, instead of the original
@@ -155,7 +158,7 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 			avpBytes = decrypt1(avpBytes, authenticator, secret, nil)
 		}
 
-		// If attribute contains its size internally, adjust the length
+		// If attribute contains its size internally, adjust the size of the slice containing the content
 		if avp.DictItem.WithLen {
 			size := avpBytes[0]
 			if len(avpBytes) < int(size)+1 {
@@ -172,7 +175,11 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 
 	// Parse according to type
 	switch avp.DictItem.RadiusType {
+
 	case RadiusTypeNone, RadiusTypeOctets, RadiusTypeString:
+
+		// Encrypted OctetStrings are padded with zeroes, and there is no length field
+		// clarifying where the string really ends. This is how radius works (!)
 
 		avpBytes := make([]byte, payloadLen)
 		if _, err := io.ReadAtLeast(payloadReader, avpBytes, payloadLen); err != nil {
@@ -206,8 +213,10 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 
 			return currentIndex, err
 		} else {
-			// Standard attributes of this type have 3 bytes for the value only (tagged && not salted?)
-			// TODO: Check that only positive integers are represented
+			// Standard attributes of this type have 3 bytes for the value only (tagged && not salted)
+			// This is because the tag leaves one less byte for encoding. But if salted, implies it is
+			// encrypted, done in 16 byte chunks, thus removing the limitation.
+			// TODO: Check that only positive integers are represented. This is weird...
 			var valueHigh byte
 			var valueLow uint16
 			if err := binary.Read(payloadReader, binary.BigEndian, &valueHigh); err != nil {
@@ -269,11 +278,13 @@ func (avp *RadiusAVP) FromReader(reader io.Reader, authenticator [16]byte, secre
 		return currentIndex, nil
 
 	case RadiusTypeIPv6Prefix:
-		// Radius Type IPv6 prefix. Encoded as 1 byte padding, 1 byte prefix length, and up to 16 bytes with prefix.
+		// Encoded as 1 byte padding, 1 byte prefix length, and up to 16 bytes with prefix.
 		var dummy byte
 		var prefixLen byte
 		address := make([]byte, 16)
-		payloadAddress := address[:payloadLen-2] // The bytes really in the AVP could be less
+		// The bytes really in the AVP could be less, and payload not be 18
+		// Input is written here, which points to part of the address
+		payloadAddress := address[:payloadLen-2]
 		if err := binary.Read(payloadReader, binary.BigEndian, &dummy); err != nil {
 			return currentIndex, err
 		}
@@ -584,7 +595,7 @@ func (avp *RadiusAVP) ToWriter(writer io.Writer, authenticator [16]byte, secret 
 	if !written {
 		var octetsValue []byte = encryptBuffer.Bytes()
 
-		// Write internal length if so required
+		// Prepend internal length if so required
 		if avp.DictItem.WithLen {
 			octetsValue = append([]byte{byte(len(octetsValue))}, octetsValue...)
 		}
@@ -614,10 +625,9 @@ func (avp *RadiusAVP) ToWriter(writer io.Writer, authenticator [16]byte, secret 
 
 // Reads a Radius AVP from a buffer
 func RadiusAVPFromBytes(inputBytes []byte, authenticator [16]byte, secret string) (RadiusAVP, uint32, error) {
-	r := bytes.NewReader(inputBytes)
 
 	avp := RadiusAVP{}
-	n, err := avp.FromReader(r, authenticator, secret)
+	n, err := avp.FromReader(bytes.NewReader(inputBytes), authenticator, secret)
 	return avp, uint32(n), err
 }
 
@@ -684,6 +694,7 @@ func (avp *RadiusAVP) Len() int {
 	// Add the Tag byte. The tag is not encrypted and subject to %16 payload size
 	if avp.DictItem.Tagged {
 		// If intetger, consumes from the payload (i.e., the integer is 3 bytes only)
+		// God knows why
 		if avp.DictItem.RadiusType != RadiusTypeInteger {
 			dataSize += 1
 		}
@@ -867,11 +878,11 @@ func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 				return &RadiusAVP{}, fmt.Errorf("could not decode %s as hex string", value)
 			}
 		} else {
-			var octetsValue, ok = value.([]byte)
-			if !ok {
+			if octetsValue, ok := value.([]byte); ok {
+				avp.Value = octetsValue
+			} else {
 				return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T: %s", avp.DictItem.RadiusType, value, value)
 			}
-			avp.Value = octetsValue
 		}
 
 	case RadiusTypeInteger, RadiusTypeInteger64:
@@ -900,7 +911,6 @@ func NewRadiusAVP(name string, value interface{}) (*RadiusAVP, error) {
 		} else {
 			// If here, the attribute cannot be tagged (isString would be true)
 			avp.Value = fmt.Sprintf("%v", value)
-			// TODO: remove --> return &RadiusAVP{}, fmt.Errorf("error creating radius avp with type %d and value of type %T: %s", avp.DictItem.RadiusType, value, value)
 		}
 
 	case RadiusTypeAddress, RadiusTypeIPv6Address:
